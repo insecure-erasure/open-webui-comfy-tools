@@ -1,0 +1,172 @@
+{
+  "41": {
+    "inputs": {
+      "width": [
+        "69",
+        0
+      ],
+      "height": [
+        "69",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "42": {
+    "inputs": {
+      "stop_at_clip_layer": -2,
+      "clip": [
+        "68",
+        0
+      ]
+    },
+    "class_type": "CLIPSetLastLayer",
+    "_meta": {
+      "title": "CLIP Set Last Layer"
+    }
+  },
+  "43": {
+    "inputs": {
+      "conditioning": [
+        "63",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ZeroOut"
+    }
+  },
+  "51": {
+    "inputs": {
+      "vae_name": "Z-Image_natural_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "52": {
+    "inputs": {
+      "samples": [
+        "66",
+        0
+      ],
+      "vae": [
+        "51",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "58": {
+    "inputs": {
+      "unet_name": "zImageTurbo-p60-refiners-nvfp4.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "61": {
+    "inputs": {
+      "images": [
+        "52",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "63": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "66": {
+    "inputs": {
+      "seed": 823340200148900,
+      "steps": 10,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "58",
+        0
+      ],
+      "positive": [
+        "63",
+        0
+      ],
+      "negative": [
+        "43",
+        0
+      ],
+      "latent_image": [
+        "41",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "68": {
+    "inputs": {
+      "clip_name": "qwen3_4b_instruct_2507_mxfp8.safetensors",
+      "type": "stable_diffusion",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "69": {
+    "inputs": {
+      "megapixel": "1.0",
+      "aspect_ratio": "2:3 (Classic Portrait)",
+      "divisible_by": "64",
+      "custom_ratio": true,
+      "custom_aspect_ratio": [
+        "84",
+        0
+      ]
+    },
+    "class_type": "FluxResolutionNode",
+    "_meta": {
+      "title": "Flux Resolution Calc"
+    }
+  },
+  "84": {
+    "inputs": {
+      "string_a": "3",
+      "string_b": "2",
+      "delimiter": ":"
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Aspect ratio"
+    }
+  }
+}

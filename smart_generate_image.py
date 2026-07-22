@@ -2,11 +2,12 @@
 title: Smart Generate Image
 author: A. Martin
 description: Generate images through ComfyUI with seed, model, size, and steps control
-version: 2.3
+version: 2.4
 """
 
 import logging
 import math
+import random as _random
 from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
@@ -141,10 +142,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     if engine != "comfyui":
         return await _original_image_generations(request, form_data, metadata, user)
 
-    # =========================================================================
-    # LAYER 1 - Admin defaults
-    # =========================================================================
-    log.info("ComfyUI image generation requested - resolving Layer 1 defaults")
+    log.info("Image generation requested")
 
     size = "512x512"
     if image_config.IMAGE_SIZE and "x" in image_config.IMAGE_SIZE:
@@ -156,28 +154,24 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     gcd = math.gcd(width, height)
     reduced_w = width // gcd
     reduced_h = height // gcd
-    log.info(
-        "Dimensions resolved: %s -> gcd=%d -> %dx%d",
-        size,
-        gcd,
-        reduced_w,
-        reduced_h,
-    )
 
     admin_default_model = await images_router.get_image_model(request)
     effective_model = (
         form_data.model if form_data.model is not None else admin_default_model
     )
     admin_steps = image_config.IMAGE_STEPS
+
     log.info(
-        "Model resolved: admin=%s, effective=%s | Admin steps: %s",
-        admin_default_model,
-        effective_model,
-        admin_steps if admin_steps is not None else "not set",
+        "Generating image: prompt_len=%d, size=%s, seed=%s, steps=%s, model=%s",
+        len(form_data.prompt),
+        size,
+        form_data.seed,
+        form_data.steps if form_data.steps is not None else "workflow_default",
+        effective_model or "not_set",
     )
 
     # =========================================================================
-    # LAYER 2 - Node bindings
+    # Node bindings
     # =========================================================================
     from open_webui.utils.images.comfyui import (
         ComfyUICreateImageForm,
@@ -188,13 +182,9 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     configured_node_types = {
         node["type"] for node in image_config.COMFYUI_WORKFLOW_NODES
     }
-    log.info(
-        "Layer 2 - Configured node types: %s",
-        sorted(configured_node_types),
-    )
 
     # =========================================================================
-    # LAYER 3 - Payload build
+    # Payload build
     # =========================================================================
     data = {
         "prompt": form_data.prompt,
@@ -203,59 +193,25 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         "n": 1,
     }
 
-    seed = form_data.seed if form_data.seed is not None else 0
-    data["seed"] = seed
-    if "seed" not in configured_node_types:
-        log.warning(
-            "Seed=%d was provided but no 'seed' node binding is configured. "
-            "The value will be ignored by ComfyUI.",
-            seed,
-        )
+    if form_data.seed is not None:
+        data["seed"] = form_data.seed
+        if "seed" not in configured_node_types:
+            log.warning(
+                "Seed=%d was provided but no 'seed' node binding is configured. "
+                "The value will be ignored by ComfyUI.",
+                form_data.seed,
+            )
 
     if "steps" in configured_node_types:
         if form_data.steps is not None:
             data["steps"] = form_data.steps
-            log.info("Steps overridden by LLM: %d", form_data.steps)
         elif admin_steps is not None:
             data["steps"] = admin_steps
-            log.info("Steps from admin default: %d", admin_steps)
-        else:
-            log.info(
-                "Steps node configured but no admin default set - "
-                "ComfyUI will use its workflow default"
-            )
-    else:
-        log.info("Steps omitted - no 'steps' node binding configured")
 
     if "model" in configured_node_types:
         data["model"] = effective_model
-        log.info(
-            "Model %s: %s",
-            (
-                "overridden by LLM"
-                if form_data.model is not None
-                else "from admin default"
-            ),
-            effective_model,
-        )
-    else:
-        log.info("Model omitted - no 'model' node binding configured")
 
-    log.info(
-        "Layer 3 - Payload built: prompt_len=%d, width=%s, height=%s, "
-        "seed=%d, steps=%s, model=%s",
-        len(data["prompt"]),
-        data["width"],
-        data["height"],
-        data["seed"],
-        data.get("steps", "not_sent"),
-        data.get("model", "not_sent"),
-    )
-
-    # =========================================================================
-    # LAYER 4 - ComfyUI execution (modified: no local storage)
-    # =========================================================================
-    log.info("Layer 4 - Dispatching to ComfyUI")
+    log.info("Dispatching to ComfyUI (%s)", image_config.COMFYUI_BASE_URL)
 
     cf_form = ComfyUICreateImageForm(
         **{
@@ -285,8 +241,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         log.error("ComfyUI returned no image data")
         raise RuntimeError("ComfyUI returned no image data")
 
-    log.info("ComfyUI returned %d image(s)", len(res["data"]))
-
     # No download/re-upload - return the URL directly from
     # the image generation engine using the Base URL configured
     # in Admin Panel > Settings > Images.
@@ -304,18 +258,16 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         images.append({"url": image_url})
 
     log.info(
-        "Image generation complete - %d image(s) returned directly "
-        "from ComfyUI (no local storage)",
+        "Generation complete - %d image(s) - %s",
         len(images),
+        images[0]["url"],
     )
     return images
 
 
 images_router.image_generations = patched_image_generations
 
-log.info(
-    "MONKEY PATCH 3: image_generations patched for ComfyUI " "with 4-layer hierarchy"
-)
+log.info("MONKEY PATCH 3: image_generations patched for ComfyUI")
 
 # =============================================================================
 # TOOLS CLASS
@@ -332,7 +284,7 @@ log.info(
 
 class Tools:
     """
-    Smart Generate Image - generate images through ComfyUI with control over size, steps, and seed.
+    Smart Generate Image - generate images through ComfyUI with control over size.
 
     Activate this tool from the tool selector in the chat input.
 
@@ -341,8 +293,6 @@ class Tools:
         or scene. Do not add superfluous details. Write the final prompt in English.
     size (optional): Only provide when the user explicitly requests specific
         dimensions. Format as WxH (e.g., 2000x3000).
-    seed (optional): Only provide when the user explicitly requests a
-        specific seed.
     """
 
     class Valves(BaseModel):
@@ -362,6 +312,10 @@ class Tools:
             description="Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting.",
         )
         steps: str = _STEPS_FIELD
+        seed: int = Field(
+            default=-1,
+            description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
+        )
 
     def __init__(self):
         self.valves = self.Valves()
@@ -371,7 +325,6 @@ class Tools:
         self,
         prompt: str,
         size: str | None = None,
-        seed: int = 0,
         __request__=None,
         __user__=None,
         __event_emitter__=None,
@@ -379,15 +332,13 @@ class Tools:
         __message_id__=None,
     ):
         """
-        Generate one image with optional control over size and seed.
+        Generate one image with optional control over size.
 
         prompt: Image generation prompt. Translate the user's request into English internally,
             then enrich with visual details without changing the subject or scene. Do not add
             superfluous details. Write the final prompt in English.
         size (optional): Only provide when the user explicitly requests specific
             dimensions. Format as WxH (e.g., 2000x3000).
-        seed (optional): Only provide when the user explicitly
-            requests a specific seed.
         """
         if __request__ is None:
             log.error("generate_image_pro called without request context")
@@ -398,62 +349,57 @@ class Tools:
 
             user = UserModel(**__user__) if __user__ else None
 
-            # Resolve model: UserValves > Valves > Admin UI default
+            # Resolve model: UserValves > AdminValves > Admin UI default
             user_valves = (__user__ or {}).get('valves', None)
             user_model = (
                 user_valves.model_name if user_valves and user_valves.model_name else ""
             )
             resolved_model = user_model or self.valves.model_name or None
 
-            # Resolve steps: UserValves > AdminValves > Sistema > workflow default
+            # Resolve steps: UserValves > AdminValves > Admin UI > workflow default
             # All clamped against IMAGE_STEPS if set, or 15 as safety ceiling.
             from open_webui.routers.images import get_image_config
 
             image_config = await get_image_config()
             admin_steps_config = image_config.IMAGE_STEPS
-            techo = 15 if admin_steps_config is None or admin_steps_config <= 0 else admin_steps_config
+            ceiling = 15 if admin_steps_config is None or admin_steps_config <= 0 else admin_steps_config
 
             user_valve_steps = int(user_valves.steps) if user_valves and user_valves.steps and user_valves.steps != "0" else 0
             admin_valve_steps = int(self.valves.steps) if self.valves.steps and self.valves.steps != "0" else 0
 
             resolved_steps = None
             if user_valve_steps > 0:
-                resolved_steps = min(user_valve_steps, techo)
+                resolved_steps = min(user_valve_steps, ceiling)
                 if resolved_steps < user_valve_steps and __event_emitter__:
                     await __event_emitter__(
                         {
                             "type": "notification",
                             "data": {
                                 "type": "warning",
-                                "content": f"\u26a0\ufe0f Steps clamped to {techo} (system limit).",
+                                "content": f"\u26a0\ufe0f Steps clamped to {ceiling} (system limit).",
                             },
                         }
                     )
             elif admin_valve_steps > 0:
-                resolved_steps = min(admin_valve_steps, techo)
+                resolved_steps = min(admin_valve_steps, ceiling)
                 if resolved_steps < admin_valve_steps and __event_emitter__:
                     await __event_emitter__(
                         {
                             "type": "notification",
                             "data": {
                                 "type": "warning",
-                                "content": f"\u26a0\ufe0f Steps clamped to {techo} (system limit).",
+                                "content": f"\u26a0\ufe0f Steps clamped to {ceiling} (system limit).",
                             },
                         }
                     )
             elif admin_steps_config is not None and admin_steps_config > 0:
                 resolved_steps = admin_steps_config
 
+            # Resolve seed: UserValve. -1 = generate random, >=0 = fixed.
+            user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
+            seed_arg = _random.randint(0, 0xFFFFFFFFFFFFFFFF) if user_seed == -1 else user_seed
+
             steps_label = str(resolved_steps) if resolved_steps else "workflow default"
-            log.info(
-                "generate_image_pro called - prompt_len=%d, "
-                "size=%s, steps=%s, seed=%d, model=%s",
-                len(prompt),
-                size,
-                resolved_steps or "workflow_default",
-                seed,
-                resolved_model or "admin_default",
-            )
 
             if __event_emitter__:
                 await __event_emitter__(
@@ -474,7 +420,7 @@ class Tools:
                     model=resolved_model,
                     size=size,
                     steps=resolved_steps,
-                    seed=seed,
+                    seed=seed_arg,
                 ),
                 user=user,
             )
@@ -492,8 +438,6 @@ class Tools:
                 )
 
             image_url = images[0]["url"] if images else None
-
-            log.info("Image generated - url=%s", image_url)
 
             return f"Image generated successfully.\n\nDisplay the image in your response like this:\n![Generated image]({image_url})"
 

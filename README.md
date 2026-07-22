@@ -1,6 +1,6 @@
 # Smart Generate Image
 
-Open WebUI tool for AI image generation through ComfyUI -- with seed and size control, configurable model and steps via Valves.
+Open WebUI tool for AI image generation through ComfyUI -- with size control, configurable model, steps and seed via Valves.
 
 > **Compatible with:** Open WebUI + ComfyUI
 
@@ -16,15 +16,14 @@ It is installed as a regular user tool in **Workspace -> Tools**. It does not re
 
 ## Tool parameters
 
-The tool exposes three parameters to the LLM:
+The tool exposes two parameters to the LLM:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | prompt | string | Image description. The LLM translates to English and enriches with visual details. |
 | size | string (optional) | Dimensions as WxH (e.g. 2000x3000). Falls back to Admin UI config if omitted. |
-| seed | int (optional) | Random seed (default 0). Same prompt + same seed = same image. Ignored by non-ComfyUI engines. |
 
-Model and steps are not tool parameters -- they are configured via Valves.
+Model, steps, and seed are configured via Valves.
 
 ---
 
@@ -47,12 +46,15 @@ Configurable by end users from the chat interface.
 |-------|------|---------|-------------|
 | model_name | string | "" | Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting. |
 | steps | dropdown | 0 (Inherit) | Inference steps (1-15, descending). 0 = inherit from admin valve or Admin UI setting. |
+| seed | int | -1 | Seed. -1 = random, >=0 = fixed seed for reproducibility. |
 
 ### Precedence
 
 **Model resolution:** UserValves > AdminValves > Admin UI (get_image_model) > None
 
 **Steps resolution:** UserValves > AdminValves > Admin UI (IMAGE_STEPS) > workflow default
+
+**Seed resolution:** UserValve. -1 = random (auto-generated), >=0 = fixed.
 
 Both UserValves and AdminValves are clamped against the Admin UI IMAGE_STEPS ceiling (or 15 as safety fallback). When clamping occurs, a warning toast is shown to the user.
 
@@ -100,15 +102,12 @@ Ask the AI to create an image naturally:
 > *"Generate an image of a cat wearing a spacesuit on Mars"*
 >
 > *"Create a 1920x1080 landscape of a cyberpunk city at night"*
->
-> *"Make another one like the previous image but with a different seed"*
 
 Optional details the AI can handle:
 
 - **Size**: "... at 2000x3000"
-- **Seed**: "... with seed 42"
 
-Model and steps are controlled via Valves and Admin UI settings, not from the chat prompt.
+Model, steps, and seed are controlled via Valves and Admin UI settings, not from the chat prompt.
 
 ---
 
