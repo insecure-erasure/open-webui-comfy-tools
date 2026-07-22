@@ -79,7 +79,7 @@
   "61": {
     "inputs": {
       "images": [
-        "52",
+        "420:412",
         0
       ]
     },
@@ -103,7 +103,7 @@
   },
   "66": {
     "inputs": {
-      "seed": 823340200148900,
+      "seed": 0,
       "steps": 10,
       "cfg": 1,
       "sampler_name": "euler",
@@ -134,7 +134,7 @@
   "68": {
     "inputs": {
       "clip_name": "qwen3_4b_instruct_2507_mxfp8.safetensors",
-      "type": "stable_diffusion",
+      "type": "lumina2",
       "device": "default"
     },
     "class_type": "CLIPLoader",
@@ -160,13 +160,97 @@
   },
   "84": {
     "inputs": {
-      "string_a": "3",
-      "string_b": "2",
+      "string_a": "",
+      "string_b": "",
       "delimiter": ":"
     },
     "class_type": "StringConcatenate",
     "_meta": {
       "title": "Aspect ratio"
     }
+  },
+  "420:409": {
+    "inputs": {
+      "model": "seedvr2_ema_7b-Q4_K_M.gguf",
+      "device": "cuda:0",
+      "blocks_to_swap": 36,
+      "swap_io_components": false,
+      "offload_device": "cpu",
+      "cache_model": false,
+      "attention_mode": "sdpa"
+    },
+    "class_type": "SeedVR2LoadDiTModel",
+    "_meta": {
+      "title": "SeedVR2 (Down)Load DiT Model"
+    }
+  },
+  "420:410": {
+    "inputs": {
+      "model": "ema_vae_fp16.safetensors",
+      "device": "cuda:0",
+      "encode_tiled": true,
+      "encode_tile_size": 1024,
+      "encode_tile_overlap": 128,
+      "decode_tiled": true,
+      "decode_tile_size": 1024,
+      "decode_tile_overlap": 128,
+      "tile_debug": "false",
+      "offload_device": "none",
+      "cache_model": false
+    },
+    "class_type": "SeedVR2LoadVAEModel",
+    "_meta": {
+      "title": "SeedVR2 (Down)Load VAE Model"
+    }
+  },
+  "420:412": {
+    "inputs": {
+      "blend_factor": 0.15,
+      "blend_mode": "normal",
+      "image1": [
+        "420:411",
+        0
+      ],
+      "image2": [
+        "52",
+        0
+      ]
+    },
+    "class_type": "ImageBlend",
+    "_meta": {
+      "title": "Image Blend"
+    }
+  },
+  "420:411": {
+    "inputs": {
+      "seed": 0,
+      "resolution": 2048,
+      "max_resolution": 2048,
+      "batch_size": 1,
+      "uniform_batch_size": false,
+      "color_correction": "lab",
+      "temporal_overlap": 0,
+      "prepend_frames": 0,
+      "input_noise_scale": 0.01,
+      "latent_noise_scale": 0,
+      "offload_device": "cpu",
+      "enable_debug": false,
+      "image": [
+        "52",
+        0
+      ],
+      "dit": [
+        "420:409",
+        0
+      ],
+      "vae": [
+        "420:410",
+        0
+      ]
+    },
+    "class_type": "SeedVR2VideoUpscaler",
+    "_meta": {
+      "title": "SeedVR2 Video Upscaler (v2.5.24)"
+    }
   }
-}
+} 
