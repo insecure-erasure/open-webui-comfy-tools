@@ -5,9 +5,12 @@ description: Generate images through ComfyUI with seed, model, size, and steps c
 version: 2.4
 """
 
+import asyncio
 import logging
 import math
 import random as _random
+
+import httpx
 from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
@@ -233,6 +236,18 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
             image_config.COMFYUI_BASE_URL,
             image_config.COMFYUI_API_KEY,
         )
+    except asyncio.CancelledError:
+        log.info("Image generation cancelled by user — interrupting ComfyUI")
+        try:
+            interrupt_url = f"{image_config.COMFYUI_BASE_URL.rstrip('/')}/interrupt"
+            headers = {}
+            if image_config.COMFYUI_API_KEY:
+                headers["Authorization"] = f"Bearer {image_config.COMFYUI_API_KEY}"
+            async with httpx.AsyncClient() as client:
+                await client.post(interrupt_url, headers=headers, timeout=5)
+        except Exception:
+            log.warning("Failed to interrupt ComfyUI", exc_info=True)
+        raise
     except Exception as e:
         log.error("ComfyUI image generation failed: %s", e)
         raise
@@ -441,6 +456,20 @@ class Tools:
 
             return f"Image generated successfully.\n\nDisplay the image in your response like this:\n![Generated image]({image_url})"
 
+        except asyncio.CancelledError:
+            log.info("generate_image_pro cancelled by user")
+            if __event_emitter__:
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {
+                            "description": "\u2753 Image generation cancelled.",
+                            "done": True,
+                            "hidden": False,
+                        },
+                    }
+                )
+            return "Image generation cancelled."
         except Exception as e:
             log.exception("generate_image_pro failed: %s", e)
             return f"Error generating image: {e}"
