@@ -314,15 +314,13 @@ log.info(
 
 class Tools:
     """
-    Smart Generate Image - generate images through ComfyUI with full control over seed, model, size, and steps.
+    Smart Generate Image - generate images through ComfyUI with control over size, steps, and seed.
 
     Activate this tool from the tool selector in the chat input.
 
     prompt: Image generation prompt. Translate the user's request into English
         internally, then enrich with visual details without changing the subject
         or scene. Do not add superfluous details. Write the final prompt in English.
-    model (optional): Only provide when the user explicitly requests a
-        specific model.
     size (optional): Only provide when the user explicitly requests specific
         dimensions. Format as WxH (e.g., 2000x3000).
     steps (optional): Only provide when the user explicitly requests a
@@ -332,9 +330,20 @@ class Tools:
     """
 
     class Valves:
-        """No configuration valves needed - all settings come from Admin UI."""
+        """Admin-level configuration."""
 
-        pass
+        model_name: str = Field(
+            default="",
+            description="Model/checkpoint name. Overrides the Admin UI default. Leave empty to use the Admin UI setting.",
+        )
+
+    class UserValves:
+        """User-level configuration (overrides admin valve and Admin UI)."""
+
+        model_name: str = Field(
+            default="",
+            description="Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting.",
+        )
 
     def __init__(self):
         self.citation = False
@@ -342,7 +351,6 @@ class Tools:
     async def generate_image_pro(
         self,
         prompt: str,
-        model: str | None = None,
         size: str | None = None,
         steps: int | None = None,
         seed: int = 0,
@@ -353,13 +361,11 @@ class Tools:
         __message_id__=None,
     ):
         """
-        Generate one image with optional control over model, seed, size, and steps.
+        Generate one image with optional control over size, steps, and seed.
 
         prompt: Image generation prompt. Translate the user's request into English internally,
             then enrich with visual details without changing the subject or scene. Do not add
             superfluous details. Write the final prompt in English.
-        model (optional): Only provide when the user explicitly requests a
-            specific model.
         size (optional): Only provide when the user explicitly requests specific
             dimensions. Format as WxH (e.g., 2000x3000).
         steps (optional): Only provide when the user explicitly requests a
@@ -376,21 +382,28 @@ class Tools:
 
             user = UserModel(**__user__) if __user__ else None
 
+            # Resolve model: UserValves > Valves > Admin UI default
+            user_valves = (__user__ or {}).get('valves', None)
+            user_model = (
+                user_valves.model_name if user_valves and user_valves.model_name else ""
+            )
+            resolved_model = user_model or self.valves.model_name or None
+
             log.info(
-                "generate_image_pro called - prompt_len=%d, model=%s, "
-                "size=%s, steps=%s, seed=%d",
+                "generate_image_pro called - prompt_len=%d, "
+                "size=%s, steps=%s, seed=%d, model=%s",
                 len(prompt),
-                model,
                 size,
                 steps,
                 seed,
+                resolved_model or "admin_default",
             )
 
             images = await patched_image_generations(
                 request=__request__,
                 form_data=PatchedCreateImageForm(
                     prompt=prompt,
-                    model=model,
+                    model=resolved_model,
                     size=size,
                     steps=steps,
                     seed=seed,
