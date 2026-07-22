@@ -375,7 +375,7 @@ class Tools:
         """
         if __request__ is None:
             log.error("generate_image_pro called without request context")
-            return "Error: This tool requires an active Open WebUI chat session. Please try using the built-in image chip instead."
+            return "Error: The tool could not be initialized."
 
         try:
             from open_webui.models.users import UserModel
