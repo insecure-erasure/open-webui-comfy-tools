@@ -1,7 +1,7 @@
 """
 title: Image Generator Pro
 author: Abel
-version: 1.3
+version: 1.4
 """
 
 import json
@@ -13,10 +13,6 @@ log = logging.getLogger(__name__)
 
 # =============================================================================
 # MONKEY PATCH 1: Add seed field to CreateImageForm
-#
-# The built-in CreateImageForm does not have a seed field.
-# We subclass it to add one, then replace the original in the module so that
-# any code importing CreateImageForm gets our patched version.
 # =============================================================================
 from open_webui.routers import images as images_router
 
@@ -31,20 +27,84 @@ images_router.CreateImageForm = PatchedCreateImageForm
 images_router.GenerateImageForm = PatchedCreateImageForm
 
 # =============================================================================
-# MONKEY PATCH 2: Intercept image_generations for ComfyUI
+# MONKEY PATCH 2: Make _apply_workflow_nodes ignore None values
 #
-# We intercept calls to image_generations only when the engine is ComfyUI.
-# This allows us to:
-#   - Reduce width/height to their lowest ratio via GCD before passing
-#     them to the ComfyUI workflow (your workflow handles the actual scaling).
-#   - Inject a seed if the user explicitly provided one.
-#   - Optionally override model, steps, and negative_prompt.
+# The original function always overwrites workflow node inputs even when
+# the payload value is None. This causes the workflow to receive null for
+# fields like steps, seed, or negative_prompt when the LLM omits them.
 #
-# For any other engine (OpenAI, Gemini, AUTOMATIC1111), we delegate to the
-# original function unchanged.
-#
-# If no seed is provided, ComfyUI uses its own internal random seed — the
-# workflow default is preserved.
+# Our patched version skips assignment when the value is None, preserving
+# whatever default the exported workflow JSON has.
+# =============================================================================
+from open_webui.utils.images import comfyui as comfyui_module
+
+_original_apply_nodes = comfyui_module._apply_workflow_nodes
+
+
+def patched_apply_workflow_nodes(workflow, nodes, model, payload):
+    """Like the original, but skips assignment when the payload value is None."""
+    for node in nodes:
+        if node.type:
+            if node.type == 'model':
+                if model is not None:
+                    for node_id in node.node_ids:
+                        workflow[node_id]['inputs'][node.key] = model
+
+            elif node.type == 'prompt':
+                if payload.prompt is not None:
+                    for node_id in node.node_ids:
+                        workflow[node_id]['inputs'][node.key if node.key else 'text'] = payload.prompt
+
+            elif node.type == 'negative_prompt':
+                if payload.negative_prompt is not None:
+                    for node_id in node.node_ids:
+                        workflow[node_id]['inputs'][node.key if node.key else 'text'] = payload.negative_prompt
+
+            elif node.type == 'image':
+                if payload.image is not None:
+                    if isinstance(payload.image, list):
+                        for idx, node_id in enumerate(node.node_ids):
+                            if idx < len(payload.image):
+                                workflow[node_id]['inputs'][node.key] = payload.image[idx]
+                    else:
+                        for node_id in node.node_ids:
+                            workflow[node_id]['inputs'][node.key] = payload.image
+
+            elif node.type == 'width':
+                if payload.width is not None:
+                    for node_id in node.node_ids:
+                        workflow[node_id]['inputs'][node.key if node.key else 'width'] = payload.width
+
+            elif node.type == 'height':
+                if payload.height is not None:
+                    for node_id in node.node_ids:
+                        workflow[node_id]['inputs'][node.key if node.key else 'height'] = payload.height
+
+            elif node.type == 'n':
+                if payload.n is not None:
+                    for node_id in node.node_ids:
+                        workflow[node_id]['inputs'][node.key if node.key else 'batch_size'] = payload.n
+
+            elif node.type == 'steps':
+                if payload.steps is not None:
+                    for node_id in node.node_ids:
+                        workflow[node_id]['inputs'][node.key if node.key else 'steps'] = payload.steps
+
+            elif node.type == 'seed':
+                if payload.seed is not None:
+                    for node_id in node.node_ids:
+                        workflow[node_id]['inputs'][node.key] = payload.seed
+
+            else:
+                if node.value is not None:
+                    for node_id in node.node_ids:
+                        workflow[node_id]['inputs'][node.key] = node.value
+
+
+comfyui_module._apply_workflow_nodes = patched_apply_workflow_nodes
+
+# =============================================================================
+# MONKEY PATCH 3: Intercept image_generations for ComfyUI
 # =============================================================================
 _original_image_generations = images_router.image_generations
 
@@ -56,7 +116,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     image_config = await get_image_config()
     engine = image_config.IMAGE_GENERATION_ENGINE
 
-    # Only ComfyUI needs special handling (GCD reduction, optional seed)
     if engine == "comfyui":
         from open_webui.routers.images import (
             get_image_model,
@@ -78,7 +137,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         width, height = tuple(map(int, size.split("x")))
 
         # Reduce dimensions to their lowest ratio via GCD
-        # e.g. 2000x3000 → gcd=1000 → 2x3
         gcd = math.gcd(width, height)
         width //= gcd
         height //= gcd
@@ -86,8 +144,9 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         metadata = metadata or {}
         model = await get_image_model(request)
 
-        # Build the payload — only include fields the user explicitly provided.
-        # Everything else falls back to the ComfyUI workflow defaults.
+        # Build payload — only include fields the user explicitly provided.
+        # None values are omitted so the patched _apply_workflow_nodes
+        # preserves the workflow defaults.
         data = {
             "prompt": form_data.prompt,
             "width": width,
@@ -95,17 +154,13 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
             "n": 1,
         }
 
-        # Seed: only inject if explicitly provided; otherwise ComfyUI randomizes
         seed = getattr(form_data, "seed", None)
         if seed is not None:
             data["seed"] = seed
-        # Steps: only if explicitly provided; otherwise workflow default
         if form_data.steps is not None:
             data["steps"] = form_data.steps
-        # Negative prompt: only if explicitly provided; otherwise workflow default
         if form_data.negative_prompt is not None:
             data["negative_prompt"] = form_data.negative_prompt
-        # Model: only if explicitly provided; otherwise admin config default
         if form_data.model is not None:
             data["model"] = form_data.model
 
@@ -155,11 +210,6 @@ images_router.image_generations = patched_image_generations
 
 # =============================================================================
 # TOOL EXPOSED TO THE LLM
-#
-# This is the function the LLM calls via native tool calling.
-# It respects the tool selector (⚙️) in the chat — activate/deactivate
-# Image Generator Pro from there. The chip (📷) controls the built-in
-# generate_image and is intentionally kept independent.
 # =============================================================================
 async def generate_image_pro(
     prompt: str,
@@ -180,12 +230,10 @@ async def generate_image_pro(
 
     Works with any engine configured in Open WebUI.
     For ComfyUI:
-      - Dimensions are reduced to their lowest ratio (GCD) before sending,
-        so "2000x3000" becomes 2x3. Your workflow handles the actual scaling.
+      - Dimensions are reduced to their lowest ratio (GCD) before sending.
       - All parameters default to what the ComfyUI workflow defines.
         Only override them when explicitly passed.
-      - Seed requires a "seed" node configured in your workflow nodes
-        (Admin Settings → Image Generation → ComfyUI Workflow Nodes).
+      - Seed requires a "seed" node configured in your workflow nodes.
 
     Activate this tool from the tool selector (⚙️) in the chat input.
     The image generation chip (📷) controls the built-in generate_image
@@ -198,9 +246,8 @@ async def generate_image_pro(
     :param steps: Inference steps. Falls back to ComfyUI workflow default if omitted.
     :param seed: Random seed for reproducibility. Same seed + same prompt =
         same image every time. Falls back to ComfyUI internal random if omitted.
-        Ignored by OpenAI/Gemini (they don't support seed).
-    :param negative_prompt: What to avoid in the image. Falls back to ComfyUI
-        workflow default if omitted.
+        Ignored by OpenAI/Gemini.
+    :param negative_prompt: What to avoid. Falls back to ComfyUI workflow default if omitted.
     :return: JSON with status and success confirmation
     """
     if __request__ is None:
