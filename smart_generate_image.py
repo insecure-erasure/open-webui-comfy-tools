@@ -5,7 +5,6 @@ description: Generate images through ComfyUI with seed, model, size, and steps c
 version: 2.2
 """
 
-import json
 import logging
 import math
 from pydantic import BaseModel, Field
@@ -379,7 +378,7 @@ class Tools:
         """
         if __request__ is None:
             log.error("generate_image_pro called without request context")
-            return json.dumps({"error": "Request context not available"})
+            return "Error: Request context not available"
 
         try:
             from open_webui.models.users import UserModel
@@ -415,15 +414,8 @@ class Tools:
 
             log.info("Image generated — url=%s", image_url)
 
-            return json.dumps(
-                {
-                    "status": "success",
-                    "message": f"Image generated. Display it in your response as: ![Generated image]({image_url})",
-                    "image_url": image_url,
-                },
-                ensure_ascii=False,
-            )
+            return f"Image generated successfully.\n\n![Generated image]({image_url})"
 
         except Exception as e:
             log.exception("generate_image_pro failed: %s", e)
-            return json.dumps({"error": str(e)})
+            return f"Error generating image: {e}"
