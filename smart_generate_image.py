@@ -478,6 +478,7 @@ class Tools:
             elif admin_steps_config is not None and admin_steps_config > 0:
                 resolved_steps = admin_steps_config
 
+            steps_label = str(resolved_steps) if resolved_steps else "workflow default"
             log.info(
                 "generate_image_pro called - prompt_len=%d, "
                 "size=%s, steps=%s, seed=%d, model=%s",
@@ -487,6 +488,18 @@ class Tools:
                 seed,
                 resolved_model or "admin_default",
             )
+
+            if __event_emitter__:
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {
+                            "description": f"Generating image with {steps_label} steps...",
+                            "done": False,
+                            "hidden": False,
+                        },
+                    }
+                )
 
             images = await patched_image_generations(
                 request=__request__,
@@ -500,9 +513,18 @@ class Tools:
                 user=user,
             )
 
-            # Image is not emitted via event emitter and not persisted
-            # to chat history. The LLM receives the URL and renders it
-            # as markdown in its text response.
+            if __event_emitter__:
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {
+                            "description": "Image generated.",
+                            "done": True,
+                            "hidden": False,
+                        },
+                    }
+                )
+
             image_url = images[0]["url"] if images else None
 
             log.info("Image generated - url=%s", image_url)
