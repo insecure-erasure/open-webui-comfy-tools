@@ -469,7 +469,7 @@ class Tools:
                         },
                     }
                 )
-            return "Image generation cancelled."
+            return "Image generation cancelled by user. Stop further generations and answer the user."
         except Exception as e:
             log.exception("generate_image_pro failed: %s", e)
             return f"Error generating image: {e}"
