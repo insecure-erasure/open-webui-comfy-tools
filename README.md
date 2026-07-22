@@ -12,7 +12,7 @@ When you ask your AI assistant to generate an image, **Smart Generate Image** ta
 
 Smart Generate Image is installed as a **regular user tool** in **Workspace -> Tools**. It is not a model capability or a builtin tool -- you do not need to enable **Image Generation** in the model's settings or activate it as a builtin tool. The tool simply needs to be enabled in the chat's tool selector.
 
-It uses the image generation settings you configure in **Admin -> Settings -> Images**, as long as **Image Generation Engine** is set to **ComfyUI**. Everything else (Base URL, workflow, nodes, defaults) comes from that same configuration panel.
+It uses the image generation settings you configure in **Admin Panel -> Settings -> Images**, as long as **Image Generation Engine** is set to **ComfyUI**. Everything else (Base URL, workflow, nodes, defaults) comes from that same configuration panel.
 
 ### Key features
 
@@ -54,7 +54,7 @@ When **Native Tool Calling** is enabled, the AI will prefer Smart Generate Image
 
 ## Configuration
 
-Everything is configured through the **Open WebUI Admin panel -> Settings -> Images**:
+Everything is configured through the **Admin Panel -> Settings -> Images**:
 
 - **Image Generation Engine** -- Set to **ComfyUI**.
 - **ComfyUI Base URL** -- The address of your ComfyUI server (must be reachable from your browser).
@@ -102,8 +102,8 @@ You can also be more specific:
 - Open WebUI (any recent version with Tools support)
 - ComfyUI server running and accessible
 - Native Tool Calling enabled in Open WebUI settings
-- A ComfyUI workflow exported and configured in Admin -> Images
-- **Image Generation Engine** set to **ComfyUI** in Admin -> Settings -> Images
+- A ComfyUI workflow exported and configured in **Admin Panel -> Settings -> Images**
+- **Image Generation Engine** set to **ComfyUI** in **Admin Panel -> Settings -> Images**
 - **Image Generation** does NOT need to be enabled as a model capability or builtin tool
 
 ---
@@ -114,6 +114,6 @@ You can also be more specific:
 A: Make sure your `ComfyUI Base URL` is accessible from your browser. The image is served directly from ComfyUI, not stored locally.
 
 **Q: Seed doesn't seem to do anything.**  
-A: Your workflow needs a "seed" node configured in **Admin -> Images -> ComfyUI Workflow Nodes**. Without it, the seed value is ignored and ComfyUI uses its own random seed.
+A: Your workflow needs a "seed" node configured in **Admin Panel -> Settings -> Images -> ComfyUI Workflow Nodes**. Without it, the seed value is ignored and ComfyUI uses its own random seed.
 
 
