@@ -1,7 +1,8 @@
 """
-title: Image Generator Pro
+title: Smart Generate Image
 author: Abel
-version: 2.1 — No local storage mode
+description: Generate images through ComfyUI with seed, model, size, and steps control
+version: 2.2
 """
 
 import json
@@ -309,7 +310,7 @@ log.info(
 # TOOLS CLASS
 #
 # The chip (📷) controls the built-in generate_image independently from this
-# tool. Activate or deactivate Image Generator Pro from the tool selector
+# Activate or deactivate Smart Generate Image from the tool selector
 # (⚙️) in the chat input.
 #
 # Images are NOT emitted via event emitter and NOT persisted to chat history.
@@ -320,7 +321,7 @@ log.info(
 
 class Tools:
     """
-    Image Generator Pro — full control over seed, model, size, and steps.
+    Smart Generate Image — generate images through ComfyUI with full control over seed, model, size, and steps.
 
     Activate this tool from the tool selector (⚙️) in the chat input.
 

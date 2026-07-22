@@ -1,4 +1,4 @@
-# Image Generator Pro
+# Smart Generate Image
 
 Open WebUI tool for AI image generation through ComfyUI -- with control over seed, model, size, and steps, directly from your chat.
 
@@ -8,7 +8,7 @@ Open WebUI tool for AI image generation through ComfyUI -- with control over see
 
 ## Overview
 
-When you ask your AI assistant to generate an image, **Image Generator Pro** takes over and sends your request straight to ComfyUI. The image appears right in the chat conversation -- no extra clicks, no separate tools.
+When you ask your AI assistant to generate an image, **Smart Generate Image** takes over and sends your request straight to ComfyUI. The image appears right in the chat conversation -- no extra clicks, no separate tools.
 
 ### Key features
 
@@ -24,7 +24,7 @@ When you ask your AI assistant to generate an image, **Image Generator Pro** tak
 
 Open WebUI has two image generation tools available to the AI:
 
-| Feature | Native `generate_image` | Image Generator Pro |
+| Feature | Native `generate_image` | Smart Generate Image |
 |---------|------------------------|---------------------|
 | **Trigger** | Click the image chip in the chat input | The AI calls it automatically when you ask for an image |
 | **Seed control** | Not available | Yes -- reproducible images |
@@ -32,7 +32,7 @@ Open WebUI has two image generation tools available to the AI:
 | **Aspect ratio** | Fixed or admin-set | Smart GCD conversion |
 | **Steps override** | Admin default only | Override per request |
 
-When **Native Tool Calling** is enabled in Open WebUI, the built-in image generation function (`generate_image`) is available to the AI alongside Image Generator Pro. The AI will decide which one to use based on your request -- if you need seed, model, or steps control, it will use Image Generator Pro. For simple requests, it may use the native `generate_image`.
+When **Native Tool Calling** is enabled in Open WebUI, the built-in image generation function (`generate_image`) is available to the AI alongside Smart Generate Image. The AI will decide which one to use based on your request -- if you need seed, model, or steps control, it will use Smart Generate Image. For simple requests, it may use the native `generate_image`.
 
 > **Note:** The native chip in the chat input still works independently. You can keep both tools enabled.
 
@@ -43,8 +43,8 @@ When **Native Tool Calling** is enabled in Open WebUI, the built-in image genera
 1. In Open WebUI, go to **Workspace -> Tools**.
 2. Click **"+"** to create a new tool.
 3. Paste the contents of `smart_generate_image.py`.
-4. Save it with the title **"Image Generator Pro"**.
-5. Go to any chat, open the tool selector, and enable **Image Generator Pro**.
+4. Save it with the title **"Smart Generate Image"**.
+5. Go to any chat, open the tool selector, and enable **Smart Generate Image**.
 
 ---
 
