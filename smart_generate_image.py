@@ -334,29 +334,29 @@ class Tools:
             default="",
             description="Model/checkpoint name. Overrides the Admin UI default. Leave empty to use the Admin UI setting.",
         )
-        steps: int = Field(
-            default=0,
+        steps: str = Field(
+            default="0",
             description="Inference steps. 0 = inherit from Admin UI or use workflow default.",
             json_schema_extra={
                 "input": {
                     "type": "select",
                     "options": [
-                        {"value": 0, "label": "Inherit (Admin UI / workflow default)"},
-                        {"value": 15, "label": "15"},
-                        {"value": 14, "label": "14"},
-                        {"value": 13, "label": "13"},
-                        {"value": 12, "label": "12"},
-                        {"value": 11, "label": "11"},
-                        {"value": 10, "label": "10"},
-                        {"value": 9, "label": "9"},
-                        {"value": 8, "label": "8"},
-                        {"value": 7, "label": "7"},
-                        {"value": 6, "label": "6"},
-                        {"value": 5, "label": "5"},
-                        {"value": 4, "label": "4"},
-                        {"value": 3, "label": "3"},
-                        {"value": 2, "label": "2"},
-                        {"value": 1, "label": "1"},
+                        {"value": "0", "label": "Inherit (Admin UI / workflow default)"},
+                        {"value": "15", "label": "15"},
+                        {"value": "14", "label": "14"},
+                        {"value": "13", "label": "13"},
+                        {"value": "12", "label": "12"},
+                        {"value": "11", "label": "11"},
+                        {"value": "10", "label": "10"},
+                        {"value": "9", "label": "9"},
+                        {"value": "8", "label": "8"},
+                        {"value": "7", "label": "7"},
+                        {"value": "6", "label": "6"},
+                        {"value": "5", "label": "5"},
+                        {"value": "4", "label": "4"},
+                        {"value": "3", "label": "3"},
+                        {"value": "2", "label": "2"},
+                        {"value": "1", "label": "1"},
                     ],
                 }
             },
@@ -369,29 +369,29 @@ class Tools:
             default="",
             description="Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting.",
         )
-        steps: int = Field(
-            default=0,
+        steps: str = Field(
+            default="0",
             description="Inference steps. 0 = inherit from admin valve or Admin UI setting.",
             json_schema_extra={
                 "input": {
                     "type": "select",
                     "options": [
-                        {"value": 0, "label": "Inherit"},
-                        {"value": 15, "label": "15"},
-                        {"value": 14, "label": "14"},
-                        {"value": 13, "label": "13"},
-                        {"value": 12, "label": "12"},
-                        {"value": 11, "label": "11"},
-                        {"value": 10, "label": "10"},
-                        {"value": 9, "label": "9"},
-                        {"value": 8, "label": "8"},
-                        {"value": 7, "label": "7"},
-                        {"value": 6, "label": "6"},
-                        {"value": 5, "label": "5"},
-                        {"value": 4, "label": "4"},
-                        {"value": 3, "label": "3"},
-                        {"value": 2, "label": "2"},
-                        {"value": 1, "label": "1"},
+                        {"value": "0", "label": "Inherit"},
+                        {"value": "15", "label": "15"},
+                        {"value": "14", "label": "14"},
+                        {"value": "13", "label": "13"},
+                        {"value": "12", "label": "12"},
+                        {"value": "11", "label": "11"},
+                        {"value": "10", "label": "10"},
+                        {"value": "9", "label": "9"},
+                        {"value": "8", "label": "8"},
+                        {"value": "7", "label": "7"},
+                        {"value": "6", "label": "6"},
+                        {"value": "5", "label": "5"},
+                        {"value": "4", "label": "4"},
+                        {"value": "3", "label": "3"},
+                        {"value": "2", "label": "2"},
+                        {"value": "1", "label": "1"},
                     ],
                 }
             },
@@ -447,8 +447,8 @@ class Tools:
             admin_steps_config = image_config.IMAGE_STEPS
             techo = 15 if admin_steps_config is None or admin_steps_config <= 0 else admin_steps_config
 
-            user_valve_steps = user_valves.steps if user_valves and user_valves.steps else 0
-            admin_valve_steps = self.valves.steps if self.valves.steps else 0
+            user_valve_steps = int(user_valves.steps) if user_valves and user_valves.steps and user_valves.steps != "0" else 0
+            admin_valve_steps = int(self.valves.steps) if self.valves.steps and self.valves.steps != "0" else 0
 
             resolved_steps = None
             if user_valve_steps > 0:
