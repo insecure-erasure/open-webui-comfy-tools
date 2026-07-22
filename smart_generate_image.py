@@ -18,9 +18,9 @@ _STEPS_OPTIONS = [
 ]
 _STEPS_OPTIONS.insert(0, {"value": "0", "label": "System default"})
 
-_STEPS_FIELD = lambda label: Field(
+_STEPS_FIELD = Field(
     default="0",
-    description=f"Inference steps. Set to 0 for: {label}",
+    description="Inference steps.",
     json_schema_extra={
         "input": {
             "type": "select",
@@ -352,7 +352,7 @@ class Tools:
             default="",
             description="Model/checkpoint name. Overrides the Admin UI default. Leave empty to use the Admin UI setting.",
         )
-        steps: str = _STEPS_FIELD("inherit from Admin UI or use workflow default")
+        steps: str = _STEPS_FIELD
 
     class UserValves(BaseModel):
         """User-level configuration (overrides admin valve and Admin UI)."""
@@ -361,7 +361,7 @@ class Tools:
             default="",
             description="Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting.",
         )
-        steps: str = _STEPS_FIELD("inherit from admin valve or Admin UI setting")
+        steps: str = _STEPS_FIELD
 
     def __init__(self):
         self.valves = self.Valves()
