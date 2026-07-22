@@ -312,9 +312,9 @@ log.info(
 # tool. Activate or deactivate Image Generator Pro from the tool selector
 # (⚙️) in the chat input.
 #
-# Images are displayed via event emitter but NOT persisted to the chat
-# message history. This avoids contaminating the context for non-vision
-# models and prevents the "not vision capable" toast in the UI.
+# Images are NOT emitted via event emitter and NOT persisted to chat history.
+# The LLM receives the image URL and renders it as markdown in its response.
+# This avoids the "not vision capable" toast for non-vision models.
 # =============================================================================
 
 
@@ -408,37 +408,20 @@ class Tools:
                 user=user,
             )
 
-            image_files = [
-                {"type": "image", "url": img["url"]} for img in images
-            ]
-
-            # Images are NOT persisted to the chat history to avoid
-            # contaminating the context for non-vision models.
-            # They are only displayed via the event emitter below.
-
-            # Emit images to the UI via the event emitter
-            if __event_emitter__ and image_files:
-                await __event_emitter__(
-                    {
-                        "type": "chat:message:files",
-                        "data": {"files": image_files},
-                    }
-                )
+            # Image is not emitted via event emitter and not persisted
+            # to chat history. The LLM receives the URL and renders it
+            # as markdown in its text response.
+            image_url = images[0]["url"] if images else None
 
             log.info(
-                "Image delivered to chat — %d file(s)", len(image_files)
+                "Image generated — url=%s", image_url
             )
 
             return json.dumps(
                 {
                     "status": "success",
-                    "message": (
-                        "The image has been successfully generated and is "
-                        "already visible to the user in the chat. You do not "
-                        "need to display or embed the image again - just "
-                        "acknowledge that it has been created."
-                    ),
-                    "images": images,
+                    "message": "Image generated successfully.",
+                    "image_url": image_url,
                 },
                 ensure_ascii=False,
             )
