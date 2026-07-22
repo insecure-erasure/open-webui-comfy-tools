@@ -26,13 +26,15 @@ Open WebUI has two image generation tools available to the AI:
 
 | Feature | Native `generate_image` | Smart Generate Image |
 |---------|------------------------|---------------------|
-| **Trigger** | Click the image chip in the chat input | The AI calls it automatically when you ask for an image |
+| **Parameters** | Prompt only | Prompt, seed, model, size, steps |
 | **Seed control** | Not available | Yes -- reproducible images |
-| **Model override** | Admin default only | Ask for a specific model |
-| **Aspect ratio** | Fixed or admin-set | Smart GCD conversion |
-| **Steps override** | Admin default only | Override per request |
+| **Model override** | Not available | Ask for a specific model |
+| **Aspect ratio** | Not available | Smart GCD conversion |
+| **Steps override** | Not available | Override per request |
 
-When **Native Tool Calling** is enabled in Open WebUI, the built-in `generate_image` function is available to the AI alongside Smart Generate Image. The AI will decide which one to use based on your request -- if you need seed, model, or steps control, it will use Smart Generate Image. For simple requests without those parameters, it may use the native `generate_image`.
+The native `generate_image` function was simplified by the Open WebUI development team and now only accepts a prompt parameter -- all UI settings (model, size, steps) are ignored when called through Native Tool Calling. Smart Generate Image restores and expands that functionality.
+
+When **Native Tool Calling** is enabled, the AI will prefer Smart Generate Image whenever you ask for an image, since it provides full control over the generation process.
 
 ---
 
