@@ -1,7 +1,7 @@
 """
 title: Image Generator Pro
 author: Abel
-version: 2.0
+version: 2.1 — No local storage mode
 """
 
 import json
@@ -92,9 +92,7 @@ def patched_apply_workflow_nodes(workflow, nodes, model, payload):
                 if isinstance(payload.image, list):
                     for idx, node_id in enumerate(node.node_ids):
                         if idx < len(payload.image):
-                            workflow[node_id]["inputs"][input_key] = (
-                                payload.image[idx]
-                            )
+                            workflow[node_id]["inputs"][input_key] = payload.image[idx]
                 else:
                     for node_id in node.node_ids:
                         workflow[node_id]["inputs"][input_key] = payload.image
@@ -123,9 +121,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     engine = image_config.IMAGE_GENERATION_ENGINE
 
     if engine != "comfyui":
-        return await _original_image_generations(
-            request, form_data, metadata, user
-        )
+        return await _original_image_generations(request, form_data, metadata, user)
 
     # =========================================================================
     # LAYER 1 — Admin defaults
@@ -165,10 +161,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     # =========================================================================
     # LAYER 2 — Node bindings
     # =========================================================================
-    from open_webui.routers.images import (
-        get_image_data,
-        upload_image,
-    )
     from open_webui.utils.images.comfyui import (
         ComfyUICreateImageForm,
         ComfyUIWorkflow,
@@ -221,7 +213,11 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         data["model"] = effective_model
         log.info(
             "Model %s: %s",
-            "overridden by LLM" if form_data.model is not None else "from admin default",
+            (
+                "overridden by LLM"
+                if form_data.model is not None
+                else "from admin default"
+            ),
             effective_model,
         )
     else:
@@ -239,7 +235,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     )
 
     # =========================================================================
-    # LAYER 4 — ComfyUI execution
+    # LAYER 4 — ComfyUI execution (modified: no local storage)
     # =========================================================================
     log.info("Layer 4 — Dispatching to ComfyUI")
 
@@ -273,36 +269,40 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
 
     log.info("ComfyUI returned %d image(s)", len(res["data"]))
 
-    metadata = metadata or {}
+    # ═══════════════════════════════════════════════════════════════════════
+    # NO descargamos ni re-subimos — devolvemos la URL directamente de
+    # ComfyUI usando la Base URL configurada en Admin Panel > Settings > Images.
+    #
+    # PRERREQUISITO: COMFYUI_BASE_URL debe ser accesible desde el navegador
+    # del usuario final (o desde donde el LLM renderice la imagen).
+    #
+    # Si usas Preview Image en ComfyUI, la imagen vive en el buffer interno
+    # de ComfyUI y la URL es válida mientras el servidor no se reinicie.
+    # Para persistencia más larga, considera añadir un nodo Save Image que
+    # guarde en una carpeta servida estáticamente por nginx.
+    # ═══════════════════════════════════════════════════════════════════════
     images = []
-    headers = None
-    if image_config.COMFYUI_API_KEY:
-        headers = {"Authorization": f"Bearer {image_config.COMFYUI_API_KEY}"}
-
     for img in res["data"]:
-        img_data, ctype = await get_image_data(
-            img["url"],
-            headers,
-            trusted_base_url=image_config.COMFYUI_BASE_URL,
-        )
-        _, url = await upload_image(
-            request,
-            img_data,
-            ctype,
-            {**cf_form.model_dump(exclude_none=True), **metadata},
-            user,
-        )
-        images.append({"url": url})
+        raw_url = img["url"]
+        if raw_url.startswith("/"):
+            base = image_config.COMFYUI_BASE_URL.rstrip("/")
+            image_url = f"{base}{raw_url}"
+        else:
+            image_url = raw_url
+        images.append({"url": image_url})
 
-    log.info("Image generation complete — %d image(s) uploaded", len(images))
+    log.info(
+        "Image generation complete — %d image(s) returned directly "
+        "from ComfyUI (no local storage)",
+        len(images),
+    )
     return images
 
 
 images_router.image_generations = patched_image_generations
 
 log.info(
-    "MONKEY PATCH 3: image_generations patched for ComfyUI "
-    "with 4-layer hierarchy"
+    "MONKEY PATCH 3: image_generations patched for ComfyUI " "with 4-layer hierarchy"
 )
 
 # =============================================================================
@@ -359,7 +359,7 @@ class Tools:
         __message_id__=None,
     ):
         """
-        Generate one image with optionals control over model, seed, size, and steps.
+        Generate one image with optional control over model, seed, size, and steps.
 
         prompt: Image generation prompt. Translate the user's request into English internally,
             then enrich with visual details without changing the subject or scene. Do not add
@@ -377,12 +377,8 @@ class Tools:
         using markdown: ![Generated image](image_url)
         """
         if __request__ is None:
-            log.error(
-                "generate_image_pro called without request context"
-            )
-            return json.dumps(
-                {"error": "Request context not available"}
-            )
+            log.error("generate_image_pro called without request context")
+            return json.dumps({"error": "Request context not available"})
 
         try:
             from open_webui.models.users import UserModel
@@ -416,9 +412,7 @@ class Tools:
             # as markdown in its text response.
             image_url = images[0]["url"] if images else None
 
-            log.info(
-                "Image generated — url=%s", image_url
-            )
+            log.info("Image generated — url=%s", image_url)
 
             return json.dumps(
                 {
