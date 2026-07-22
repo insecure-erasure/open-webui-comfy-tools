@@ -1,7 +1,7 @@
 """
 title: Image Generator Pro
 author: Abel
-version: 1.1
+version: 1.0
 """
 
 import json
@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 log = logging.getLogger(__name__)
 
 # =============================================================================
-# ÚNICO MONKEY PATCH: Añadir seed a CreateImageForm
+# MONKEY PATCH 1: seed en CreateImageForm
 # =============================================================================
 from open_webui.routers import images as images_router
 
@@ -22,23 +22,85 @@ images_router.CreateImageForm = PatchedCreateImageForm
 images_router.GenerateImageForm = PatchedCreateImageForm
 
 # =============================================================================
-# WRAPER AGNÓSTICO de image_generations
-# Solo propaga seed si el form lo trae, sin saber qué engine es
+# MONKEY PATCH 2: Solo intercepta ComfyUI para inyectar seed
 # =============================================================================
 _original_image_generations = images_router.image_generations
 
 async def patched_image_generations(request, form_data, metadata=None, user=None):
-    """Toma seed del form y lo inyecta en metadata para que los engines lo recojan."""
-    metadata = metadata or {}
+    from open_webui.routers.images import get_image_config
+    import uuid
+
+    image_config = await get_image_config()
+    engine = image_config.IMAGE_GENERATION_ENGINE
     seed = getattr(form_data, 'seed', None)
-    if seed is not None:
-        metadata['seed'] = seed
+
+    # Solo si es ComfyUI y hay seed, interceptamos
+    if engine == 'comfyui' and seed is not None:
+        from open_webui.routers.images import (
+            get_image_model, get_image_data, upload_image,
+        )
+        from open_webui.utils.images.comfyui import (
+            ComfyUICreateImageForm, ComfyUIWorkflow, comfyui_create_image,
+        )
+
+        # Resolución de tamaño (respeta config de la UI)
+        size = '512x512'
+        if image_config.IMAGE_SIZE and 'x' in image_config.IMAGE_SIZE:
+            size = image_config.IMAGE_SIZE
+        if form_data.size and 'x' in form_data.size:
+            size = form_data.size
+        width, height = tuple(map(int, size.split('x')))
+
+        metadata = metadata or {}
+        model = await get_image_model(request)
+
+        # Construimos el payload como lo haría el original, pero con seed
+        data = {
+            'prompt': form_data.prompt,
+            'width': width,
+            'height': height,
+            'n': 1,
+        }
+        if image_config.IMAGE_STEPS is not None or form_data.steps is not None:
+            data['steps'] = form_data.steps if form_data.steps is not None else image_config.IMAGE_STEPS
+        if form_data.negative_prompt is not None:
+            data['negative_prompt'] = form_data.negative_prompt
+        data['seed'] = seed  # ← Única diferencia con el original
+
+        cf_form = ComfyUICreateImageForm(**{
+            'workflow': ComfyUIWorkflow(**{
+                'workflow': image_config.COMFYUI_WORKFLOW,
+                'nodes': image_config.COMFYUI_WORKFLOW_NODES,
+            }),
+            **data,
+        })
+
+        res = await comfyui_create_image(
+            model, cf_form, str(uuid.uuid4()),
+            image_config.COMFYUI_BASE_URL, image_config.COMFYUI_API_KEY,
+        )
+
+        images = []
+        headers = None
+        if image_config.COMFYUI_API_KEY:
+            headers = {'Authorization': f'Bearer {image_config.COMFYUI_API_KEY}'}
+        for img in res['data']:
+            img_data, ctype = await get_image_data(
+                img['url'], headers,
+                trusted_base_url=image_config.COMFYUI_BASE_URL,
+            )
+            _, url = await upload_image(request, img_data, ctype,
+                {**cf_form.model_dump(exclude_none=True), **metadata}, user)
+            images.append({'url': url})
+        return images
+
+    # Para cualquier otro engine (o ComfyUI sin seed), delegamos al original
     return await _original_image_generations(request, form_data, metadata, user)
 
 images_router.image_generations = patched_image_generations
 
 # =============================================================================
-# HERRAMIENTA
+# HERRAMIENTA EXPUESTA AL LLM
 # =============================================================================
 async def generate_image_pro(
     prompt: str,
@@ -53,15 +115,15 @@ async def generate_image_pro(
     __message_id__=None,
 ):
     """
-    Generate one image with optional seed, size, steps, and negative prompt.
-    Works with any image generation engine configured in Open WebUI.
+    Generate one image with optional seed and full control over parameters.
+    Respects admin-configured defaults for size, steps, and engine.
 
     :param prompt: What to generate
-    :param size: Dimensions as "WxH" (e.g., "1024x768"). Falls back to admin config.
-    :param steps: Inference steps. Falls back to admin config.
-    :param seed: Random seed for reproducibility. Same seed + same prompt = same image.
-        Leave empty or -1 for random. Requires engine support (ComfyUI, A1111).
-        Ignored by engines that don't support it (OpenAI, Gemini).
+    :param size: Dimensions as "WxH" (e.g., "1024x768"). Falls back to admin config if omitted.
+    :param steps: Inference steps. Falls back to admin config if omitted.
+    :param seed: Random seed for reproducibility. Same seed + same prompt = same image every time.
+        Works with ComfyUI (requires a "seed" node in your workflow config).
+        Ignored by OpenAI/Gemini.
     :param negative_prompt: What to avoid in the image
     :return: Success confirmation.
     """
