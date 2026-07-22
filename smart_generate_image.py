@@ -31,9 +31,7 @@ class PatchedCreateImageForm(images_router.CreateImageForm):
 images_router.CreateImageForm = PatchedCreateImageForm
 images_router.GenerateImageForm = PatchedCreateImageForm
 
-log.info(
-    "MONKEY PATCH 1: CreateImageForm patched with seed field"
-)
+log.info("MONKEY PATCH 1: CreateImageForm patched with seed field")
 
 # =============================================================================
 # MONKEY PATCH 2: Make _apply_workflow_nodes ignore None values
@@ -119,9 +117,7 @@ def patched_apply_workflow_nodes(workflow, nodes, model, payload):
 
 comfyui_module._apply_workflow_nodes = patched_apply_workflow_nodes
 
-log.info(
-    "MONKEY PATCH 2: _apply_workflow_nodes patched to ignore None values"
-)
+log.info("MONKEY PATCH 2: _apply_workflow_nodes patched to ignore None values")
 
 # =============================================================================
 # MONKEY PATCH 3: Override image_generations for ComfyUI
@@ -179,7 +175,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         reduced_h,
     )
 
-    model = await get_image_model(request)
+    model = await images_router.get_image_model(request)
     log.info("Model resolved: %s", model)
 
     # =========================================================================
@@ -329,9 +325,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         )
         images.append({"url": url})
 
-    log.info(
-        "Image generation complete — %d image(s) uploaded", len(images)
-    )
+    log.info("Image generation complete — %d image(s) uploaded", len(images))
     return images
 
 
@@ -343,29 +337,25 @@ log.info(
 )
 
 # =============================================================================
-# TOOL EXPOSED TO THE LLM
+# TOOLS CLASS
 #
-# This is the function the LLM calls via native tool calling.
-# It respects the tool selector (⚙️) in the chat — activate or deactivate
-# Image Generator Pro from there. The chip (📷) controls the built-in
-# generate_image independently.
+# The Open WebUI plugin loader requires a class named `Tools` in the module.
+# The function is defined as a method so it gets discovered as a callable tool.
+#
+# The chip (📷) controls the built-in generate_image independently from this
+# tool. Activate or deactivate Image Generator Pro from the tool selector
+# (⚙️) in the chat input.
 # =============================================================================
-async def generate_image_pro(
-    prompt: str,
-    model: str | None = None,
-    size: str | None = None,
-    steps: int | None = None,
-    seed: int = 0,
-    __request__=None,
-    __user__=None,
-    __event_emitter__=None,
-    __chat_id__=None,
-    __message_id__=None,
-):
-    """
-    Generate one image with full control over model, seed, size, and steps.
 
-    Works with any engine configured in Open WebUI.
+
+class Tools:
+    """
+    Image Generator Pro — full control over seed, model, size, and steps.
+
+    Activate this tool from the tool selector (⚙️) in the chat input.
+    The image generation chip (📷) controls the built-in generate_image
+    independently.
+
     For ComfyUI:
       - Dimensions are reduced to their lowest ratio (GCD) before sending,
         so "2000x3000" becomes 2×3. Your workflow handles scaling.
@@ -374,99 +364,122 @@ async def generate_image_pro(
         explicitly passed.
       - Parameters are only injected if a corresponding node binding
         exists in the workflow nodes configuration.
-
-    Activate this tool from the tool selector (⚙️) in the chat input.
-    The image generation chip (📷) controls the built-in generate_image
-    independently.
-
-    :param prompt: What to generate
-    :param model: Model or checkpoint override. Falls back to admin config
-        and then to the workflow default if omitted.
-    :param size: Dimensions as "WxH" (e.g., "2000x3000" → 2×3 for ComfyUI).
-        Falls back to admin config if omitted.
-    :param steps: Inference steps. Falls back to ComfyUI workflow default
-        if omitted.
-    :param seed: Random seed. Defaults to 0 (reproducible). Same seed +
-        same prompt = same image every time. Ignored by OpenAI and Gemini.
-    :return: JSON with status and success confirmation
     """
-    if __request__ is None:
-        log.error(
-            "generate_image_pro called without request context"
-        )
-        return json.dumps(
-            {"error": "Request context not available"}
-        )
 
-    try:
-        from open_webui.models.users import UserModel
-        from open_webui.models.chats import Chats
+    class Valves:
+        """No configuration valves needed — all settings come from Admin UI."""
 
-        user = UserModel(**__user__) if __user__ else None
+        pass
 
-        log.info(
-            "generate_image_pro called — prompt_len=%d, model=%s, "
-            "size=%s, steps=%s, seed=%d",
-            len(prompt),
-            model,
-            size,
-            steps,
-            seed,
-        )
+    def __init__(self):
+        self.citation = False
 
-        images = await patched_image_generations(
-            request=__request__,
-            form_data=PatchedCreateImageForm(
-                prompt=prompt,
-                model=model,
-                size=size,
-                steps=steps,
-                seed=seed,
-            ),
-            user=user,
-        )
+    async def generate_image_pro(
+        self,
+        prompt: str,
+        model: str | None = None,
+        size: str | None = None,
+        steps: int | None = None,
+        seed: int = 0,
+        __request__=None,
+        __user__=None,
+        __event_emitter__=None,
+        __chat_id__=None,
+        __message_id__=None,
+    ):
+        """
+        Generate one image with full control over model, seed, size, and steps.
 
-        image_files = [
-            {"type": "image", "url": img["url"]} for img in images
-        ]
+        Works with any engine configured in Open WebUI.
 
-        # Persist files to the chat message if context is available
-        if __chat_id__ and __message_id__ and images:
-            db_files = (
-                await Chats.add_message_files_by_id_and_message_id(
-                    __chat_id__, __message_id__, image_files
-                )
+        :param prompt: What to generate
+        :param model: Model or checkpoint override. Falls back to admin config
+            and then to the workflow default if omitted.
+        :param size: Dimensions as "WxH" (e.g., "2000x3000" → 2×3 for ComfyUI).
+            Falls back to admin config if omitted.
+        :param steps: Inference steps. Falls back to ComfyUI workflow default
+            if omitted.
+        :param seed: Random seed. Defaults to 0 (reproducible). Same seed +
+            same prompt = same image every time. Ignored by OpenAI and Gemini.
+        :return: JSON with status and success confirmation
+        """
+        if __request__ is None:
+            log.error(
+                "generate_image_pro called without request context"
             )
-            if db_files is not None:
-                image_files = db_files
-
-        # Emit images to the UI via the event emitter
-        if __event_emitter__ and image_files:
-            await __event_emitter__(
-                {
-                    "type": "chat:message:files",
-                    "data": {"files": image_files},
-                }
+            return json.dumps(
+                {"error": "Request context not available"}
             )
 
-        log.info(
-            "Image delivered to chat — %d file(s)", len(image_files)
-        )
+        try:
+            from open_webui.models.users import UserModel
+            from open_webui.models.chats import Chats
 
-        return json.dumps(
-            {
-                "status": "success",
-                "message": (
-                    "The image has been successfully generated and is "
-                    "already visible to the user in the chat. You do not "
-                    "need to display or embed the image again - just "
-                    "acknowledge that it has been created."
+            user = UserModel(**__user__) if __user__ else None
+
+            log.info(
+                "generate_image_pro called — prompt_len=%d, model=%s, "
+                "size=%s, steps=%s, seed=%d",
+                len(prompt),
+                model,
+                size,
+                steps,
+                seed,
+            )
+
+            images = await patched_image_generations(
+                request=__request__,
+                form_data=PatchedCreateImageForm(
+                    prompt=prompt,
+                    model=model,
+                    size=size,
+                    steps=steps,
+                    seed=seed,
                 ),
-                "images": images,
-            },
-            ensure_ascii=False,
-        )
+                user=user,
+            )
 
-    except Exception as e:
-        log.exception("generate_image_pro failed: %s", e)
-        return json.dumps({"error": str(e)})
+            image_files = [
+                {"type": "image", "url": img["url"]} for img in images
+            ]
+
+            # Persist files to the chat message if context is available
+            if __chat_id__ and __message_id__ and images:
+                db_files = (
+                    await Chats.add_message_files_by_id_and_message_id(
+                        __chat_id__, __message_id__, image_files
+                    )
+                )
+                if db_files is not None:
+                    image_files = db_files
+
+            # Emit images to the UI via the event emitter
+            if __event_emitter__ and image_files:
+                await __event_emitter__(
+                    {
+                        "type": "chat:message:files",
+                        "data": {"files": image_files},
+                    }
+                )
+
+            log.info(
+                "Image delivered to chat — %d file(s)", len(image_files)
+            )
+
+            return json.dumps(
+                {
+                    "status": "success",
+                    "message": (
+                        "The image has been successfully generated and is "
+                        "already visible to the user in the chat. You do not "
+                        "need to display or embed the image again - just "
+                        "acknowledge that it has been created."
+                    ),
+                    "images": images,
+                },
+                ensure_ascii=False,
+            )
+
+        except Exception as e:
+            log.exception("generate_image_pro failed: %s", e)
+            return json.dumps({"error": str(e)})
