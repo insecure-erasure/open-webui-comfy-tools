@@ -124,9 +124,9 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         return await _original_image_generations(request, form_data, metadata, user)
 
     # =========================================================================
-    # LAYER 1 — Admin defaults
+    # LAYER 1 - Admin defaults
     # =========================================================================
-    log.info("ComfyUI image generation requested — resolving Layer 1 defaults")
+    log.info("ComfyUI image generation requested - resolving Layer 1 defaults")
 
     size = "512x512"
     if image_config.IMAGE_SIZE and "x" in image_config.IMAGE_SIZE:
@@ -139,7 +139,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     reduced_w = width // gcd
     reduced_h = height // gcd
     log.info(
-        "Dimensions resolved: %s → gcd=%d → %dx%d",
+        "Dimensions resolved: %s -> gcd=%d -> %dx%d",
         size,
         gcd,
         reduced_w,
@@ -159,7 +159,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     )
 
     # =========================================================================
-    # LAYER 2 — Node bindings
+    # LAYER 2 - Node bindings
     # =========================================================================
     from open_webui.utils.images.comfyui import (
         ComfyUICreateImageForm,
@@ -171,12 +171,12 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         node["type"] for node in image_config.COMFYUI_WORKFLOW_NODES
     }
     log.info(
-        "Layer 2 — Configured node types: %s",
+        "Layer 2 - Configured node types: %s",
         sorted(configured_node_types),
     )
 
     # =========================================================================
-    # LAYER 3 — Payload build
+    # LAYER 3 - Payload build
     # =========================================================================
     data = {
         "prompt": form_data.prompt,
@@ -203,11 +203,11 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
             log.info("Steps from admin default: %d", admin_steps)
         else:
             log.info(
-                "Steps node configured but no admin default set — "
+                "Steps node configured but no admin default set - "
                 "ComfyUI will use its workflow default"
             )
     else:
-        log.info("Steps omitted — no 'steps' node binding configured")
+        log.info("Steps omitted - no 'steps' node binding configured")
 
     if "model" in configured_node_types:
         data["model"] = effective_model
@@ -221,10 +221,10 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
             effective_model,
         )
     else:
-        log.info("Model omitted — no 'model' node binding configured")
+        log.info("Model omitted - no 'model' node binding configured")
 
     log.info(
-        "Layer 3 — Payload built: prompt_len=%d, width=%s, height=%s, "
+        "Layer 3 - Payload built: prompt_len=%d, width=%s, height=%s, "
         "seed=%d, steps=%s, model=%s",
         len(data["prompt"]),
         data["width"],
@@ -235,9 +235,9 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     )
 
     # =========================================================================
-    # LAYER 4 — ComfyUI execution (modified: no local storage)
+    # LAYER 4 - ComfyUI execution (modified: no local storage)
     # =========================================================================
-    log.info("Layer 4 — Dispatching to ComfyUI")
+    log.info("Layer 4 - Dispatching to ComfyUI")
 
     cf_form = ComfyUICreateImageForm(
         **{
@@ -269,18 +269,12 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
 
     log.info("ComfyUI returned %d image(s)", len(res["data"]))
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # NO descargamos ni re-subimos — devolvemos la URL directamente de
-    # ComfyUI usando la Base URL configurada en Admin Panel > Settings > Images.
+    # No download/re-upload - return the URL directly from
+    # the image generation engine using the Base URL configured
+    # in Admin Panel > Settings > Images.
     #
-    # PRERREQUISITO: COMFYUI_BASE_URL debe ser accesible desde el navegador
-    # del usuario final (o desde donde el LLM renderice la imagen).
-    #
-    # Si usas Preview Image en ComfyUI, la imagen vive en el buffer interno
-    # de ComfyUI y la URL es válida mientras el servidor no se reinicie.
-    # Para persistencia más larga, considera añadir un nodo Save Image que
-    # guarde en una carpeta servida estáticamente por nginx.
-    # ═══════════════════════════════════════════════════════════════════════
+    # PREREQUISITE: The Base URL must be accessible from the
+    # user's browser (or from where the LLM renders the image).
     images = []
     for img in res["data"]:
         raw_url = img["url"]
@@ -292,7 +286,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         images.append({"url": image_url})
 
     log.info(
-        "Image generation complete — %d image(s) returned directly "
+        "Image generation complete - %d image(s) returned directly "
         "from ComfyUI (no local storage)",
         len(images),
     )
@@ -308,9 +302,9 @@ log.info(
 # =============================================================================
 # TOOLS CLASS
 #
-# The chip (📷) controls the built-in generate_image independently from this
+# The built-in generate_image and this tool are independent.
 # Activate or deactivate Smart Generate Image from the tool selector
-# (⚙️) in the chat input.
+# in the chat input.
 #
 # Images are NOT emitted via event emitter and NOT persisted to chat history.
 # The LLM receives the image URL and renders it as markdown in its response.
@@ -320,9 +314,9 @@ log.info(
 
 class Tools:
     """
-    Smart Generate Image — generate images through ComfyUI with full control over seed, model, size, and steps.
+    Smart Generate Image - generate images through ComfyUI with full control over seed, model, size, and steps.
 
-    Activate this tool from the tool selector (⚙️) in the chat input.
+    Activate this tool from the tool selector in the chat input.
 
     prompt: Image generation prompt. Translate the user's request into English
         internally, then enrich with visual details without changing the subject
@@ -338,7 +332,7 @@ class Tools:
     """
 
     class Valves:
-        """No configuration valves needed — all settings come from Admin UI."""
+        """No configuration valves needed - all settings come from Admin UI."""
 
         pass
 
@@ -383,7 +377,7 @@ class Tools:
             user = UserModel(**__user__) if __user__ else None
 
             log.info(
-                "generate_image_pro called — prompt_len=%d, model=%s, "
+                "generate_image_pro called - prompt_len=%d, model=%s, "
                 "size=%s, steps=%s, seed=%d",
                 len(prompt),
                 model,
@@ -409,7 +403,7 @@ class Tools:
             # as markdown in its text response.
             image_url = images[0]["url"] if images else None
 
-            log.info("Image generated — url=%s", image_url)
+            log.info("Image generated - url=%s", image_url)
 
             return f"Image generated successfully.\n\nDisplay the image in your response like this:\n![Generated image]({image_url})"
 
