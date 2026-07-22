@@ -11,6 +11,24 @@ from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
 
+# Shared dropdown options for the steps valve (15 down to 1, plus "System default")
+_STEPS_OPTIONS = [
+    {"value": str(i), "label": str(i)}
+    for i in range(15, 0, -1)
+]
+_STEPS_OPTIONS.insert(0, {"value": "0", "label": "System default"})
+
+_STEPS_FIELD = lambda label: Field(
+    default="0",
+    description=f"Inference steps. Set to 0 for: {label}",
+    json_schema_extra={
+        "input": {
+            "type": "select",
+            "options": _STEPS_OPTIONS,
+        }
+    },
+)
+
 # =============================================================================
 # MONKEY PATCH 1: Add seed field to CreateImageForm
 # =============================================================================
@@ -334,33 +352,7 @@ class Tools:
             default="",
             description="Model/checkpoint name. Overrides the Admin UI default. Leave empty to use the Admin UI setting.",
         )
-        steps: str = Field(
-            default="0",
-            description="Inference steps. 0 = inherit from Admin UI or use workflow default.",
-            json_schema_extra={
-                "input": {
-                    "type": "select",
-                    "options": [
-                        {"value": "0", "label": "System default"},
-                        {"value": "15", "label": "15"},
-                        {"value": "14", "label": "14"},
-                        {"value": "13", "label": "13"},
-                        {"value": "12", "label": "12"},
-                        {"value": "11", "label": "11"},
-                        {"value": "10", "label": "10"},
-                        {"value": "9", "label": "9"},
-                        {"value": "8", "label": "8"},
-                        {"value": "7", "label": "7"},
-                        {"value": "6", "label": "6"},
-                        {"value": "5", "label": "5"},
-                        {"value": "4", "label": "4"},
-                        {"value": "3", "label": "3"},
-                        {"value": "2", "label": "2"},
-                        {"value": "1", "label": "1"},
-                    ],
-                }
-            },
-        )
+        steps: str = _STEPS_FIELD("inherit from Admin UI or use workflow default")
 
     class UserValves(BaseModel):
         """User-level configuration (overrides admin valve and Admin UI)."""
@@ -369,33 +361,7 @@ class Tools:
             default="",
             description="Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting.",
         )
-        steps: str = Field(
-            default="0",
-            description="Inference steps. 0 = inherit from admin valve or Admin UI setting.",
-            json_schema_extra={
-                "input": {
-                    "type": "select",
-                    "options": [
-                        {"value": "0", "label": "Inherit"},
-                        {"value": "15", "label": "15"},
-                        {"value": "14", "label": "14"},
-                        {"value": "13", "label": "13"},
-                        {"value": "12", "label": "12"},
-                        {"value": "11", "label": "11"},
-                        {"value": "10", "label": "10"},
-                        {"value": "9", "label": "9"},
-                        {"value": "8", "label": "8"},
-                        {"value": "7", "label": "7"},
-                        {"value": "6", "label": "6"},
-                        {"value": "5", "label": "5"},
-                        {"value": "4", "label": "4"},
-                        {"value": "3", "label": "3"},
-                        {"value": "2", "label": "2"},
-                        {"value": "1", "label": "1"},
-                    ],
-                }
-            },
-        )
+        steps: str = _STEPS_FIELD("inherit from admin valve or Admin UI setting")
 
     def __init__(self):
         self.valves = self.Valves()
