@@ -418,7 +418,7 @@ class Tools:
             return json.dumps(
                 {
                     "status": "success",
-                    "message": "Image generated successfully.",
+                    "message": f"Image generated. Display it in your response as: ![Generated image]({image_url})",
                     "image_url": image_url,
                 },
                 ensure_ascii=False,
