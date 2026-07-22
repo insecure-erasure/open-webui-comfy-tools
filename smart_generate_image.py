@@ -38,16 +38,26 @@ log.info("MONKEY PATCH 1: CreateImageForm patched with seed field")
 #
 # The original function unconditionally overwrites workflow node inputs even
 # when the payload value is None. This injects null into the workflow JSON
-# for fields like steps when the LLM omits them.
+# for fields when the LLM omits them.
 #
 # Our patched version skips assignment when the value is None, preserving
 # whatever default the exported workflow JSON carries.
 #
-# For `width` and `height`, the input key is hardcoded to `"value"` because
-# the workflow uses PrimitiveString nodes that receive aspect ratio strings
-# via their "value" input field (nodes 99 and 100 in this workflow).
+# Each parameter type has a hardcoded fallback input key that matches the
+# actual node input field in the target workflow. These are used when the
+# UI does not provide a custom key via the Workflow Nodes configuration.
 # =============================================================================
 from open_webui.utils.images import comfyui as comfyui_module
+
+# Mapping of node type to default input key for the target workflow
+NODE_TYPE_INPUT_KEYS = {
+    "prompt": "text",
+    "model": "unet_name",
+    "width": "string_a",
+    "height": "string_b",
+    "steps": "steps",
+    "seed": "seed",
+}
 
 
 def patched_apply_workflow_nodes(workflow, nodes, model, payload):
@@ -56,63 +66,61 @@ def patched_apply_workflow_nodes(workflow, nodes, model, payload):
         if not node.type:
             continue
 
+        # Determine the input key: use the configured key if available,
+        # otherwise fall back to the hardcoded default for this node type.
+        input_key = node.key if node.key else NODE_TYPE_INPUT_KEYS.get(node.type, node.key)
+
         if node.type == "model":
             if model is not None:
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key] = model
+                    workflow[node_id]["inputs"][input_key] = model
 
         elif node.type == "prompt":
             if payload.prompt is not None:
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][
-                        node.key if node.key else "text"
-                    ] = payload.prompt
+                    workflow[node_id]["inputs"][input_key] = payload.prompt
 
         elif node.type == "width":
             if payload.width is not None:
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"]["value"] = payload.width
+                    workflow[node_id]["inputs"][input_key] = payload.width
 
         elif node.type == "height":
             if payload.height is not None:
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"]["value"] = payload.height
+                    workflow[node_id]["inputs"][input_key] = payload.height
 
         elif node.type == "steps":
             if payload.steps is not None:
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][
-                        node.key if node.key else "steps"
-                    ] = payload.steps
+                    workflow[node_id]["inputs"][input_key] = payload.steps
 
         elif node.type == "seed":
             if payload.seed is not None:
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key] = payload.seed
+                    workflow[node_id]["inputs"][input_key] = payload.seed
 
         elif node.type == "n":
             if payload.n is not None:
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][
-                        node.key if node.key else "batch_size"
-                    ] = payload.n
+                    workflow[node_id]["inputs"][input_key] = payload.n
 
         elif node.type == "image":
             if payload.image is not None:
                 if isinstance(payload.image, list):
                     for idx, node_id in enumerate(node.node_ids):
                         if idx < len(payload.image):
-                            workflow[node_id]["inputs"][node.key] = (
+                            workflow[node_id]["inputs"][input_key] = (
                                 payload.image[idx]
                             )
                 else:
                     for node_id in node.node_ids:
-                        workflow[node_id]["inputs"][node.key] = payload.image
+                        workflow[node_id]["inputs"][input_key] = payload.image
 
         else:
             if node.value is not None:
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key] = node.value
+                    workflow[node_id]["inputs"][input_key] = node.value
 
 
 comfyui_module._apply_workflow_nodes = patched_apply_workflow_nodes
@@ -152,7 +160,8 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     # LAYER 1 — Admin defaults
     #
     # These come from the Admin UI: Image Size, Model, Steps.
-    # If the LLM omits a parameter, the admin default is used instead.
+    # They are used as defaults — if the LLM omits a parameter, the admin
+    # default is injected instead. If the LLM provides a value, it overrides.
     # =========================================================================
     log.info("ComfyUI image generation requested — resolving Layer 1 defaults")
 
@@ -176,7 +185,12 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     )
 
     model = await images_router.get_image_model(request)
-    log.info("Model resolved: %s", model)
+    admin_steps = image_config.IMAGE_STEPS
+    log.info(
+        "Model resolved: %s | Admin steps: %s",
+        model,
+        admin_steps if admin_steps is not None else "not set",
+    )
 
     # =========================================================================
     # LAYER 2 — Node bindings
@@ -209,17 +223,13 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     # =========================================================================
     # LAYER 3 — Payload build
     #
-    # Every parameter in the payload goes through this check:
-    #   1. Is the node type configured in Layer 2?
-    #   2. Did the LLM provide a value? If not, fall back to Layer 1.
-    #   3. If there is no Layer 1 default either, the parameter is omitted.
-    #
     # prompt, width, height and seed are always sent.
-    # steps and model are only sent when the LLM explicitly requests them.
+    # model and steps are always sent when a node binding exists — they use
+    # the admin default from Layer 1 unless the LLM explicitly overrides them.
     #
-    # Width and height are converted to strings because the ComfyUI workflow
-    # uses PrimitiveString nodes (99 and 100) that receive aspect ratio
-    # strings via their "value" input field.
+    # Width and height are converted to strings for the StringConcatenate
+    # node that builds the aspect ratio string (e.g. "2:3") for the
+    # FluxResolutionNode.
     # =========================================================================
     data = {
         "prompt": form_data.prompt,
@@ -238,29 +248,36 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
             seed,
         )
 
-    # Steps — only sent if the LLM explicitly passed a value
-    if form_data.steps is not None:
-        data["steps"] = form_data.steps
-        if "steps" not in configured_node_types:
-            log.warning(
-                "Steps=%d was provided but no 'steps' node binding is "
-                "configured. The value will be ignored by ComfyUI.",
-                form_data.steps,
+    # Steps — always sent when a node binding exists.
+    # Uses admin default if LLM did not provide a value.
+    if "steps" in configured_node_types:
+        if form_data.steps is not None:
+            data["steps"] = form_data.steps
+            log.info("Steps overridden by LLM: %d", form_data.steps)
+        elif admin_steps is not None:
+            data["steps"] = admin_steps
+            log.info("Steps from admin default: %d", admin_steps)
+        else:
+            log.info(
+                "Steps node configured but no admin default set — "
+                "ComfyUI will use its workflow default"
             )
     else:
-        log.info("Steps omitted — ComfyUI will use its workflow default")
+        log.info(
+            "Steps omitted — no 'steps' node binding configured"
+        )
 
-    # Model — only sent if the LLM explicitly passed a value
-    if form_data.model is not None:
-        data["model"] = form_data.model
-        if "model" not in configured_node_types:
-            log.warning(
-                "Model='%s' was provided but no 'model' node binding is "
-                "configured. The value will be ignored.",
-                form_data.model,
-            )
+    # Model — always sent when a node binding exists.
+    # Uses admin default (already resolved via get_image_model) unless
+    # the LLM explicitly overrides it.
+    if "model" in configured_node_types:
+        if form_data.model is not None:
+            data["model"] = form_data.model
+            log.info("Model overridden by LLM: %s", form_data.model)
+        else:
+            log.info("Model from admin default: %s", model)
     else:
-        log.info("Model omitted — using admin default: %s", model)
+        log.info("Model omitted — no 'model' node binding configured")
 
     log.info(
         "Layer 3 — Payload built: prompt_len=%d, width=%s, height=%s, "
@@ -269,8 +286,8 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         data["width"],
         data["height"],
         data["seed"],
-        data.get("steps", "workflow_default"),
-        data.get("model", "admin_default"),
+        data.get("steps", "not_sent"),
+        data.get("model", "not_sent"),
     )
 
     # =========================================================================
@@ -367,8 +384,8 @@ class Tools:
       - Dimensions are reduced to their lowest ratio (GCD) before sending,
         so "2000x3000" becomes 2×3. Your workflow handles scaling.
       - Seed defaults to 0 for reproducibility. Change it for variation.
-      - Steps and model default to the ComfyUI workflow values unless
-        explicitly passed.
+      - Steps and model use admin UI defaults unless explicitly overridden
+        by passing them to the tool.
       - Parameters are only injected if a corresponding node binding
         exists in the workflow nodes configuration.
     """
@@ -401,11 +418,10 @@ class Tools:
 
         :param prompt: What to generate
         :param model: Model or checkpoint override. Falls back to admin config
-            and then to the workflow default if omitted.
+            if omitted.
         :param size: Dimensions as "WxH" (e.g., "2000x3000" → 2×3 for ComfyUI).
             Falls back to admin config if omitted.
-        :param steps: Inference steps. Falls back to ComfyUI workflow default
-            if omitted.
+        :param steps: Inference steps. Falls back to admin config if omitted.
         :param seed: Random seed. Defaults to 0 (reproducible). Same seed +
             same prompt = same image every time. Ignored by OpenAI and Gemini.
         :return: JSON with status and success confirmation
