@@ -341,7 +341,7 @@ class Tools:
                 "input": {
                     "type": "select",
                     "options": [
-                        {"value": "0", "label": "Inherit (Admin UI / workflow default)"},
+                        {"value": "0", "label": "System default"},
                         {"value": "15", "label": "15"},
                         {"value": "14", "label": "14"},
                         {"value": "13", "label": "13"},
