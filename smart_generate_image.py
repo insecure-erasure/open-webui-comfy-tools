@@ -1,8 +1,8 @@
 """
 title: Smart Generate Image
-author: Abel
+author: A. Martin
 description: Generate images through ComfyUI with seed, model, size, and steps control
-version: 2.2
+version: 2.3
 """
 
 import logging
