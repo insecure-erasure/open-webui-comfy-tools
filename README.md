@@ -20,21 +20,21 @@ When you ask your AI assistant to generate an image, **Image Generator Pro** tak
 
 ---
 
-## Relationship with the native image tool
+## Relationship with native image generation tool
 
-Open WebUI has two ways of generating images:
+Open WebUI has two image generation tools available to the AI:
 
-| Feature | Native (chip icon) | Image Generator Pro (tool selector) |
-|---------|-------------------|-------------------------------------|
+| Feature | Native `generate_image` | Image Generator Pro |
+|---------|------------------------|---------------------|
 | **Trigger** | Click the image chip in the chat input | The AI calls it automatically when you ask for an image |
 | **Seed control** | Not available | Yes -- reproducible images |
 | **Model override** | Admin default only | Ask for a specific model |
 | **Aspect ratio** | Fixed or admin-set | Smart GCD conversion |
 | **Steps override** | Admin default only | Override per request |
 
-When **Native Tool Calling** is enabled in Open WebUI, the AI will automatically use Image Generator Pro whenever you ask for an image -- just describe what you want and the AI handles the rest.
+When **Native Tool Calling** is enabled in Open WebUI, the built-in image generation function (`generate_image`) is available to the AI alongside Image Generator Pro. The AI will decide which one to use based on your request -- if you need seed, model, or steps control, it will use Image Generator Pro. For simple requests, it may use the native `generate_image`.
 
-> **Note:** The native chip still works independently. You can keep both enabled -- the AI will choose the right one.
+> **Note:** The native chip in the chat input still works independently. You can keep both tools enabled.
 
 ---
 
