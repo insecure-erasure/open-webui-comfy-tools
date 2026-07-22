@@ -1,6 +1,6 @@
 # Smart Generate Image
 
-Open WebUI tool for AI image generation through ComfyUI -- with control over seed, model, size, and steps, directly from your chat.
+Open WebUI tool for AI image generation through ComfyUI -- with seed and size control, configurable model and steps via Valves.
 
 > **Compatible with:** Open WebUI + ComfyUI
 
@@ -8,92 +8,77 @@ Open WebUI tool for AI image generation through ComfyUI -- with control over see
 
 ## Overview
 
-When you ask your AI assistant to generate an image, **Smart Generate Image** takes over and sends your request straight to ComfyUI. The image appears right in the chat conversation -- no extra clicks, no separate tools.
+Smart Generate Image is a tool that sends image generation requests to ComfyUI. The image appears in the chat rendered as markdown by the LLM. No local storage, no event emitter for files, no database persistence.
 
-Smart Generate Image is installed as a **regular user tool** in **Workspace -> Tools**. It is not a model capability or a builtin tool -- you do not need to enable **Image Generation** in the model's settings or activate it as a builtin tool. The tool simply needs to be enabled in the chat's tool selector.
-
-It uses the image generation settings you configure in **Admin Panel -> Settings -> Images**, as long as **Image Generation Engine** is set to **ComfyUI**. Everything else (Base URL, workflow, nodes, defaults) comes from that same configuration panel.
-
-### Key features
-
-- **Seed control** -- Same prompt + same seed = same image every time. Useful for iterating on a design without losing the look you liked.
-- **Smart dimensions** -- You can ask for `2000x3000` and the tool automatically converts it to the right aspect ratio for your ComfyUI workflow (no more "invalid size" errors).
-- **AI-enhanced prompts** -- The AI enriches your description with helpful visual details, and translates it to English if needed.
-- **No local storage** -- Images are served directly from ComfyUI. No unnecessary downloads or re-uploads, keeping your server disk clean.
-- **Works with your existing setup** -- All settings (model, image size, steps) come from your Open WebUI Admin panel. No extra configuration needed.
+It is installed as a regular user tool in **Workspace -> Tools**. It does not require Image Generation to be enabled as a model capability or builtin tool. It uses the image generation settings from **Admin Panel -> Settings -> Images** when the engine is set to ComfyUI.
 
 ---
 
-## Relationship with native image generation tool
+## Tool parameters
 
-Open WebUI has two image generation tools available to the AI:
+The tool exposes three parameters to the LLM:
 
-| Feature | Native `generate_image` | Smart Generate Image |
-|---------|------------------------|---------------------|
-| **Parameters** | Prompt only | Prompt, seed, model, size, steps |
-| **Seed control** | Not available | Yes -- reproducible images |
-| **Model override** | Not available | Ask for a specific model |
-| **Aspect ratio** | Not available | Smart GCD conversion |
-| **Steps override** | Not available | Override per request |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| prompt | string | Image description. The LLM translates to English and enriches with visual details. |
+| size | string (optional) | Dimensions as WxH (e.g. 2000x3000). Falls back to Admin UI config if omitted. |
+| seed | int (optional) | Random seed (default 0). Same prompt + same seed = same image. Ignored by non-ComfyUI engines. |
 
-The native `generate_image` function was simplified by the Open WebUI development team and now only accepts a prompt parameter -- all UI settings (model, size, steps) are ignored when called through Native Tool Calling. Smart Generate Image restores and expands that functionality.
-
-When **Native Tool Calling** is enabled, the AI will prefer Smart Generate Image whenever you ask for an image, since it provides full control over the generation process.
+Model and steps are not tool parameters -- they are configured via Valves.
 
 ---
 
-## Installation
+## Valves
 
-1. In Open WebUI, go to **Workspace -> Tools**.
-2. Click **"+"** to create a new tool.
-3. Paste the contents of `smart_generate_image.py`.
-4. Save it with the title **"Smart Generate Image"**.
-5. Go to any chat, open the tool selector, and enable **Smart Generate Image**.
+### Admin Valves
+
+Configurable by admins in **Workspace -> Tools -> Smart Generate Image -> Valves**.
+
+| Valve | Type | Default | Description |
+|-------|------|---------|-------------|
+| model_name | string | "" | Model/checkpoint name. Overrides the Admin UI default. Leave empty to use the Admin UI setting. |
+| steps | dropdown | 0 (Inherit) | Inference steps (1-15, descending). 0 = inherit from Admin UI or use workflow default. |
+
+### User Valves
+
+Configurable by end users from the chat interface.
+
+| Valve | Type | Default | Description |
+|-------|------|---------|-------------|
+| model_name | string | "" | Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting. |
+| steps | dropdown | 0 (Inherit) | Inference steps (1-15, descending). 0 = inherit from admin valve or Admin UI setting. |
+
+### Precedence
+
+**Model resolution:** UserValves > AdminValves > Admin UI (get_image_model) > None
+
+**Steps resolution:** UserValves > AdminValves > Admin UI (IMAGE_STEPS) > workflow default
+
+Both UserValves and AdminValves are clamped against the Admin UI IMAGE_STEPS ceiling (or 15 as safety fallback). When clamping occurs, a warning toast is shown to the user.
 
 ---
 
 ## Configuration
 
-Everything is configured through the **Admin Panel -> Settings -> Images**:
+Configure these in **Admin Panel -> Settings -> Images**:
 
-- **Image Generation Engine** -- Set to **ComfyUI**.
-- **ComfyUI Base URL** -- The address of your ComfyUI server (must be reachable from your browser).
-- **ComfyUI Workflow** -- Your exported workflow JSON.
-- **ComfyUI Workflow Nodes** -- Define which nodes receive prompt, seed, model, steps, etc.
-- **Image Size** -- Default dimensions (user can override).
-- **Image Steps** -- Default inference steps (user can override).
+- Image Generation Engine: ComfyUI
+- ComfyUI Base URL: your ComfyUI server address (must be browser-accessible)
+- ComfyUI Workflow: exported workflow JSON
+- ComfyUI Workflow Nodes: define which nodes receive each parameter
+- Image Size: default dimensions
+- Image Steps: default inference steps (acts as ceiling for Valves)
 
-> If you want seed support, make sure your workflow has a **"seed"** node configured in the Workflow Nodes section.
+For seed support, configure a "seed" node in Workflow Nodes.
 
 ---
 
-## Usage
+## Installation
 
-Just ask the AI to create an image naturally:
-
-> *"Generate an image of a cat wearing a spacesuit on Mars"*
->
-> *"Create a 1920x1080 landscape of a cyberpunk city at night"*
->
-> *"Make another one like the previous image but with a different seed"*
-
-The AI will:
-
-1. Translate your request to English if needed.
-2. Enrich the prompt with visual details (without changing your subject).
-3. Send it to ComfyUI with the appropriate settings.
-4. Display the image directly in the chat.
-
-### Optional parameters
-
-You can also be more specific:
-
-| You say | What happens |
-|---------|-------------|
-| *"... use model sdxl_ turbo"* | The tool switches to that model |
-| *"... at 2000x3000"* | Dimensions are converted to your workflow's aspect ratio |
-| *"... with 30 steps"* | Overrides the default step count |
-| *"... with seed 42"* | Locks the random seed for reproducibility |
+1. Go to **Workspace -> Tools** in Open WebUI.
+2. Click **"+"** and paste the contents of `smart_generate_image.py`.
+3. Save as **"Smart Generate Image"**.
+4. Enable the tool in the chat tool selector.
 
 ---
 
@@ -101,19 +86,39 @@ You can also be more specific:
 
 - Open WebUI (any recent version with Tools support)
 - ComfyUI server running and accessible
-- Native Tool Calling enabled in Open WebUI settings
-- A ComfyUI workflow exported and configured in **Admin Panel -> Settings -> Images**
-- **Image Generation Engine** set to **ComfyUI** in **Admin Panel -> Settings -> Images**
-- **Image Generation** does NOT need to be enabled as a model capability or builtin tool
+- Native Tool Calling enabled
+- ComfyUI workflow configured in Admin Panel -> Settings -> Images
+- Image Generation Engine set to ComfyUI
+- Image Generation does NOT need to be enabled as a model capability or builtin tool
+
+---
+
+## Usage
+
+Ask the AI to create an image naturally:
+
+> *"Generate an image of a cat wearing a spacesuit on Mars"*
+>
+> *"Create a 1920x1080 landscape of a cyberpunk city at night"*
+>
+> *"Make another one like the previous image but with a different seed"*
+
+Optional details the AI can handle:
+
+- **Size**: "... at 2000x3000"
+- **Seed**: "... with seed 42"
+
+Model and steps are controlled via Valves and Admin UI settings, not from the chat prompt.
 
 ---
 
 ## FAQ
 
 **Q: The image doesn't show up in the chat.**  
-A: Make sure your `ComfyUI Base URL` is accessible from your browser. The image is served directly from ComfyUI, not stored locally.
+A: Check that the ComfyUI Base URL is accessible from your browser. Images are served directly from ComfyUI.
 
 **Q: Seed doesn't seem to do anything.**  
-A: Your workflow needs a "seed" node configured in **Admin Panel -> Settings -> Images -> ComfyUI Workflow Nodes**. Without it, the seed value is ignored and ComfyUI uses its own random seed.
+A: Configure a "seed" node in Admin Panel -> Settings -> Images -> ComfyUI Workflow Nodes.
 
-
+**Q: How do I change the model or steps?**  
+A: Admins configure them in Workspace -> Tools -> Smart Generate Image -> Valves. Users can override from the chat interface. Alternatively, set defaults in Admin Panel -> Settings -> Images.
