@@ -69,26 +69,21 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         metadata = metadata or {}
         model = await get_image_model(request)
 
-        # Build payload — replicates what the original does, plus seed
+        # Build payload — only include what the user explicitly provides
         data = {
             "prompt": form_data.prompt,
             "width": width,
             "height": height,
             "n": 1,
+            "seed": seed,
         }
 
-        if image_config.IMAGE_STEPS is not None or form_data.steps is not None:
-            data["steps"] = (
-                form_data.steps
-                if form_data.steps is not None
-                else image_config.IMAGE_STEPS
-            )
+        if form_data.steps is not None:
+            data["steps"] = form_data.steps
         if form_data.negative_prompt is not None:
             data["negative_prompt"] = form_data.negative_prompt
         if form_data.model is not None:
             data["model"] = form_data.model
-
-        data["seed"] = seed  # ← the only real difference from the original
 
         cf_form = ComfyUICreateImageForm(
             **{
@@ -157,16 +152,18 @@ async def generate_image_pro(
     Works with any engine configured in Open WebUI.
     ComfyUI-specific: seed is fully supported; dimensions are reduced to
     their lowest ratio (GCD) before being sent to the workflow.
+    Steps and negative_prompt default to whatever the ComfyUI workflow
+    defines — they are only overridden when explicitly provided.
 
     :param prompt: What to generate
     :param model: Model/checkpoint override. Falls back to admin config if omitted.
     :param size: Dimensions as "WxH" (e.g., "2000x3000" → 2x3 for ComfyUI).
         Falls back to admin config if omitted.
-    :param steps: Inference steps. Falls back to admin config if omitted.
+    :param steps: Inference steps. Overrides ComfyUI workflow default if set.
     :param seed: Random seed for reproducibility. Same seed + same prompt =
         same image every time. Works with ComfyUI (requires a "seed" node
         configured in workflow nodes). Ignored by OpenAI/Gemini.
-    :param negative_prompt: What to avoid in the image
+    :param negative_prompt: What to avoid. Overrides ComfyUI workflow default if set.
     :return: JSON with status and success confirmation
     """
     if __request__ is None:
