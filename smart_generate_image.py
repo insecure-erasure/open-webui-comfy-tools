@@ -46,10 +46,16 @@ log.info("MONKEY PATCH 1: CreateImageForm patched with seed field")
 # Each parameter type has a hardcoded fallback input key that matches the
 # actual node input field in the target workflow. These are used when the
 # UI does not provide a custom key via the Workflow Nodes configuration.
+#
+# Important: ComfyUINodeInput has a Pydantic default of `key='text'`.
+# Since `node.key` is never None or empty, we always check the hardcoded
+# mapping first, falling back to `node.key` only when the type is unknown.
 # =============================================================================
 from open_webui.utils.images import comfyui as comfyui_module
 
-# Mapping of node type to default input key for the target workflow
+# Mapping of node type to default input key for the target workflow.
+# Used instead of the Pydantic default 'text' which does not match
+# the actual input field names of most ComfyUI node types.
 NODE_TYPE_INPUT_KEYS = {
     "prompt": "text",
     "model": "unet_name",
@@ -66,11 +72,11 @@ def patched_apply_workflow_nodes(workflow, nodes, model, payload):
         if not node.type:
             continue
 
-        # Determine the input key: use the configured key if available,
-        # otherwise fall back to the hardcoded default for this node type.
-        input_key = node.key if node.key else NODE_TYPE_INPUT_KEYS.get(
-            node.type, node.key
-        )
+        # Resolve the input key: prefer the hardcoded mapping for known
+        # node types, falling back to node.key for unknown/custom types.
+        # The Pydantic default 'text' is never used since every type we
+        # support has an entry in NODE_TYPE_INPUT_KEYS.
+        input_key = NODE_TYPE_INPUT_KEYS.get(node.type, node.key)
 
         if node.type == "model":
             if model is not None:
@@ -256,7 +262,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         )
 
     # Steps — always sent when a node binding exists.
-    # Uses effective value: LLM override > admin default.
+    # Uses effective value: LLM override > admin default > not sent.
     if "steps" in configured_node_types:
         if form_data.steps is not None:
             data["steps"] = form_data.steps
