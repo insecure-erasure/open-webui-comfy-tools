@@ -323,8 +323,6 @@ class Tools:
         or scene. Do not add superfluous details. Write the final prompt in English.
     size (optional): Only provide when the user explicitly requests specific
         dimensions. Format as WxH (e.g., 2000x3000).
-    steps (optional): Only provide when the user explicitly requests a
-        specific number of steps.
     seed (optional): Only provide when the user explicitly requests a
         specific seed.
     """
@@ -336,6 +334,12 @@ class Tools:
             default="",
             description="Model/checkpoint name. Overrides the Admin UI default. Leave empty to use the Admin UI setting.",
         )
+        steps: int = Field(
+            default=0,
+            ge=0,
+            le=15,
+            description="Inference steps. Leave at 0 to inherit from Admin UI settings or use workflow default.",
+        )
 
     class UserValves:
         """User-level configuration (overrides admin valve and Admin UI)."""
@@ -343,6 +347,12 @@ class Tools:
         model_name: str = Field(
             default="",
             description="Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting.",
+        )
+        steps: int = Field(
+            default=0,
+            ge=0,
+            le=15,
+            description="Inference steps. Leave at 0 to use admin valve or Admin UI setting.",
         )
 
     def __init__(self):
@@ -352,7 +362,6 @@ class Tools:
         self,
         prompt: str,
         size: str | None = None,
-        steps: int | None = None,
         seed: int = 0,
         __request__=None,
         __user__=None,
@@ -361,15 +370,13 @@ class Tools:
         __message_id__=None,
     ):
         """
-        Generate one image with optional control over size, steps, and seed.
+        Generate one image with optional control over size and seed.
 
         prompt: Image generation prompt. Translate the user's request into English internally,
             then enrich with visual details without changing the subject or scene. Do not add
             superfluous details. Write the final prompt in English.
         size (optional): Only provide when the user explicitly requests specific
             dimensions. Format as WxH (e.g., 2000x3000).
-        steps (optional): Only provide when the user explicitly requests a
-            specific number of steps.
         seed (optional): Only provide when the user explicitly
             requests a specific seed.
         """
@@ -389,12 +396,51 @@ class Tools:
             )
             resolved_model = user_model or self.valves.model_name or None
 
+            # Resolve steps: UserValves > AdminValves > Sistema > workflow default
+            # All clamped against IMAGE_STEPS if set, or 15 as safety ceiling.
+            from open_webui.routers.images import get_image_config
+
+            image_config = await get_image_config()
+            admin_steps_config = image_config.IMAGE_STEPS
+            techo = 15 if admin_steps_config is None or admin_steps_config <= 0 else admin_steps_config
+
+            user_valve_steps = user_valves.steps if user_valves and user_valves.steps else 0
+            admin_valve_steps = self.valves.steps if self.valves.steps else 0
+
+            resolved_steps = None
+            if user_valve_steps > 0:
+                resolved_steps = min(user_valve_steps, techo)
+                if resolved_steps < user_valve_steps and __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "warning",
+                                "content": f"Steps clamped to {techo} (system limit).",
+                            },
+                        }
+                    )
+            elif admin_valve_steps > 0:
+                resolved_steps = min(admin_valve_steps, techo)
+                if resolved_steps < admin_valve_steps and __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "warning",
+                                "content": f"Steps clamped to {techo} (system limit).",
+                            },
+                        }
+                    )
+            elif admin_steps_config is not None and admin_steps_config > 0:
+                resolved_steps = admin_steps_config
+
             log.info(
                 "generate_image_pro called - prompt_len=%d, "
                 "size=%s, steps=%s, seed=%d, model=%s",
                 len(prompt),
                 size,
-                steps,
+                resolved_steps or "workflow_default",
                 seed,
                 resolved_model or "admin_default",
             )
@@ -405,7 +451,7 @@ class Tools:
                     prompt=prompt,
                     model=resolved_model,
                     size=size,
-                    steps=steps,
+                    steps=resolved_steps,
                     seed=seed,
                 ),
                 user=user,
