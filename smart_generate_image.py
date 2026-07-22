@@ -398,6 +398,7 @@ class Tools:
         )
 
     def __init__(self):
+        self.valves = self.Valves()
         self.citation = False
 
     async def generate_image_pro(
