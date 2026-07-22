@@ -13,10 +13,6 @@ log = logging.getLogger(__name__)
 
 # =============================================================================
 # MONKEY PATCH 1: Add seed field to CreateImageForm
-#
-# The built-in CreateImageForm does not have a seed field.
-# We subclass it to add one, then replace the original in the module so that
-# any code importing CreateImageForm gets our patched version.
 # =============================================================================
 from open_webui.routers import images as images_router
 
@@ -35,27 +31,9 @@ log.info("MONKEY PATCH 1: CreateImageForm patched with seed field")
 
 # =============================================================================
 # MONKEY PATCH 2: Make _apply_workflow_nodes ignore None values
-#
-# The original function unconditionally overwrites workflow node inputs even
-# when the payload value is None. This injects null into the workflow JSON
-# for fields when the LLM omits them.
-#
-# Our patched version skips assignment when the value is None, preserving
-# whatever default the exported workflow JSON carries.
-#
-# Each parameter type has a hardcoded fallback input key that matches the
-# actual node input field in the target workflow. These are used when the
-# UI does not provide a custom key via the Workflow Nodes configuration.
-#
-# Important: ComfyUINodeInput has a Pydantic default of `key='text'`.
-# Since `node.key` is never None or empty, we always check the hardcoded
-# mapping first, falling back to `node.key` only when the type is unknown.
 # =============================================================================
 from open_webui.utils.images import comfyui as comfyui_module
 
-# Mapping of node type to default input key for the target workflow.
-# Used instead of the Pydantic default 'text' which does not match
-# the actual input field names of most ComfyUI node types.
 NODE_TYPE_INPUT_KEYS = {
     "prompt": "text",
     "model": "unet_name",
@@ -72,10 +50,6 @@ def patched_apply_workflow_nodes(workflow, nodes, model, payload):
         if not node.type:
             continue
 
-        # Resolve the input key: prefer the hardcoded mapping for known
-        # node types, falling back to node.key for unknown/custom types.
-        # The Pydantic default 'text' is never used since every type we
-        # support has an entry in NODE_TYPE_INPUT_KEYS.
         input_key = NODE_TYPE_INPUT_KEYS.get(node.type, node.key)
 
         if node.type == "model":
@@ -137,17 +111,6 @@ log.info("MONKEY PATCH 2: _apply_workflow_nodes patched to ignore None values")
 
 # =============================================================================
 # MONKEY PATCH 3: Override image_generations for ComfyUI
-#
-# The original image_generations function does not support seed injection,
-# GCD-based dimension reduction, or model override per-call.
-#
-# Our override organises the logic in four explicit layers:
-#   Layer 1 — Admin defaults  (from Admin UI Settings)
-#   Layer 2 — Node bindings   (from Workflow Nodes configuration)
-#   Layer 3 — Payload build   (tool parameters filtered through Layer 2)
-#   Layer 4 — ComfyUI call    (execution against the workflow JSON)
-#
-# For any non-ComfyUI engine we delegate transparently to the original.
 # =============================================================================
 _original_image_generations = images_router.image_generations
 
@@ -166,10 +129,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
 
     # =========================================================================
     # LAYER 1 — Admin defaults
-    #
-    # These come from the Admin UI: Image Size, Model, Steps.
-    # They are used as defaults — if the LLM omits a parameter, the admin
-    # default is injected instead. If the LLM provides a value, it overrides.
     # =========================================================================
     log.info("ComfyUI image generation requested — resolving Layer 1 defaults")
 
@@ -180,7 +139,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         size = form_data.size
     width, height = tuple(map(int, size.split("x")))
 
-    # Reduce dimensions to their lowest ratio via GCD
     gcd = math.gcd(width, height)
     reduced_w = width // gcd
     reduced_h = height // gcd
@@ -192,7 +150,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         reduced_h,
     )
 
-    # Resolve effective model: LLM override > admin default
     admin_default_model = await images_router.get_image_model(request)
     effective_model = (
         form_data.model if form_data.model is not None else admin_default_model
@@ -207,13 +164,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
 
     # =========================================================================
     # LAYER 2 — Node bindings
-    #
-    # The set of parameter types for which the admin has defined a node
-    # binding in Workflow Nodes. Parameters without a binding are silently
-    # ignored — there is nowhere to inject them.
-    #
-    # COMFYUI_WORKFLOW_NODES comes from the database as a list of dicts,
-    # not Pydantic objects, so we access via dict key.
     # =========================================================================
     from open_webui.routers.images import (
         get_image_data,
@@ -235,14 +185,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
 
     # =========================================================================
     # LAYER 3 — Payload build
-    #
-    # prompt, width, height and seed are always sent.
-    # model and steps are always sent when a node binding exists — they use
-    # the effective value (LLM override or admin default) from Layer 1.
-    #
-    # Width and height are converted to strings for the StringConcatenate
-    # node that builds the aspect ratio string (e.g. "2:3") for the
-    # FluxResolutionNode.
     # =========================================================================
     data = {
         "prompt": form_data.prompt,
@@ -251,7 +193,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         "n": 1,
     }
 
-    # Seed — always sent; defaults to 0 for consistency across calls
     seed = form_data.seed if form_data.seed is not None else 0
     data["seed"] = seed
     if "seed" not in configured_node_types:
@@ -261,8 +202,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
             seed,
         )
 
-    # Steps — always sent when a node binding exists.
-    # Uses effective value: LLM override > admin default > not sent.
     if "steps" in configured_node_types:
         if form_data.steps is not None:
             data["steps"] = form_data.steps
@@ -278,8 +217,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     else:
         log.info("Steps omitted — no 'steps' node binding configured")
 
-    # Model — always sent when a node binding exists.
-    # Uses effective model: LLM override > admin default.
     if "model" in configured_node_types:
         data["model"] = effective_model
         log.info(
@@ -303,13 +240,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
 
     # =========================================================================
     # LAYER 4 — ComfyUI execution
-    #
-    # The workflow JSON is loaded, node bindings are applied by the patched
-    # _apply_workflow_nodes, and the prompt is queued via WebSocket.
-    #
-    # The effective model is passed both in the payload (for injection into
-    # the model node via _apply_workflow_nodes) and as the separate model
-    # parameter to comfyui_create_image.
     # =========================================================================
     log.info("Layer 4 — Dispatching to ComfyUI")
 
@@ -378,12 +308,13 @@ log.info(
 # =============================================================================
 # TOOLS CLASS
 #
-# The Open WebUI plugin loader requires a class named `Tools` in the module.
-# The function is defined as a method so it gets discovered as a callable tool.
-#
 # The chip (📷) controls the built-in generate_image independently from this
 # tool. Activate or deactivate Image Generator Pro from the tool selector
 # (⚙️) in the chat input.
+#
+# Images are displayed via event emitter but NOT persisted to the chat
+# message history. This avoids contaminating the context for non-vision
+# models and prevents the "not vision capable" toast in the UI.
 # =============================================================================
 
 
@@ -392,17 +323,18 @@ class Tools:
     Image Generator Pro — full control over seed, model, size, and steps.
 
     Activate this tool from the tool selector (⚙️) in the chat input.
-    The image generation chip (📷) controls the built-in generate_image
-    independently.
 
-    For ComfyUI:
-      - Dimensions are reduced to their lowest ratio (GCD) before sending,
-        so "2000x3000" becomes 2×3. Your workflow handles scaling.
-      - Seed defaults to 0 for reproducibility. Change it for variation.
-      - Steps and model use admin UI defaults unless explicitly overridden
-        by passing them to the tool.
-      - Parameters are only injected if a corresponding node binding
-        exists in the workflow nodes configuration.
+    prompt: Image generation prompt. Translate the user's request into English
+        internally, then enrich with visual details without changing the subject
+        or scene. Do not add superfluous details. Write the final prompt in English.
+    model (optional): Only provide when the user explicitly requests a
+        specific model.
+    size (optional): Only provide when the user explicitly requests specific
+        dimensions. Format as WxH (e.g., 2000x3000).
+    steps (optional): Only provide when the user explicitly requests a
+        specific number of steps.
+    seed (optional): Only provide when the user explicitly requests a
+        specific seed.
     """
 
     class Valves:
@@ -429,17 +361,17 @@ class Tools:
         """
         Generate one image with full control over model, seed, size, and steps.
 
-        Works with any engine configured in Open WebUI.
-
-        :param prompt: What to generate
-        :param model: Model or checkpoint override. Falls back to admin config
-            if omitted.
-        :param size: Dimensions as "WxH" (e.g., "2000x3000" → 2×3 for ComfyUI).
-            Falls back to admin config if omitted.
-        :param steps: Inference steps. Falls back to admin config if omitted.
-        :param seed: Random seed. Defaults to 0 (reproducible). Same seed +
-            same prompt = same image every time. Ignored by OpenAI and Gemini.
-        :return: JSON with status and success confirmation
+        prompt: Image generation prompt. Translate the user's request into English
+            internally, then enrich with visual details without changing the subject
+            or scene. Do not add superfluous details. Write the final prompt in English.
+        model (optional): Only provide when the user explicitly requests a
+            specific model.
+        size (optional): Only provide when the user explicitly requests specific
+            dimensions. Format as WxH (e.g., 2000x3000).
+        steps (optional): Only provide when the user explicitly requests a
+            specific number of steps.
+        seed (optional): Only provide when the user explicitly requests a
+            specific seed.
         """
         if __request__ is None:
             log.error(
@@ -451,7 +383,6 @@ class Tools:
 
         try:
             from open_webui.models.users import UserModel
-            from open_webui.models.chats import Chats
 
             user = UserModel(**__user__) if __user__ else None
 
@@ -481,15 +412,9 @@ class Tools:
                 {"type": "image", "url": img["url"]} for img in images
             ]
 
-            # Persist files to the chat message if context is available
-            if __chat_id__ and __message_id__ and images:
-                db_files = (
-                    await Chats.add_message_files_by_id_and_message_id(
-                        __chat_id__, __message_id__, image_files
-                    )
-                )
-                if db_files is not None:
-                    image_files = db_files
+            # Images are NOT persisted to the chat history to avoid
+            # contaminating the context for non-vision models.
+            # They are only displayed via the event emitter below.
 
             # Emit images to the UI via the event emitter
             if __event_emitter__ and image_files:
