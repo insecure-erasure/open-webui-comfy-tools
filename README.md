@@ -1,18 +1,18 @@
 # Image Generator Pro
 
-A smart Open WebUI tool for AI image generation through ComfyUI -- with full control over seed, model, size, and steps, directly from your chat.
+Open WebUI tool for AI image generation through ComfyUI -- with control over seed, model, size, and steps, directly from your chat.
 
 > **Compatible with:** Open WebUI + ComfyUI
 
 ---
 
-## What does it do?
+## Overview
 
 When you ask your AI assistant to generate an image, **Image Generator Pro** takes over and sends your request straight to ComfyUI. The image appears right in the chat conversation -- no extra clicks, no separate tools.
 
-### What makes it special?
+### Key features
 
-- **Seed control** -- Same prompt + same seed = same image every time. Perfect for iterating on a design without losing the look you liked.
+- **Seed control** -- Same prompt + same seed = same image every time. Useful for iterating on a design without losing the look you liked.
 - **Smart dimensions** -- You can ask for `2000x3000` and the tool automatically converts it to the right aspect ratio for your ComfyUI workflow (no more "invalid size" errors).
 - **AI-enhanced prompts** -- The AI enriches your description with helpful visual details, and translates it to English if needed.
 - **No local storage** -- Images are served directly from ComfyUI. No unnecessary downloads or re-uploads, keeping your server disk clean.
@@ -20,7 +20,7 @@ When you ask your AI assistant to generate an image, **Image Generator Pro** tak
 
 ---
 
-## How it replaces the native image tool
+## Relationship with the native image tool
 
 Open WebUI has two ways of generating images:
 
@@ -34,7 +34,7 @@ Open WebUI has two ways of generating images:
 
 When **Native Tool Calling** is enabled in Open WebUI, the AI will automatically use Image Generator Pro whenever you ask for an image -- just describe what you want and the AI handles the rest.
 
-> **Tip:** The native chip still works independently. You can keep both enabled -- the AI will choose the right one.
+> **Note:** The native chip still works independently. You can keep both enabled -- the AI will choose the right one.
 
 ---
 
@@ -45,8 +45,6 @@ When **Native Tool Calling** is enabled in Open WebUI, the AI will automatically
 3. Paste the contents of `smart_generate_image.py`.
 4. Save it with the title **"Image Generator Pro"**.
 5. Go to any chat, open the tool selector, and enable **Image Generator Pro**.
-
-That's it! The tool will now be available for your AI to use.
 
 ---
 
@@ -65,7 +63,7 @@ Everything is configured through the **Open WebUI Admin panel -> Settings -> Ima
 
 ---
 
-## How to use it (for end users)
+## Usage
 
 Just ask the AI to create an image naturally:
 
@@ -113,4 +111,4 @@ A: Make sure your `ComfyUI Base URL` is accessible from your browser. The image 
 A: Your workflow needs a "seed" node configured in **Admin -> Images -> ComfyUI Workflow Nodes**. Without it, the seed value is ignored and ComfyUI uses its own random seed.
 
 **Q: Can I still use the native image chip?**  
-A: Yes! Both work independently. The chip uses the built-in Open WebUI image generation, while this tool gives you extra control.
+A: Yes. Both work independently. The chip uses the built-in Open WebUI image generation, while this tool gives you extra control.
