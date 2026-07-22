@@ -10,6 +10,10 @@ Open WebUI tool for AI image generation through ComfyUI -- with control over see
 
 When you ask your AI assistant to generate an image, **Smart Generate Image** takes over and sends your request straight to ComfyUI. The image appears right in the chat conversation -- no extra clicks, no separate tools.
 
+Smart Generate Image is installed as a **regular user tool** in **Workspace -> Tools**. It is not a model capability or a builtin tool -- you do not need to enable **Image Generation** in the model's settings or activate it as a builtin tool. The tool simply needs to be enabled in the chat's tool selector.
+
+It uses the image generation settings you configure in **Admin -> Settings -> Images**, as long as **Image Generation Engine** is set to **ComfyUI**. Everything else (Base URL, workflow, nodes, defaults) comes from that same configuration panel.
+
 ### Key features
 
 - **Seed control** -- Same prompt + same seed = same image every time. Useful for iterating on a design without losing the look you liked.
@@ -99,6 +103,8 @@ You can also be more specific:
 - ComfyUI server running and accessible
 - Native Tool Calling enabled in Open WebUI settings
 - A ComfyUI workflow exported and configured in Admin -> Images
+- **Image Generation Engine** set to **ComfyUI** in Admin -> Settings -> Images
+- **Image Generation** does NOT need to be enabled as a model capability or builtin tool
 
 ---
 
