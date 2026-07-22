@@ -32,9 +32,7 @@ Open WebUI has two image generation tools available to the AI:
 | **Aspect ratio** | Fixed or admin-set | Smart GCD conversion |
 | **Steps override** | Admin default only | Override per request |
 
-When **Native Tool Calling** is enabled in Open WebUI, the built-in image generation function (`generate_image`) is available to the AI alongside Smart Generate Image. The AI will decide which one to use based on your request -- if you need seed, model, or steps control, it will use Smart Generate Image. For simple requests, it may use the native `generate_image`.
-
-> **Note:** The native chip in the chat input still works independently. You can keep both tools enabled.
+When **Native Tool Calling** is enabled in Open WebUI, the built-in `generate_image` function is available to the AI alongside Smart Generate Image. The AI will decide which one to use based on your request -- if you need seed, model, or steps control, it will use Smart Generate Image. For simple requests without those parameters, it may use the native `generate_image`.
 
 ---
 
@@ -110,5 +108,4 @@ A: Make sure your `ComfyUI Base URL` is accessible from your browser. The image 
 **Q: Seed doesn't seem to do anything.**  
 A: Your workflow needs a "seed" node configured in **Admin -> Images -> ComfyUI Workflow Nodes**. Without it, the seed value is ignored and ComfyUI uses its own random seed.
 
-**Q: Can I still use the native image chip?**  
-A: Yes. Both work independently. The chip uses the built-in Open WebUI image generation, while this tool gives you extra control.
+
