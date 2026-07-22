@@ -327,7 +327,7 @@ class Tools:
         specific seed.
     """
 
-    class Valves:
+    class Valves(BaseModel):
         """Admin-level configuration."""
 
         model_name: str = Field(
@@ -336,12 +336,33 @@ class Tools:
         )
         steps: int = Field(
             default=0,
-            ge=0,
-            le=15,
-            description="Inference steps. Leave at 0 to inherit from Admin UI settings or use workflow default.",
+            description="Inference steps. 0 = inherit from Admin UI or use workflow default.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": [
+                        {"value": 0, "label": "Inherit (Admin UI / workflow default)"},
+                        {"value": 15, "label": "15"},
+                        {"value": 14, "label": "14"},
+                        {"value": 13, "label": "13"},
+                        {"value": 12, "label": "12"},
+                        {"value": 11, "label": "11"},
+                        {"value": 10, "label": "10"},
+                        {"value": 9, "label": "9"},
+                        {"value": 8, "label": "8"},
+                        {"value": 7, "label": "7"},
+                        {"value": 6, "label": "6"},
+                        {"value": 5, "label": "5"},
+                        {"value": 4, "label": "4"},
+                        {"value": 3, "label": "3"},
+                        {"value": 2, "label": "2"},
+                        {"value": 1, "label": "1"},
+                    ],
+                }
+            },
         )
 
-    class UserValves:
+    class UserValves(BaseModel):
         """User-level configuration (overrides admin valve and Admin UI)."""
 
         model_name: str = Field(
@@ -350,9 +371,30 @@ class Tools:
         )
         steps: int = Field(
             default=0,
-            ge=0,
-            le=15,
-            description="Inference steps. Leave at 0 to use admin valve or Admin UI setting.",
+            description="Inference steps. 0 = inherit from admin valve or Admin UI setting.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": [
+                        {"value": 0, "label": "Inherit"},
+                        {"value": 15, "label": "15"},
+                        {"value": 14, "label": "14"},
+                        {"value": 13, "label": "13"},
+                        {"value": 12, "label": "12"},
+                        {"value": 11, "label": "11"},
+                        {"value": 10, "label": "10"},
+                        {"value": 9, "label": "9"},
+                        {"value": 8, "label": "8"},
+                        {"value": 7, "label": "7"},
+                        {"value": 6, "label": "6"},
+                        {"value": 5, "label": "5"},
+                        {"value": 4, "label": "4"},
+                        {"value": 3, "label": "3"},
+                        {"value": 2, "label": "2"},
+                        {"value": 1, "label": "1"},
+                    ],
+                }
+            },
         )
 
     def __init__(self):
