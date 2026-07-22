@@ -42,6 +42,10 @@ log.info("MONKEY PATCH 1: CreateImageForm patched with seed field")
 #
 # Our patched version skips assignment when the value is None, preserving
 # whatever default the exported workflow JSON carries.
+#
+# For `width` and `height`, the input key is hardcoded to `"value"` because
+# the workflow uses PrimitiveString nodes that receive aspect ratio strings
+# via their "value" input field (nodes 99 and 100 in this workflow).
 # =============================================================================
 from open_webui.utils.images import comfyui as comfyui_module
 
@@ -67,16 +71,12 @@ def patched_apply_workflow_nodes(workflow, nodes, model, payload):
         elif node.type == "width":
             if payload.width is not None:
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][
-                        node.key if node.key else "width"
-                    ] = payload.width
+                    workflow[node_id]["inputs"]["value"] = payload.width
 
         elif node.type == "height":
             if payload.height is not None:
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][
-                        node.key if node.key else "height"
-                    ] = payload.height
+                    workflow[node_id]["inputs"]["value"] = payload.height
 
         elif node.type == "steps":
             if payload.steps is not None:
@@ -216,11 +216,15 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     #
     # prompt, width, height and seed are always sent.
     # steps and model are only sent when the LLM explicitly requests them.
+    #
+    # Width and height are converted to strings because the ComfyUI workflow
+    # uses PrimitiveString nodes (99 and 100) that receive aspect ratio
+    # strings via their "value" input field.
     # =========================================================================
     data = {
         "prompt": form_data.prompt,
-        "width": reduced_w,
-        "height": reduced_h,
+        "width": str(reduced_w),
+        "height": str(reduced_h),
         "n": 1,
     }
 
@@ -259,7 +263,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         log.info("Model omitted — using admin default: %s", model)
 
     log.info(
-        "Layer 3 — Payload built: prompt_len=%d, width=%d, height=%d, "
+        "Layer 3 — Payload built: prompt_len=%d, width=%s, height=%s, "
         "seed=%d, steps=%s, model=%s",
         len(data["prompt"]),
         data["width"],
