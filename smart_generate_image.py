@@ -459,7 +459,7 @@ class Tools:
                             "type": "notification",
                             "data": {
                                 "type": "warning",
-                                "content": f"Steps clamped to {techo} (system limit).",
+                                "content": f"\u26a0\ufe0f Steps clamped to {techo} (system limit).",
                             },
                         }
                     )
@@ -471,7 +471,7 @@ class Tools:
                             "type": "notification",
                             "data": {
                                 "type": "warning",
-                                "content": f"Steps clamped to {techo} (system limit).",
+                                "content": f"\u26a0\ufe0f Steps clamped to {techo} (system limit).",
                             },
                         }
                     )
@@ -494,7 +494,7 @@ class Tools:
                     {
                         "type": "status",
                         "data": {
-                            "description": f"Generating image with {steps_label} steps...",
+                            "description": f"\U0001f3a8 Generating image with {steps_label} steps...",
                             "done": False,
                             "hidden": False,
                         },
@@ -518,7 +518,7 @@ class Tools:
                     {
                         "type": "status",
                         "data": {
-                            "description": "Image generated.",
+                            "description": "\u2705 Image generated.",
                             "done": True,
                             "hidden": False,
                         },
