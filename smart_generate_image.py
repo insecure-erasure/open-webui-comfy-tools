@@ -31,7 +31,9 @@ class PatchedCreateImageForm(images_router.CreateImageForm):
 images_router.CreateImageForm = PatchedCreateImageForm
 images_router.GenerateImageForm = PatchedCreateImageForm
 
-log.info("MONKEY PATCH 1: CreateImageForm patched with seed field")
+log.info(
+    "MONKEY PATCH 1: CreateImageForm patched with seed field"
+)
 
 # =============================================================================
 # MONKEY PATCH 2: Make _apply_workflow_nodes ignore None values
@@ -102,7 +104,9 @@ def patched_apply_workflow_nodes(workflow, nodes, model, payload):
                 if isinstance(payload.image, list):
                     for idx, node_id in enumerate(node.node_ids):
                         if idx < len(payload.image):
-                            workflow[node_id]["inputs"][node.key] = payload.image[idx]
+                            workflow[node_id]["inputs"][node.key] = (
+                                payload.image[idx]
+                            )
                 else:
                     for node_id in node.node_ids:
                         workflow[node_id]["inputs"][node.key] = payload.image
@@ -115,7 +119,9 @@ def patched_apply_workflow_nodes(workflow, nodes, model, payload):
 
 comfyui_module._apply_workflow_nodes = patched_apply_workflow_nodes
 
-log.info("MONKEY PATCH 2: _apply_workflow_nodes patched to ignore None values")
+log.info(
+    "MONKEY PATCH 2: _apply_workflow_nodes patched to ignore None values"
+)
 
 # =============================================================================
 # MONKEY PATCH 3: Override image_generations for ComfyUI
@@ -142,7 +148,9 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     engine = image_config.IMAGE_GENERATION_ENGINE
 
     if engine != "comfyui":
-        return await _original_image_generations(request, form_data, metadata, user)
+        return await _original_image_generations(
+            request, form_data, metadata, user
+        )
 
     # =========================================================================
     # LAYER 1 — Admin defaults
@@ -232,8 +240,8 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         data["steps"] = form_data.steps
         if "steps" not in configured_node_types:
             log.warning(
-                "Steps=%d was provided but no 'steps' node binding is configured. "
-                "The value will be ignored by ComfyUI.",
+                "Steps=%d was provided but no 'steps' node binding is "
+                "configured. The value will be ignored by ComfyUI.",
                 form_data.steps,
             )
     else:
@@ -244,16 +252,16 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         data["model"] = form_data.model
         if "model" not in configured_node_types:
             log.warning(
-                "Model='%s' was provided but no 'model' node binding is configured. "
-                "The value will be ignored.",
+                "Model='%s' was provided but no 'model' node binding is "
+                "configured. The value will be ignored.",
                 form_data.model,
             )
     else:
         log.info("Model omitted — using admin default: %s", model)
 
     log.info(
-        "Layer 3 — Payload built: prompt_len=%d, width=%d, height=%d, seed=%d, "
-        "steps=%s, model=%s",
+        "Layer 3 — Payload built: prompt_len=%d, width=%d, height=%d, "
+        "seed=%d, steps=%s, model=%s",
         len(data["prompt"]),
         data["width"],
         data["height"],
@@ -308,7 +316,9 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
 
     for img in res["data"]:
         img_data, ctype = await get_image_data(
-            img["url"], headers, trusted_base_url=image_config.COMFYUI_BASE_URL
+            img["url"],
+            headers,
+            trusted_base_url=image_config.COMFYUI_BASE_URL,
         )
         _, url = await upload_image(
             request,
@@ -319,13 +329,18 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         )
         images.append({"url": url})
 
-    log.info("Image generation complete — %d image(s) uploaded", len(images))
+    log.info(
+        "Image generation complete — %d image(s) uploaded", len(images)
+    )
     return images
 
 
 images_router.image_generations = patched_image_generations
 
-log.info("MONKEY PATCH 3: image_generations patched for ComfyUI with 4-layer hierarchy")
+log.info(
+    "MONKEY PATCH 3: image_generations patched for ComfyUI "
+    "with 4-layer hierarchy"
+)
 
 # =============================================================================
 # TOOL EXPOSED TO THE LLM
@@ -376,8 +391,12 @@ async def generate_image_pro(
     :return: JSON with status and success confirmation
     """
     if __request__ is None:
-        log.error("generate_image_pro called without request context")
-        return json.dumps({"error": "Request context not available"})
+        log.error(
+            "generate_image_pro called without request context"
+        )
+        return json.dumps(
+            {"error": "Request context not available"}
+        )
 
     try:
         from open_webui.models.users import UserModel
@@ -386,8 +405,8 @@ async def generate_image_pro(
         user = UserModel(**__user__) if __user__ else None
 
         log.info(
-            "generate_image_pro called — prompt_len=%d, model=%s, size=%s, "
-            "steps=%s, seed=%d",
+            "generate_image_pro called — prompt_len=%d, model=%s, "
+            "size=%s, steps=%s, seed=%d",
             len(prompt),
             model,
             size,
@@ -407,12 +426,16 @@ async def generate_image_pro(
             user=user,
         )
 
-        image_files = [{"type": "image", "url": img["url"]} for img in images]
+        image_files = [
+            {"type": "image", "url": img["url"]} for img in images
+        ]
 
         # Persist files to the chat message if context is available
         if __chat_id__ and __message_id__ and images:
-            db_files = await Chats.add_message_files_by_id_and_message_id(
-                __chat_id__, __message_id__, image_files
+            db_files = (
+                await Chats.add_message_files_by_id_and_message_id(
+                    __chat_id__, __message_id__, image_files
+                )
             )
             if db_files is not None:
                 image_files = db_files
@@ -426,13 +449,20 @@ async def generate_image_pro(
                 }
             )
 
-        log.info("Image delivered to chat — %d file(s)", len(image_files))
+        log.info(
+            "Image delivered to chat — %d file(s)", len(image_files)
+        )
 
         return json.dumps(
             {
                 "status": "success",
-                "message": "Image generated.",
-                "seed_used": seed,
+                "message": (
+                    "The image has been successfully generated and is "
+                    "already visible to the user in the chat. You do not "
+                    "need to display or embed the image again - just "
+                    "acknowledge that it has been created."
+                ),
+                "images": images,
             },
             ensure_ascii=False,
         )
