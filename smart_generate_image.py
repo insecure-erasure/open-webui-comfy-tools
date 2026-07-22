@@ -361,9 +361,6 @@ class Tools:
         """
         Generate one image with optional control over model, seed, size, and steps.
 
-        Display the generated image in your response using markdown:
-            ![Generated image](image_url)
-
         prompt: Image generation prompt. Translate the user's request into English internally,
             then enrich with visual details without changing the subject or scene. Do not add
             superfluous details. Write the final prompt in English.
@@ -414,7 +411,7 @@ class Tools:
 
             log.info("Image generated — url=%s", image_url)
 
-            return f"Image generated successfully.\n\n![Generated image]({image_url})"
+            return f"Image generated successfully.\n\nDisplay the image in your response like this:\n![Generated image]({image_url})"
 
         except Exception as e:
             log.exception("generate_image_pro failed: %s", e)
