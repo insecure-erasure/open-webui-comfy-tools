@@ -1,7 +1,7 @@
 """
 title: Image Generator Pro
 author: Abel
-version: 1.2
+version: 1.3
 """
 
 import json
@@ -27,7 +27,7 @@ images_router.CreateImageForm = PatchedCreateImageForm
 images_router.GenerateImageForm = PatchedCreateImageForm
 
 # =============================================================================
-# MONKEY PATCH 2: Intercept image_generations only for ComfyUI
+# MONKEY PATCH 2: Intercept ComfyUI always (GCD), seed only if provided
 # =============================================================================
 _original_image_generations = images_router.image_generations
 
@@ -38,10 +38,9 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
 
     image_config = await get_image_config()
     engine = image_config.IMAGE_GENERATION_ENGINE
-    seed = getattr(form_data, "seed", None)
 
-    # Only intercept ComfyUI + seed to inject extra params
-    if engine == "comfyui" and seed is not None:
+    # Intercept ComfyUI always — for GCD reduction and optional seed
+    if engine == "comfyui":
         from open_webui.routers.images import (
             get_image_model,
             get_image_data,
@@ -75,9 +74,11 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
             "width": width,
             "height": height,
             "n": 1,
-            "seed": seed,
         }
 
+        seed = getattr(form_data, "seed", None)
+        if seed is not None:
+            data["seed"] = seed
         if form_data.steps is not None:
             data["steps"] = form_data.steps
         if form_data.negative_prompt is not None:
@@ -123,7 +124,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
             images.append({"url": url})
         return images
 
-    # For any other engine (or ComfyUI without seed), delegate to original
+    # For any other engine, delegate to original
     return await _original_image_generations(request, form_data, metadata, user)
 
 
@@ -147,23 +148,25 @@ async def generate_image_pro(
 ):
     """
     Generate one image with full control over model, seed, size, steps,
-    and negative prompt. Respects admin-configured defaults.
+    and negative prompt.
 
     Works with any engine configured in Open WebUI.
-    ComfyUI-specific: seed is fully supported; dimensions are reduced to
-    their lowest ratio (GCD) before being sent to the workflow.
-    Steps and negative_prompt default to whatever the ComfyUI workflow
-    defines — they are only overridden when explicitly provided.
+    For ComfyUI:
+      - Dimensions are reduced to their lowest ratio (GCD) before sending.
+      - All parameters default to what the ComfyUI workflow defines.
+        Only override them when explicitly passed.
+      - Seed requires a "seed" node configured in your workflow nodes.
 
     :param prompt: What to generate
     :param model: Model/checkpoint override. Falls back to admin config if omitted.
     :param size: Dimensions as "WxH" (e.g., "2000x3000" → 2x3 for ComfyUI).
         Falls back to admin config if omitted.
-    :param steps: Inference steps. Overrides ComfyUI workflow default if set.
+    :param steps: Inference steps. Falls back to ComfyUI workflow default if omitted.
     :param seed: Random seed for reproducibility. Same seed + same prompt =
-        same image every time. Works with ComfyUI (requires a "seed" node
-        configured in workflow nodes). Ignored by OpenAI/Gemini.
-    :param negative_prompt: What to avoid. Overrides ComfyUI workflow default if set.
+        same image. Falls back to ComfyUI random if omitted.
+        Ignored by OpenAI/Gemini.
+    :param negative_prompt: What to avoid. Falls back to ComfyUI workflow
+        default if omitted.
     :return: JSON with status and success confirmation
     """
     if __request__ is None:
@@ -209,7 +212,7 @@ async def generate_image_pro(
             {
                 "status": "success",
                 "message": "Image generated.",
-                "seed_used": seed if seed is not None else -1,
+                "seed_used": seed if seed is not None else "workflow_default",
             },
             ensure_ascii=False,
         )
