@@ -184,6 +184,9 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     # The set of parameter types for which the admin has defined a node
     # binding in Workflow Nodes. Parameters without a binding are silently
     # ignored — there is nowhere to inject them.
+    #
+    # COMFYUI_WORKFLOW_NODES comes from the database as a list of dicts,
+    # not Pydantic objects, so we access via dict key.
     # =========================================================================
     from open_webui.routers.images import (
         get_image_data,
@@ -196,7 +199,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     )
 
     configured_node_types = {
-        node.type for node in image_config.COMFYUI_WORKFLOW_NODES
+        node["type"] for node in image_config.COMFYUI_WORKFLOW_NODES
     }
     log.info(
         "Layer 2 — Configured node types: %s",
