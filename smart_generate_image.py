@@ -68,7 +68,9 @@ def patched_apply_workflow_nodes(workflow, nodes, model, payload):
 
         # Determine the input key: use the configured key if available,
         # otherwise fall back to the hardcoded default for this node type.
-        input_key = node.key if node.key else NODE_TYPE_INPUT_KEYS.get(node.type, node.key)
+        input_key = node.key if node.key else NODE_TYPE_INPUT_KEYS.get(
+            node.type, node.key
+        )
 
         if node.type == "model":
             if model is not None:
@@ -184,11 +186,16 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         reduced_h,
     )
 
-    model = await images_router.get_image_model(request)
+    # Resolve effective model: LLM override > admin default
+    admin_default_model = await images_router.get_image_model(request)
+    effective_model = (
+        form_data.model if form_data.model is not None else admin_default_model
+    )
     admin_steps = image_config.IMAGE_STEPS
     log.info(
-        "Model resolved: %s | Admin steps: %s",
-        model,
+        "Model resolved: admin=%s, effective=%s | Admin steps: %s",
+        admin_default_model,
+        effective_model,
         admin_steps if admin_steps is not None else "not set",
     )
 
@@ -225,7 +232,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     #
     # prompt, width, height and seed are always sent.
     # model and steps are always sent when a node binding exists — they use
-    # the admin default from Layer 1 unless the LLM explicitly overrides them.
+    # the effective value (LLM override or admin default) from Layer 1.
     #
     # Width and height are converted to strings for the StringConcatenate
     # node that builds the aspect ratio string (e.g. "2:3") for the
@@ -249,7 +256,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         )
 
     # Steps — always sent when a node binding exists.
-    # Uses admin default if LLM did not provide a value.
+    # Uses effective value: LLM override > admin default.
     if "steps" in configured_node_types:
         if form_data.steps is not None:
             data["steps"] = form_data.steps
@@ -263,19 +270,17 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
                 "ComfyUI will use its workflow default"
             )
     else:
-        log.info(
-            "Steps omitted — no 'steps' node binding configured"
-        )
+        log.info("Steps omitted — no 'steps' node binding configured")
 
     # Model — always sent when a node binding exists.
-    # Uses admin default (already resolved via get_image_model) unless
-    # the LLM explicitly overrides it.
+    # Uses effective model: LLM override > admin default.
     if "model" in configured_node_types:
-        if form_data.model is not None:
-            data["model"] = form_data.model
-            log.info("Model overridden by LLM: %s", form_data.model)
-        else:
-            log.info("Model from admin default: %s", model)
+        data["model"] = effective_model
+        log.info(
+            "Model %s: %s",
+            "overridden by LLM" if form_data.model is not None else "from admin default",
+            effective_model,
+        )
     else:
         log.info("Model omitted — no 'model' node binding configured")
 
@@ -295,6 +300,10 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     #
     # The workflow JSON is loaded, node bindings are applied by the patched
     # _apply_workflow_nodes, and the prompt is queued via WebSocket.
+    #
+    # The effective model is passed both in the payload (for injection into
+    # the model node via _apply_workflow_nodes) and as the separate model
+    # parameter to comfyui_create_image.
     # =========================================================================
     log.info("Layer 4 — Dispatching to ComfyUI")
 
@@ -312,7 +321,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
 
     try:
         res = await comfyui_create_image(
-            model,
+            effective_model,
             cf_form,
             str(uuid.uuid4()),
             image_config.COMFYUI_BASE_URL,
