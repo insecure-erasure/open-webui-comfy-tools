@@ -144,4 +144,13 @@ cython_debug/
 *.swp
 *.swo
 *~
+# pi agent files
+.pi/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
