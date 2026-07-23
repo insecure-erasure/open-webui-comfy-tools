@@ -160,8 +160,8 @@
   },
   "84": {
     "inputs": {
-      "string_a": "",
-      "string_b": "",
+      "string_a": "3",
+      "string_b": "2",
       "delimiter": ":"
     },
     "class_type": "StringConcatenate",
