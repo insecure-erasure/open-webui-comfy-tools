@@ -126,7 +126,8 @@ _ENHANCE_WORKFLOW_JSON_RAW = r"""{
       "title": "Load Image (URL/Path)"
     }
   }
-}"""
+}
+"""
 
 ENHANCE_WORKFLOW_JSON: dict = json.loads(_ENHANCE_WORKFLOW_JSON_RAW)
 
