@@ -18,32 +18,16 @@ from pydantic import BaseModel, Field
 log = logging.getLogger(__name__)
 
 # =============================================================================
-# Workflow defaults (used when corresponding valve is empty)
-# =============================================================================
-_DEFAULT_NEGATIVE_PROMPT = (
-    "deformed face, tattoo, piercing, teeth, open mouth, deformed eyes, "
-    "morphed eyes, changed identity, extra limbs, rapid movement, 3d render, "
-    "low quality, morphed features, warped, camera shake, rapid zoom"
-)
-_DEFAULT_MODEL = "Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-nvfp4.safetensors"
-_DEFAULT_LORA = "WAN2.1/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-r64-lora.safetensors"
-_DEFAULT_LENGTH = 81
-
-# =============================================================================
 # Workflow JSON - WAN2.1 Image-to-Video
 # =============================================================================
-# Use placeholders for values the tool should inject at runtime:
+# Placeholders (always injected):
 #   {{PROMPT}}   — the video prompt
-#   {{SEED}}     — seed value (quoted or unquoted, will be replaced before JSON parse)
-#   {{MODEL}}    — model/checkpoint name (_DEFAULT_MODEL if valve empty)
-#   {{LORA}}     — LoRA name (_DEFAULT_LORA if valve empty)
-#   {{LORA_ON}}  — true/false (auto-set: true if LORA is non-empty)
-#   {{LENGTH}}   — number of frames / video length (_DEFAULT_LENGTH if 0)
+#   {{SEED}}     — seed value
 #   {{IMAGE}}    — input image filename for I2V (empty string for T2V)
-#   {{NEGATIVE_PROMPT}}  — negative prompt (_DEFAULT_NEGATIVE_PROMPT if valve empty)
 #
-# Set NODE_OUTPUT below to the node ID that produces the video file
-# (e.g. VHS_VideoCombine node).
+# Optional overrides (post-parse, only when valve is non-empty):
+#   model, lora, length, negative_prompt
+#
 #
 _VIDEO_WORKFLOW_JSON_RAW = r"""{
   "6": {
@@ -57,7 +41,7 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
   },
   "7": {
     "inputs": {
-      "text": "{{NEGATIVE_PROMPT}}",
+      "text": "deformed face, tattoo, piercing, teeth, open mouth, deformed eyes, morphed eyes, changed identity, extra limbs, rapid movement, 3d render, low quality, morphed features, warped, camera shake, rapid zoom",
       "clip": [
         "1044",
         1
@@ -181,7 +165,7 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
   },
   "822": {
     "inputs": {
-      "unet_name": "{{MODEL}}"
+      "unet_name": "Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-nvfp4.safetensors"
     },
     "class_type": "UNETLoader",
     "_meta": {
@@ -260,7 +244,7 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
         "405",
         2
       ],
-      "length": {{LENGTH}},
+      "length": 81,
       "batch_size": 1,
       "positive": [
         "6",
@@ -384,8 +368,8 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
         "type": "PowerLoraLoaderHeaderWidget"
       },
       "lora_1": {
-        "on": {{LORA_ON}},
-        "lora": "{{LORA}}",
+        "on": true,
+        "lora": "WAN2.1/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-r64-lora.safetensors",
         "strength": 1
       },
       "➕ Add Lora": "",
@@ -716,27 +700,27 @@ class Tools:
             # =================================================================
             user_valves = (__user__ or {}).get("valves", None)
 
-            # Model: UserValves > AdminValves > _DEFAULT_MODEL
-            user_model = (
-                user_valves.model_name if user_valves and user_valves.model_name else ""
+            # Model: UserValves > AdminValves > leave workflow default
+            resolved_model = (
+                user_valves.model_name if user_valves and user_valves.model_name
+                else self.valves.model_name or ""
             )
-            resolved_model = user_model or self.valves.model_name or _DEFAULT_MODEL
 
-            # LoRA: UserValves > AdminValves > _DEFAULT_LORA
-            user_lora = (
-                user_valves.lora if user_valves and user_valves.lora else ""
+            # LoRA: UserValves > AdminValves > leave workflow default
+            resolved_lora = (
+                user_valves.lora if user_valves and user_valves.lora
+                else self.valves.lora or ""
             )
-            resolved_lora = user_lora or self.valves.lora or _DEFAULT_LORA
 
-            # Length: UserValves > AdminValves > _DEFAULT_LENGTH
+            # Length: UserValves > AdminValves > leave workflow default
             user_length = user_valves.length if user_valves and user_valves.length else 0
-            resolved_length = user_length or self.valves.length or _DEFAULT_LENGTH
+            resolved_length = user_length or self.valves.length or 0
 
-            # Negative prompt: UserValves > AdminValves > _DEFAULT_NEGATIVE_PROMPT
-            user_neg = (
-                user_valves.negative_prompt if user_valves and user_valves.negative_prompt else ""
+            # Negative prompt: UserValves > AdminValves > leave workflow default
+            resolved_neg = (
+                user_valves.negative_prompt if user_valves and user_valves.negative_prompt
+                else self.valves.negative_prompt or ""
             )
-            resolved_neg = user_neg or self.valves.negative_prompt or _DEFAULT_NEGATIVE_PROMPT
 
             # Seed: UserValve. -1 = random, >=0 = fixed
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
@@ -757,25 +741,30 @@ class Tools:
             # =================================================================
             # Build the workflow: inject placeholders into the raw JSON
             # =================================================================
-            # LORA_ON: boolean — enable lora only when a name is provided
-            lora_on = "true" if resolved_lora else "false"
-
             # IMAGE: the input image filename, or empty string for T2V
             image_val = image_filename or ""
 
             replacements = {
                 "PROMPT": prompt,
                 "SEED": seed_arg,
-                "MODEL": resolved_model,
-                "LORA": resolved_lora,
-                "LORA_ON": lora_on,
-                "LENGTH": resolved_length,
                 "IMAGE": image_val,
-                "NEGATIVE_PROMPT": resolved_neg,
             }
 
             injected_raw = _inject_placeholders(_VIDEO_WORKFLOW_JSON_RAW, replacements)
             workflow = json.loads(injected_raw)
+
+            # =================================================================
+            # Apply optional overrides post-parse (only when valve is non-empty)
+            # =================================================================
+            if resolved_model:
+                workflow["822"]["inputs"]["unet_name"] = resolved_model
+            if resolved_lora:
+                workflow["1044"]["inputs"]["lora_1"]["on"] = True
+                workflow["1044"]["inputs"]["lora_1"]["lora"] = resolved_lora
+            if resolved_length:
+                workflow["998"]["inputs"]["length"] = resolved_length
+            if resolved_neg:
+                workflow["7"]["inputs"]["text"] = resolved_neg
 
             log.info(
                 "Dispatching video workflow to ComfyUI (%s) - prompt_len=%d, seed=%d, "
@@ -783,9 +772,9 @@ class Tools:
                 image_config.COMFYUI_BASE_URL,
                 len(prompt),
                 seed_arg,
-                resolved_model,
-                resolved_lora or "(none)",
-                str(resolved_length),
+                resolved_model or "(workflow default)",
+                resolved_lora or "(none — workflow default)",
+                str(resolved_length) if resolved_length else "(workflow default)",
                 image_filename or "(none)",
             )
 
