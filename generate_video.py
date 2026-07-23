@@ -577,40 +577,17 @@ def _extract_video_filename(outputs: dict, output_node_id: str) -> str:
 
 class Tools:
     """
-    Generate Video - animate an image into a video through ComfyUI (WAN2.1 I2V).
+    Generate Video - animate a previously generated image into a video using WAN2.1.
 
-    Activate this tool from the tool selector in the chat input.
+    Only use when the user explicitly asks to animate an image that was
+    just generated. Pass the image_filename from the image generation
+    response as-is — do not modify it.
 
-    Use this when the user asks to animate an image that was just generated,
-    or to create a video from an existing image.
-
-    **IMPORTANT:** This is an image-to-video workflow. You MUST always
-    pass image_filename from a previous smart_generate_image or
-    enhance_image response. There is no text-to-video mode.
-
-    **Parameters for the agent:**
-
-    prompt: The video description. Translate the user's request into English
+    prompt: Video description. Translate the user's request into English
         internally, then enrich with visual motion details without changing
         the subject or scene.
-    image_filename (required): The image_filename from a previous
-        smart_generate_image or enhance_image response. Pass it as-is
-        to animate that image.
-
-    --- Available Valves ---
-    model_name (admin / user):
-        Model/checkpoint name for video generation. Leave empty for system default.
-    lora (admin / user):
-        LoRA name for video style. Leave empty for no LoRA.
-    length (admin / user):
-        Number of frames / video length. 0 = use workflow default.
-    negative_prompt (admin / user):
-        Negative prompt. Leave empty to use the workflow default.
-    seed (user only):
-        Seed for reproducibility. -1 = random, >=0 = fixed.
-    comfyui_image_base_url (admin / user):
-        Public base URL for video links. If empty, defaults
-        to COMFYUI_BASE_URL from Admin Panel > Settings > Images.
+    image_filename: The image_filename from the last image generation
+        response. Required — this tool cannot generate video from text alone.
     """
 
     class Valves(BaseModel):
@@ -680,13 +657,13 @@ class Tools:
         __message_id__=None,
     ):
         """
-        Animate an image into a video through ComfyUI (WAN2.1 I2V).
+        Animate a previously generated image into a video using WAN2.1.
 
-        Use this when the user asks to animate an image that was just generated.
+        Only use when the user explicitly asks to animate an image.
+        Pass the image_filename from the last generation as-is.
 
-        prompt: Video description in English, enriched with visual motion details.
-        image_filename: The image_filename from smart_generate_image
-            or enhance_image. Required — this is an image-to-video workflow.
+        prompt: Video description in English, enriched with motion details.
+        image_filename: The image_filename from the last image generation.
         """
         if __request__ is None:
             log.error("generate_video called without request context")
