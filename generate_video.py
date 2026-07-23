@@ -18,13 +18,16 @@ from pydantic import BaseModel, Field
 log = logging.getLogger(__name__)
 
 # =============================================================================
-# Default negative prompt (used when valve is empty)
+# Workflow defaults (used when corresponding valve is empty)
 # =============================================================================
 _DEFAULT_NEGATIVE_PROMPT = (
     "deformed face, tattoo, piercing, teeth, open mouth, deformed eyes, "
     "morphed eyes, changed identity, extra limbs, rapid movement, 3d render, "
     "low quality, morphed features, warped, camera shake, rapid zoom"
 )
+_DEFAULT_MODEL = "Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-nvfp4.safetensors"
+_DEFAULT_LORA = "WAN2.1/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-r64-lora.safetensors"
+_DEFAULT_LENGTH = 81
 
 # =============================================================================
 # Workflow JSON - WAN2.1 Image-to-Video
@@ -32,10 +35,10 @@ _DEFAULT_NEGATIVE_PROMPT = (
 # Use placeholders for values the tool should inject at runtime:
 #   {{PROMPT}}   — the video prompt
 #   {{SEED}}     — seed value (quoted or unquoted, will be replaced before JSON parse)
-#   {{MODEL}}    — model/checkpoint name
-#   {{LORA}}     — LoRA name
+#   {{MODEL}}    — model/checkpoint name (_DEFAULT_MODEL if valve empty)
+#   {{LORA}}     — LoRA name (_DEFAULT_LORA if valve empty)
 #   {{LORA_ON}}  — true/false (auto-set: true if LORA is non-empty)
-#   {{LENGTH}}   — number of frames / video length
+#   {{LENGTH}}   — number of frames / video length (_DEFAULT_LENGTH if 0)
 #   {{IMAGE}}    — input image filename for I2V (empty string for T2V)
 #   {{NEGATIVE_PROMPT}}  — negative prompt (_DEFAULT_NEGATIVE_PROMPT if valve empty)
 #
@@ -713,21 +716,21 @@ class Tools:
             # =================================================================
             user_valves = (__user__ or {}).get("valves", None)
 
-            # Model: UserValves > AdminValves > None (leave workflow default)
+            # Model: UserValves > AdminValves > _DEFAULT_MODEL
             user_model = (
                 user_valves.model_name if user_valves and user_valves.model_name else ""
             )
-            resolved_model = user_model or self.valves.model_name or ""
+            resolved_model = user_model or self.valves.model_name or _DEFAULT_MODEL
 
-            # LoRA: UserValves > AdminValves > None (leave workflow default = no lora)
+            # LoRA: UserValves > AdminValves > _DEFAULT_LORA
             user_lora = (
                 user_valves.lora if user_valves and user_valves.lora else ""
             )
-            resolved_lora = user_lora or self.valves.lora or ""
+            resolved_lora = user_lora or self.valves.lora or _DEFAULT_LORA
 
-            # Length: UserValves > AdminValves > 0 (workflow default)
+            # Length: UserValves > AdminValves > _DEFAULT_LENGTH
             user_length = user_valves.length if user_valves and user_valves.length else 0
-            resolved_length = user_length or self.valves.length or 0
+            resolved_length = user_length or self.valves.length or _DEFAULT_LENGTH
 
             # Negative prompt: UserValves > AdminValves > _DEFAULT_NEGATIVE_PROMPT
             user_neg = (
@@ -780,9 +783,9 @@ class Tools:
                 image_config.COMFYUI_BASE_URL,
                 len(prompt),
                 seed_arg,
-                resolved_model or "(workflow default)",
+                resolved_model,
                 resolved_lora or "(none)",
-                str(resolved_length) if resolved_length else "(workflow default)",
+                str(resolved_length),
                 image_filename or "(none)",
             )
 
