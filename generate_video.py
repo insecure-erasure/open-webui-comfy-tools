@@ -32,7 +32,11 @@ log = logging.getLogger(__name__)
 _VIDEO_WORKFLOW_JSON_RAW = r"""{
   "6": {
     "inputs": {
-      "text": "{{PROMPT}}"
+      "text": "{{PROMPT}}",
+      "clip": [
+        "1044",
+        1
+      ]
     },
     "class_type": "CLIPTextEncode",
     "_meta": {
@@ -165,7 +169,8 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
   },
   "822": {
     "inputs": {
-      "unet_name": "Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-nvfp4.safetensors"
+      "unet_name": "Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-nvfp4.safetensors",
+      "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
     "_meta": {
@@ -436,6 +441,11 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
 # =============================================================================
 NODE_OUTPUT: str = "1013"
 
+
+# =============================================================================
+# ComfyUI constants
+# =============================================================================
+_COMFY_SEED_MAX: int = 1125899906842624
 
 # =============================================================================
 # Placeholder injection
@@ -728,7 +738,7 @@ class Tools:
 
             # Seed: UserValve. -1 = random, >=0 = fixed
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
-            seed_arg = _random.randint(0, 0xFFFFFFFFFFFFFFFF) if user_seed == -1 else user_seed
+            seed_arg = _random.randint(0, _COMFY_SEED_MAX) if user_seed == -1 else min(user_seed, _COMFY_SEED_MAX)
 
             # Base URL: UserValves > AdminValves > COMFYUI_BASE_URL
             user_video_base_url = (
