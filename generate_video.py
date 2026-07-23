@@ -18,56 +18,417 @@ from pydantic import BaseModel, Field
 log = logging.getLogger(__name__)
 
 # =============================================================================
-# Workflow JSON - PASTE YOUR VIDEO WORKFLOW HERE
+# Workflow JSON - WAN2.1 Image-to-Video
 # =============================================================================
-# Export your video workflow from ComfyUI (WAN2.1, VideoCrafter, etc.)
-# and paste it as the value of _VIDEO_WORKFLOW_JSON_RAW below.
-#
 # Use placeholders for values the tool should inject at runtime:
 #   {{PROMPT}}   — the video prompt
 #   {{SEED}}     — seed value (quoted or unquoted, will be replaced before JSON parse)
 #   {{MODEL}}    — model/checkpoint name
 #   {{LORA}}     — LoRA name
+#   {{LORA_ON}}  — true/false (auto-set: true if LORA is non-empty)
 #   {{LENGTH}}   — number of frames / video length
+#   {{IMAGE}}    — input image filename for I2V (empty string for T2V)
 #
 # Set NODE_OUTPUT below to the node ID that produces the video file
 # (e.g. VHS_VideoCombine node).
 #
 _VIDEO_WORKFLOW_JSON_RAW = r"""{
-  "1": {
+  "6": {
     "inputs": {
-      "frames": {{LENGTH}},
-      "fps": 16,
-      "width": 832,
-      "height": 480,
-      "seed": {{SEED}},
-      "steps": 20,
-      "cfg": 4.0,
-      "prompt": "{{PROMPT}}",
-      "model": "{{MODEL}}",
-      "lora": "{{LORA}}",
-      "image": [""]
+      "text": "{{PROMPT}}"
     },
-    "class_type": "WanVideoI2V",
+    "class_type": "CLIPTextEncode",
     "_meta": {
-      "title": "WAN2.1 Image to Video"
+      "title": "Positive Prompt"
     }
   },
-  "2": {
+  "7": {
     "inputs": {
-      "images": ["1", 0],
-      "frame_rate": 16,
+      "text": "deformed face, tattoo, piercing, teeth, open mouth, deformed eyes, morphed eyes, changed identity, extra limbs, rapid movement, 3d render, low quality, morphed features, warped, camera shake, rapid zoom",
+      "clip": [
+        "1044",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative Prompt"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "876",
+        0
+      ],
+      "vae": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "39": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "54": {
+    "inputs": {
+      "shift": 3,
+      "model": [
+        "501",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "97": {
+    "inputs": {
+      "clip_name": "umt5-xxl-encoder-Q5_K_M.gguf",
+      "type": "wan"
+    },
+    "class_type": "CLIPLoaderGGUF",
+    "_meta": {
+      "title": "CLIPLoader (GGUF)"
+    }
+  },
+  "104": {
+    "inputs": {
+      "strength": 0.5,
+      "use_gpu": true,
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "FastUnsharpSharpen",
+    "_meta": {
+      "title": "Unsharpen mask"
+    }
+  },
+  "405": {
+    "inputs": {
+      "generation_width": 480,
+      "generation_height": 640,
+      "aspect_ratio_preservation": "keep_input",
+      "image": [
+        "1043",
+        0
+      ]
+    },
+    "class_type": "WanVideoImageResizeToClosest",
+    "_meta": {
+      "title": "WanVideo Image Resize To Closest"
+    }
+  },
+  "460": {
+    "inputs": {
+      "sage_attention": "disabled",
+      "allow_compile": false,
+      "model": [
+        "1044",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "SageAttention"
+    }
+  },
+  "501": {
+    "inputs": {
+      "nag_scale": 11,
+      "nag_alpha": 0.25,
+      "nag_tau": 2.5,
+      "input_type": "default",
+      "model": [
+        "460",
+        0
+      ],
+      "conditioning": [
+        "1006",
+        0
+      ]
+    },
+    "class_type": "WanVideoNAG",
+    "_meta": {
+      "title": "NAG HIGH"
+    }
+  },
+  "822": {
+    "inputs": {
+      "unet_name": "{{MODEL}}"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "876": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": [
+        "1024",
+        0
+      ],
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "54",
+        0
+      ],
+      "positive": [
+        "998",
+        0
+      ],
+      "negative": [
+        "998",
+        1
+      ],
+      "latent_image": [
+        "998",
+        2
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "993": {
+    "inputs": {
+      "crop": "none",
+      "clip_vision": [
+        "994",
+        0
+      ],
+      "image": [
+        "1043",
+        0
+      ]
+    },
+    "class_type": "CLIPVisionEncode",
+    "_meta": {
+      "title": "CLIP Vision Encode"
+    }
+  },
+  "994": {
+    "inputs": {
+      "clip_name": "clip_vision_h_fp8_e4m3fn.safetensors"
+    },
+    "class_type": "CLIPVisionLoader",
+    "_meta": {
+      "title": "Load CLIP Vision"
+    }
+  },
+  "998": {
+    "inputs": {
+      "width": [
+        "405",
+        1
+      ],
+      "height": [
+        "405",
+        2
+      ],
+      "length": {{LENGTH}},
+      "batch_size": 1,
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "1006",
+        0
+      ],
+      "vae": [
+        "39",
+        0
+      ],
+      "clip_vision_output": [
+        "993",
+        0
+      ],
+      "start_image": [
+        "405",
+        0
+      ]
+    },
+    "class_type": "WanImageToVideo",
+    "_meta": {
+      "title": "WanImageToVideo"
+    }
+  },
+  "1006": {
+    "inputs": {
+      "conditioning_to": [
+        "1007",
+        0
+      ],
+      "conditioning_from": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "ConditioningConcat",
+    "_meta": {
+      "title": "Conditioning (Concat)"
+    }
+  },
+  "1007": {
+    "inputs": {
+      "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+      "clip": [
+        "1044",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Default Wan negative prompt"
+    }
+  },
+  "1013": {
+    "inputs": {
+      "frame_rate": 36,
       "loop_count": 0,
       "filename_prefix": "wan21_output",
       "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 10,
+      "save_metadata": true,
+      "trim_to_audio": false,
       "pingpong": false,
       "save_output": true,
-      "videocodec": "libx264",
-      "audio": null
+      "images": [
+        "1052",
+        0
+      ]
     },
     "class_type": "VHS_VideoCombine",
     "_meta": {
-      "title": "Video Combine"
+      "title": "Output MP4"
+    }
+  },
+  "1014": {
+    "inputs": {
+      "blend_factor": 0.75,
+      "blend_mode": "normal",
+      "image1": [
+        "104",
+        0
+      ],
+      "image2": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "ImageBlend",
+    "_meta": {
+      "title": "Image Blend"
+    }
+  },
+  "1024": {
+    "inputs": {
+      "seed": {{SEED}}
+    },
+    "class_type": "easy seed",
+    "_meta": {
+      "title": "EasySeed"
+    }
+  },
+  "1043": {
+    "inputs": {
+      "source": "temp",
+      "url": "",
+      "image": "{{IMAGE}}",
+      "Choose file to upload": null
+    },
+    "class_type": "LoadImageByUrlOrPath",
+    "_meta": {
+      "title": "Load Image (URL/Path)"
+    }
+  },
+  "1044": {
+    "inputs": {
+      "PowerLoraLoaderHeaderWidget": {
+        "type": "PowerLoraLoaderHeaderWidget"
+      },
+      "lora_1": {
+        "on": {{LORA_ON}},
+        "lora": "{{LORA}}",
+        "strength": 1
+      },
+      "➕ Add Lora": "",
+      "model": [
+        "822",
+        0
+      ],
+      "clip": [
+        "97",
+        0
+      ]
+    },
+    "class_type": "Power Lora Loader (rgthree)",
+    "_meta": {
+      "title": "Power Lora Loader (rgthree)"
+    }
+  },
+  "1051": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.scale": 2,
+      "quality": "ULTRA",
+      "images": [
+        "1014",
+        0
+      ]
+    },
+    "class_type": "RTXVideoSuperResolution",
+    "_meta": {
+      "title": "RTX Video Super Resolution"
+    }
+  },
+  "1052": {
+    "inputs": {
+      "multiplier": 3,
+      "interp_model": [
+        "1053",
+        0
+      ],
+      "images": [
+        "1051",
+        0
+      ]
+    },
+    "class_type": "FrameInterpolate",
+    "_meta": {
+      "title": "Frame Interpolate"
+    }
+  },
+  "1053": {
+    "inputs": {
+      "model_name": "rife_v4.26.safetensors"
+    },
+    "class_type": "FrameInterpolationModelLoader",
+    "_meta": {
+      "title": "Load Frame Interpolation Model"
     }
   }
 }
@@ -76,7 +437,7 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
 # =============================================================================
 # Node ID - output node that produces the video file
 # =============================================================================
-NODE_OUTPUT: str = "2"
+NODE_OUTPUT: str = "1013"
 
 
 # =============================================================================
@@ -367,12 +728,20 @@ class Tools:
             # =================================================================
             # Build the workflow: inject placeholders into the raw JSON
             # =================================================================
+            # LORA_ON: boolean — enable lora only when a name is provided
+            lora_on = "true" if resolved_lora else "false"
+
+            # IMAGE: the input image filename, or empty string for T2V
+            image_val = image_filename or ""
+
             replacements = {
                 "PROMPT": prompt,
                 "SEED": seed_arg,
                 "MODEL": resolved_model,
                 "LORA": resolved_lora,
+                "LORA_ON": lora_on,
                 "LENGTH": resolved_length,
+                "IMAGE": image_val,
             }
 
             injected_raw = _inject_placeholders(_VIDEO_WORKFLOW_JSON_RAW, replacements)
