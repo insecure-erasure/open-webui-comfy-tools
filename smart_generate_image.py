@@ -242,7 +242,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
             image_config.COMFYUI_API_KEY,
         )
     except asyncio.CancelledError:
-        log.info("Image generation cancelled by user — interrupting ComfyUI")
+        log.info("Image generation cancelled by user - interrupting ComfyUI")
         try:
             interrupt_url = f"{image_config.COMFYUI_BASE_URL.rstrip('/')}/interrupt"
             headers = {}
@@ -280,7 +280,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
             base = image_base_url.rstrip("/")
             image_url = f"{base}{raw_url}"
         elif raw_url.startswith(comfy_base):
-            # Absolute URL from ComfyUI — rewrite the host part
+            # Absolute URL from ComfyUI - rewrite the host part
             image_url = raw_url.replace(comfy_base, image_base_url.rstrip("/"), 1)
         else:
             image_url = raw_url

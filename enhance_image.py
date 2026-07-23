@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 log = logging.getLogger(__name__)
 
 # =============================================================================
-# Workflow JSON — SeedVR2 upscale (exact copy from ComfyUI export)
+# Workflow JSON - SeedVR2 upscale (exact copy from ComfyUI export)
 # =============================================================================
 _ENHANCE_WORKFLOW_JSON_RAW = r"""{
   "61": {
@@ -147,7 +147,7 @@ class Tools:
 
     Only use when the user explicitly asks to enhance, upscale, or improve
     an image that was just generated. Pass the image_filename from the
-    smart_generate_image response — do not modify it.
+    smart_generate_image response - do not modify it.
 
     --- Available Valves ---
     comfyui_image_base_url (admin / user):
@@ -189,7 +189,7 @@ class Tools:
 
         Only call when the user explicitly asks to enhance or upscale
         an image. Pass the image_filename from the smart_generate_image
-        response as-is — do not modify it.
+        response as-is - do not modify it.
 
         image_filename: The filename from the smart_generate_image response.
         """
@@ -247,7 +247,7 @@ class Tools:
             workflow[NODE_LOAD_IMAGE]["inputs"]["image"] = filename
 
             log.info(
-                "Dispatching enhance workflow to ComfyUI (%s) — file=%s",
+                "Dispatching enhance workflow to ComfyUI (%s) - file=%s",
                 image_config.COMFYUI_BASE_URL,
                 filename,
             )
@@ -279,7 +279,7 @@ class Tools:
                     image_config.COMFYUI_API_KEY,
                 )
             except asyncio.CancelledError:
-                log.info("Enhance cancelled by user — interrupting ComfyUI")
+                log.info("Enhance cancelled by user - interrupting ComfyUI")
                 try:
                     interrupt_url = f"{image_config.COMFYUI_BASE_URL.rstrip('/')}/interrupt"
                     headers = {}

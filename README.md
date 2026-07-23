@@ -12,41 +12,75 @@ Smart Generate Image is a tool that sends image generation requests to ComfyUI. 
 
 It is installed as a regular user tool in **Workspace -> Tools**. It does not require Image Generation to be enabled as a model capability or builtin tool. It uses the image generation settings from **Admin Panel -> Settings -> Images** when the engine is set to ComfyUI.
 
+A companion tool, **Enhance Image**, can upscale previously generated images using SeedVR2.
+
 ---
 
-## Tool parameters
+## Tools
 
-The tool exposes two parameters to the LLM:
+### Smart Generate Image (`smart_generate_image.py`)
+
+Generates images through ComfyUI with control over prompt and size. Model, steps, and seed are configured via Valves.
+
+**Parameters exposed to the LLM:**
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | prompt | string | Image description. The LLM translates to English and enriches with visual details. |
 | size | string (optional) | Dimensions as WxH (e.g. 2000x3000). Falls back to Admin UI config if omitted. |
 
-Model, steps, and seed are configured via Valves.
+**Response format:**
+
+```
+image_md: ![Generated image](<url>)
+image_filename: <filename.png>
+
+Use image_md to display the image in your response.
+```
+
+- `image_md`: Markdown to render the image in the conversation.
+- `image_filename`: Internal ComfyUI filename (not directly accessible from the filesystem). Used by Enhance Image.
+
+### Enhance Image (`enhance_image.py`)
+
+Upscales or enhances a previously generated image using SeedVR2. Only use when the user explicitly asks to improve, upscale, or enhance an image.
+
+**Parameters exposed to the LLM:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| image_filename | string | The `image_filename` from the last Smart Generate Image response. Pass it as-is. |
 
 ---
 
 ## Valves
 
-### Admin Valves
+### Admin Valves (Smart Generate Image)
 
 Configurable by admins in **Workspace -> Tools -> Smart Generate Image -> Valves**.
 
 | Valve | Type | Default | Description |
 |-------|------|---------|-------------|
 | model_name | string | "" | Model/checkpoint name. Overrides the Admin UI default. Leave empty to use the Admin UI setting. |
-| steps | dropdown | 0 (Inherit) | Inference steps (1-15, descending). 0 = inherit from Admin UI or use workflow default. |
+| steps | dropdown | 0 (System default) | Inference steps (1-15, descending). 0 = inherit from Admin UI or use workflow default. |
+| comfyui_image_base_url | string | "" | Public base URL for image links. Overrides COMFYUI_BASE_URL. Leave empty to use COMFYUI_BASE_URL. |
 
-### User Valves
+### User Valves (Smart Generate Image)
 
 Configurable by end users from the chat interface.
 
 | Valve | Type | Default | Description |
 |-------|------|---------|-------------|
 | model_name | string | "" | Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting. |
-| steps | dropdown | 0 (Inherit) | Inference steps (1-15, descending). 0 = inherit from admin valve or Admin UI setting. |
+| steps | dropdown | 0 (System default) | Inference steps (1-15, descending). 0 = inherit from admin valve or Admin UI setting. |
+| comfyui_image_base_url | string | "" | Override the admin valve or COMFYUI_BASE_URL for image links. |
 | seed | int | -1 | Seed. -1 = random, >=0 = fixed seed for reproducibility. |
+
+### Valves (Enhance Image)
+
+| Valve (admin / user) | Type | Default | Description |
+|----------------------|------|---------|-------------|
+| comfyui_image_base_url | string | "" | Public base URL for enhanced image links. Leave empty to use COMFYUI_BASE_URL. |
 
 ### Precedence
 
@@ -56,7 +90,9 @@ Configurable by end users from the chat interface.
 
 **Seed resolution:** UserValve. -1 = random (auto-generated), >=0 = fixed.
 
-Both UserValves and AdminValves are clamped against the Admin UI IMAGE_STEPS ceiling (or 15 as safety fallback). When clamping occurs, a warning toast is shown to the user.
+**Image base URL resolution:** UserValves > AdminValves > COMFYUI_BASE_URL
+
+Both UserValves and AdminValves for steps are clamped against the Admin UI IMAGE_STEPS ceiling (or 15 as safety fallback). When clamping occurs, a warning toast is shown to the user.
 
 ---
 
@@ -65,13 +101,23 @@ Both UserValves and AdminValves are clamped against the Admin UI IMAGE_STEPS cei
 Configure these in **Admin Panel -> Settings -> Images**:
 
 - Image Generation Engine: ComfyUI
-- ComfyUI Base URL: your ComfyUI server address (must be browser-accessible)
+- ComfyUI Base URL: your ComfyUI server address
 - ComfyUI Workflow: exported workflow JSON
 - ComfyUI Workflow Nodes: define which nodes receive each parameter
 - Image Size: default dimensions
 - Image Steps: default inference steps (acts as ceiling for Valves)
 
 For seed support, configure a "seed" node in Workflow Nodes.
+
+### Workflows
+
+Pre-configured workflows are available in the `workflows/` directory:
+
+| File | Description |
+|------|-------------|
+| `zit.json` | Base workflow (zImageTurbo, no upscaler) |
+| `zit-seedvr2.json` | Workflow with SeedVR2 upscaler integrated |
+| `seedvr2-upscale.json` | Standalone SeedVR2 upscale workflow (used by Enhance Image) |
 
 ---
 
@@ -80,7 +126,8 @@ For seed support, configure a "seed" node in Workflow Nodes.
 1. Go to **Workspace -> Tools** in Open WebUI.
 2. Click **"+"** and paste the contents of `smart_generate_image.py`.
 3. Save as **"Smart Generate Image"**.
-4. Enable the tool in the chat tool selector.
+4. Repeat for `enhance_image.py`, save as **"Enhance Image"**.
+5. Enable the tools in the chat tool selector.
 
 ---
 
@@ -91,17 +138,23 @@ For seed support, configure a "seed" node in Workflow Nodes.
 - Native Tool Calling enabled
 - ComfyUI workflow configured in Admin Panel -> Settings -> Images
 - Image Generation Engine set to ComfyUI
-- Image Generation does NOT need to be enabled as a model capability or builtin tool
+- [ComfyUI-LoadImageURL](https://github.com/insecure-erasure/ComfyUI-LoadImageURL) custom node (required by Enhance Image)
 
 ---
 
 ## Usage
 
-Ask the AI to create an image naturally:
+Generate an image:
 
 > *"Generate an image of a cat wearing a spacesuit on Mars"*
 >
 > *"Create a 1920x1080 landscape of a cyberpunk city at night"*
+
+Enhance a generated image:
+
+> *"Enhance that image"*
+>
+> *"Upscale the last image"*
 
 Optional details the AI can handle:
 
@@ -114,10 +167,13 @@ Model, steps, and seed are controlled via Valves and Admin UI settings, not from
 ## FAQ
 
 **Q: The image doesn't show up in the chat.**  
-A: Check that the ComfyUI Base URL is accessible from your browser. Images are served directly from ComfyUI.
+A: Check that the ComfyUI Base URL (or comfyui_image_base_url valve) is accessible from your browser. Images are served directly from ComfyUI.
 
 **Q: Seed doesn't seem to do anything.**  
 A: Configure a "seed" node in Admin Panel -> Settings -> Images -> ComfyUI Workflow Nodes.
 
 **Q: How do I change the model or steps?**  
 A: Admins configure them in Workspace -> Tools -> Smart Generate Image -> Valves. Users can override from the chat interface. Alternatively, set defaults in Admin Panel -> Settings -> Images.
+
+**Q: Enhance Image fails with an image loading error.**  
+A: Ensure the [ComfyUI-LoadImageURL](https://github.com/insecure-erasure/ComfyUI-LoadImageURL) custom node is installed in ComfyUI's `custom_nodes/` directory.
