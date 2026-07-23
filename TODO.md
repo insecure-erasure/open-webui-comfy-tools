@@ -49,10 +49,11 @@ body { background:#0d0d0d; display:flex; align-items:center; justify-content:cen
 ## Tool return format
 
 ```
-video_md: <full HTML block with player>
-video_filename: {filename.mp4}
+video_html: <full HTML block with player>
+video_filename: <filename.mp4>
 
-Copy the video_md HTML block exactly as shown above into your response ...
+Paste the video_html value inside a code block in your response
+(triple backticks) so the frontend renders it as a video player.
 ```
 
 This follows the same structured key-value pattern as `smart_generate_image` (`image_md:`, `image_filename:`) and `enhance_image` (now also `image_md:`, `image_filename:`), making all tools chainable.

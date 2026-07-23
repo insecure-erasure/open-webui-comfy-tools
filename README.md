@@ -78,10 +78,11 @@ Generates a video through ComfyUI (text-to-video or image-to-video). Uses the sa
 **Response format:**
 
 ```
-video_md: <full HTML block with video player>
+video_html: <full HTML block with video player>
 video_filename: <filename.mp4>
 
-Copy the video_md HTML block exactly as shown above into your response ...
+Paste the video_html value inside a code block in your response
+(triple backticks) so the frontend renders it as a video player.
 ```
 
 The agent renders the video using an inline HTML block (`<video>` tag) instead of markdown, since markdown cannot display video.
