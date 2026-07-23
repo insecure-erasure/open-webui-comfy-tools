@@ -577,17 +577,16 @@ def _extract_video_filename(outputs: dict, output_node_id: str) -> str:
 
 class Tools:
     """
-    Generate Video - animate a previously generated image into a video using WAN2.1.
+    Generate Video - animate a previously generated image into a video.
 
     Only use when the user explicitly asks to animate an image that was
-    just generated. Pass the image_filename from the image generation
-    response as-is — do not modify it.
+    just generated.
 
     prompt: Video description. Translate the user's request into English
         internally, then enrich with visual motion details without changing
         the subject or scene.
     image_filename: The image_filename from the last image generation
-        response. Required — this tool cannot generate video from text alone.
+        response. Required.
     """
 
     class Valves(BaseModel):
@@ -657,10 +656,9 @@ class Tools:
         __message_id__=None,
     ):
         """
-        Animate a previously generated image into a video using WAN2.1.
+        Animate a previously generated image into a video.
 
         Only use when the user explicitly asks to animate an image.
-        Pass the image_filename from the last generation as-is.
 
         prompt: Video description in English, enriched with motion details.
         image_filename: The image_filename from the last image generation.
