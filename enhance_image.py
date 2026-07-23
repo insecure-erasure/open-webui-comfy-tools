@@ -249,6 +249,10 @@ class Tools:
 
             cf_form = ComfyUICreateImageForm(
                 **{
+                    "prompt": "",
+                    "width": "1",
+                    "height": "1",
+                    "n": 1,
                     "workflow": ComfyUIWorkflow(
                         **{
                             "workflow": json.dumps(workflow),
