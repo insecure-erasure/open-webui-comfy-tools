@@ -9,6 +9,7 @@ import asyncio
 import logging
 import math
 import random as _random
+from urllib.parse import urlparse, parse_qs
 
 import httpx
 from pydantic import BaseModel, Field
@@ -316,6 +317,13 @@ class Tools:
 
     Activate this tool from the tool selector in the chat input.
 
+    The response includes:
+      - image_md: markdown to display the image in the conversation
+      - image_filename: the filename on ComfyUI (not directly accessible
+        from the filesystem)
+
+    Use image_md to show the image to the user.
+
     prompt: Image generation prompt. Translate the user's request into English
         internally, then enrich with visual details without changing the subject
         or scene. Do not add superfluous details. Write the final prompt in English.
@@ -369,6 +377,9 @@ class Tools:
     ):
         """
         Generate one image with optional control over size.
+
+        Returns image_md (for displaying) and image_filename (for reference).
+        The filename is not directly accessible from the filesystem.
 
         prompt: Image generation prompt. Translate the user's request into English internally,
             then enrich with visual details without changing the subject or scene. Do not add
@@ -482,7 +493,16 @@ class Tools:
 
             image_url = images[0]["url"] if images else None
 
-            return f"Image generated successfully.\n\nDisplay the image in your response like this:\n![Generated image]({image_url})"
+            # Extract filename from the URL
+            parsed = urlparse(image_url)
+            params = parse_qs(parsed.query)
+            image_filename = params.get("filename", ["unknown"])[0]
+
+            return (
+                f"image_md: ![Generated image]({image_url})\n"
+                f"image_filename: {image_filename}\n\n"
+                "Use image_md to display the image in your response."
+            )
 
         except asyncio.CancelledError:
             log.info("smart_generate_image cancelled by user")
