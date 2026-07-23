@@ -253,7 +253,7 @@ class Tools:
                 **{
                     "workflow": ComfyUIWorkflow(
                         **{
-                            "workflow": workflow,
+                            "workflow": json.dumps(workflow),
                             "nodes": [],
                         }
                     ),
