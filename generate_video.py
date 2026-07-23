@@ -823,10 +823,8 @@ class Tools:
             )
 
             return (
-                f"video_html: {html_block}\n"
-                f"video_filename: {video_filename}\n\n"
-                "Paste the video_html value inside a code block in your response "
-                "(triple backticks) so the frontend renders it as a video player."
+                f"video_html: ```\n{html_block}\n```\n\n"
+                "Paste the video_html in your response so the frontend renders the video."
             )
 
         except asyncio.CancelledError:
