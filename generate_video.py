@@ -18,6 +18,15 @@ from pydantic import BaseModel, Field
 log = logging.getLogger(__name__)
 
 # =============================================================================
+# Default negative prompt (used when valve is empty)
+# =============================================================================
+_DEFAULT_NEGATIVE_PROMPT = (
+    "deformed face, tattoo, piercing, teeth, open mouth, deformed eyes, "
+    "morphed eyes, changed identity, extra limbs, rapid movement, 3d render, "
+    "low quality, morphed features, warped, camera shake, rapid zoom"
+)
+
+# =============================================================================
 # Workflow JSON - WAN2.1 Image-to-Video
 # =============================================================================
 # Use placeholders for values the tool should inject at runtime:
@@ -27,6 +36,7 @@ log = logging.getLogger(__name__)
 #   {{LORA}}     — LoRA name
 #   {{LORA_ON}}  — true/false (auto-set: true if LORA is non-empty)
 #   {{LENGTH}}   — number of frames / video length
+#   {{NEGATIVE_PROMPT}}  — negative prompt (falls back to default if valve empty)
 #   {{IMAGE}}    — input image filename for I2V (empty string for T2V)
 #
 # Set NODE_OUTPUT below to the node ID that produces the video file
@@ -44,7 +54,7 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
   },
   "7": {
     "inputs": {
-      "text": "deformed face, tattoo, piercing, teeth, open mouth, deformed eyes, morphed eyes, changed identity, extra limbs, rapid movement, 3d render, low quality, morphed features, warped, camera shake, rapid zoom",
+      "text": "{{NEGATIVE_PROMPT}}",
       "clip": [
         "1044",
         1
@@ -593,6 +603,8 @@ class Tools:
         LoRA name for video style. Leave empty for no LoRA.
     length (admin / user):
         Number of frames / video length. 0 = use workflow default.
+    negative_prompt (admin / user):
+        Negative prompt. Leave empty to use the workflow default.
     seed (user only):
         Seed for reproducibility. -1 = random, >=0 = fixed.
     comfyui_image_base_url (admin / user):
@@ -615,6 +627,10 @@ class Tools:
             default=0,
             description="Number of frames / video length. 0 = use workflow default.",
         )
+        negative_prompt: str = Field(
+            default="",
+            description="Negative prompt. Leave empty to use the workflow default.",
+        )
         comfyui_image_base_url: str = Field(
             default="",
             description="Public base URL for video links (overrides COMFYUI_BASE_URL). Leave empty to use COMFYUI_BASE_URL.",
@@ -634,6 +650,10 @@ class Tools:
         length: int = Field(
             default=0,
             description="Number of frames / video length. 0 = use admin valve or workflow default.",
+        )
+        negative_prompt: str = Field(
+            default="",
+            description="Your preferred negative prompt. Leave empty to use the admin valve or workflow default.",
         )
         seed: int = Field(
             default=-1,
@@ -709,6 +729,12 @@ class Tools:
             user_length = user_valves.length if user_valves and user_valves.length else 0
             resolved_length = user_length or self.valves.length or 0
 
+            # Negative prompt: UserValves > AdminValves > workflow default
+            user_neg = (
+                user_valves.negative_prompt if user_valves and user_valves.negative_prompt else ""
+            )
+            resolved_neg = user_neg or self.valves.negative_prompt or _DEFAULT_NEGATIVE_PROMPT
+
             # Seed: UserValve. -1 = random, >=0 = fixed
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
             seed_arg = _random.randint(0, 0xFFFFFFFFFFFFFFFF) if user_seed == -1 else user_seed
@@ -741,6 +767,7 @@ class Tools:
                 "LORA": resolved_lora,
                 "LORA_ON": lora_on,
                 "LENGTH": resolved_length,
+                "NEGATIVE_PROMPT": resolved_neg,
                 "IMAGE": image_val,
             }
 
