@@ -23,10 +23,12 @@ log = logging.getLogger(__name__)
 # Placeholders (always injected):
 #   {{PROMPT}}   — the video prompt
 #   {{SEED}}     — seed value
-#   {{IMAGE}}    — input image filename (always required, I2V only)
 #
 # Optional overrides (post-parse, only when valve is non-empty):
 #   model, lora, length, negative_prompt
+#
+# Node 1043 (Load Image) is configured post-parse from the `image` param.
+# urlparse distinguishes URL (scheme + netloc) from filename.
 #
 #
 _VIDEO_WORKFLOW_JSON_RAW = r"""{
@@ -359,7 +361,7 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
     "inputs": {
       "source": "temp",
       "url": "",
-      "image": "{{IMAGE}}",
+      "image": "",
       "Choose file to upload": null
     },
     "class_type": "LoadImageByUrlOrPath",
@@ -577,16 +579,18 @@ def _extract_video_filename(outputs: dict, output_node_id: str) -> str:
 
 class Tools:
     """
-    Generate Video - animate a previously generated image into a video.
+    Generate Video - animate an image into a video (image-to-video).
 
-    Only use when the user explicitly asks to animate an image that was
-    just generated.
+    Use when the user requests to animate an image into a video. Pass the
+    image reference via the `image` parameter — either a filename from a
+    previous generation (e.g. "abc123.png") or a direct URL to an external
+    image (e.g. "https://..."). The tool auto-detects which one it is.
 
     prompt: Video description. Translate the user's request into English
         internally, then enrich with visual motion details without changing
         the subject or scene.
-    image_filename: The image_filename from the last image generation
-        response. Required.
+    image: Filename from a previous generation (e.g. "abc123.png"), or a
+        direct URL to an external image to animate ("https://...").
     """
 
     class Valves(BaseModel):
@@ -648,7 +652,7 @@ class Tools:
     async def generate_video(
         self,
         prompt: str,
-        image_filename: str,
+        image: str,
         __request__=None,
         __user__=None,
         __event_emitter__=None,
@@ -656,12 +660,12 @@ class Tools:
         __message_id__=None,
     ):
         """
-        Animate a previously generated image into a video.
-
-        Only use when the user explicitly asks to animate an image.
+        Animate an image into a video (image-to-video).
 
         prompt: Video description in English, enriched with motion details.
-        image_filename: The image_filename from the last image generation.
+        image: Filename from a previous generation (e.g. "abc123.png")
+            or a direct URL to an external image ("https://...").
+            Auto-detects which mode to use.
         """
         if __request__ is None:
             log.error("generate_video called without request context")
@@ -730,17 +734,30 @@ class Tools:
             # =================================================================
             # Build the workflow: inject placeholders into the raw JSON
             # =================================================================
-            # IMAGE: the input image filename passed by the agent
-            image_val = image_filename
-
             replacements = {
                 "PROMPT": prompt,
                 "SEED": seed_arg,
-                "IMAGE": image_val,
             }
 
             injected_raw = _inject_placeholders(_VIDEO_WORKFLOW_JSON_RAW, replacements)
             workflow = json.loads(injected_raw)
+
+            # =================================================================
+            # Configure image source (node 1043) — post-parse
+            # =================================================================
+            node_img = workflow["1043"]["inputs"]
+            parsed = urlparse(image)
+            if parsed.scheme and parsed.netloc:
+                # URL mode — image is optional, remove it to avoid validation
+                # against the temp files list
+                node_img["source"] = "url"
+                node_img["url"] = image
+                node_img.pop("image", None)
+                node_img.pop("Choose file to upload", None)
+            else:
+                node_img["source"] = "temp"
+                node_img["image"] = image
+                node_img["url"] = ""
 
             # =================================================================
             # Apply optional overrides post-parse (only when valve is non-empty)
@@ -764,7 +781,7 @@ class Tools:
                 resolved_model or "(workflow default)",
                 resolved_lora or "(none — workflow default)",
                 str(resolved_length) if resolved_length else "(workflow default)",
-                image_filename,
+                image,
             )
 
             # =================================================================
@@ -811,6 +828,7 @@ class Tools:
 
             # The HTML block the agent must emit to show the video
             html_block = (
+                f'<html>\n'
                 f'<style>\n'
                 f'* {{ margin:0; padding:0; box-sizing:border-box; }}\n'
                 f'body {{ background:#0d0d0d; display:flex; align-items:center; justify-content:center; min-height:100vh; }}\n'
@@ -819,7 +837,8 @@ class Tools:
                 f'  <video controls autoplay muted loop playsinline style="width:100%;display:block">\n'
                 f'    <source src="{video_url}" type="video/mp4">\n'
                 f'  </video>\n'
-                f'</div>'
+                f'</div>\n'
+                f'<html>'
             )
 
             return (
