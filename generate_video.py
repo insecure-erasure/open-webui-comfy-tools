@@ -18,15 +18,6 @@ from pydantic import BaseModel, Field
 log = logging.getLogger(__name__)
 
 # =============================================================================
-# Default negative prompt (used when valve is empty)
-# =============================================================================
-_DEFAULT_NEGATIVE_PROMPT = (
-    "deformed face, tattoo, piercing, teeth, open mouth, deformed eyes, "
-    "morphed eyes, changed identity, extra limbs, rapid movement, 3d render, "
-    "low quality, morphed features, warped, camera shake, rapid zoom"
-)
-
-# =============================================================================
 # Workflow JSON - WAN2.1 Image-to-Video
 # =============================================================================
 # Use placeholders for values the tool should inject at runtime:
@@ -36,8 +27,10 @@ _DEFAULT_NEGATIVE_PROMPT = (
 #   {{LORA}}     — LoRA name
 #   {{LORA_ON}}  — true/false (auto-set: true if LORA is non-empty)
 #   {{LENGTH}}   — number of frames / video length
-#   {{NEGATIVE_PROMPT}}  — negative prompt (falls back to default if valve empty)
 #   {{IMAGE}}    — input image filename for I2V (empty string for T2V)
+#
+#   Negative prompt is handled post-parse: if the valve is non-empty,
+#   it overwrites node 7's text. Otherwise the workflow default is kept.
 #
 # Set NODE_OUTPUT below to the node ID that produces the video file
 # (e.g. VHS_VideoCombine node).
@@ -54,7 +47,7 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
   },
   "7": {
     "inputs": {
-      "text": "{{NEGATIVE_PROMPT}}",
+      "text": "deformed face, tattoo, piercing, teeth, open mouth, deformed eyes, morphed eyes, changed identity, extra limbs, rapid movement, 3d render, low quality, morphed features, warped, camera shake, rapid zoom",
       "clip": [
         "1044",
         1
@@ -729,11 +722,11 @@ class Tools:
             user_length = user_valves.length if user_valves and user_valves.length else 0
             resolved_length = user_length or self.valves.length or 0
 
-            # Negative prompt: UserValves > AdminValves > workflow default
+            # Negative prompt: UserValves > AdminValves > keep workflow default
             user_neg = (
                 user_valves.negative_prompt if user_valves and user_valves.negative_prompt else ""
             )
-            resolved_neg = user_neg or self.valves.negative_prompt or _DEFAULT_NEGATIVE_PROMPT
+            resolved_neg = user_neg or self.valves.negative_prompt or ""
 
             # Seed: UserValve. -1 = random, >=0 = fixed
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
@@ -767,12 +760,15 @@ class Tools:
                 "LORA": resolved_lora,
                 "LORA_ON": lora_on,
                 "LENGTH": resolved_length,
-                "NEGATIVE_PROMPT": resolved_neg,
                 "IMAGE": image_val,
             }
 
             injected_raw = _inject_placeholders(_VIDEO_WORKFLOW_JSON_RAW, replacements)
             workflow = json.loads(injected_raw)
+
+            # Overwrite negative prompt post-parse only if valve provided a value
+            if resolved_neg:
+                workflow["7"]["inputs"]["text"] = resolved_neg
 
             log.info(
                 "Dispatching video workflow to ComfyUI (%s) - prompt_len=%d, seed=%d, "
