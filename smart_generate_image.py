@@ -336,7 +336,7 @@ class Tools:
         self.valves = self.Valves()
         self.citation = False
 
-    async def generate_image_pro(
+    async def smart_generate_image(
         self,
         prompt: str,
         size: str | None = None,
@@ -356,7 +356,7 @@ class Tools:
             dimensions. Format as WxH (e.g., 2000x3000).
         """
         if __request__ is None:
-            log.error("generate_image_pro called without request context")
+            log.error("smart_generate_image called without request context")
             return "Error: The tool could not be initialized."
 
         try:
@@ -457,7 +457,7 @@ class Tools:
             return f"Image generated successfully.\n\nDisplay the image in your response like this:\n![Generated image]({image_url})"
 
         except asyncio.CancelledError:
-            log.info("generate_image_pro cancelled by user")
+            log.info("smart_generate_image cancelled by user")
             if __event_emitter__:
                 await __event_emitter__(
                     {
@@ -471,5 +471,5 @@ class Tools:
                 )
             return "The image generation was cancelled by the user. Do not retry. Acknowledge the cancellation and wait for their next request."
         except Exception as e:
-            log.exception("generate_image_pro failed: %s", e)
+            log.exception("smart_generate_image failed: %s", e)
             return f"Error generating image: {e}"
