@@ -8,6 +8,7 @@ version: 1.0
 import asyncio
 import json
 import logging
+from urllib.parse import urlparse, parse_qs
 
 import httpx
 from pydantic import BaseModel, Field
@@ -325,10 +326,15 @@ class Tools:
 
             enhanced_url = images[0]["url"] if images else None
 
+            # Extract filename from URL (same as smart_generate_image)
+            parsed = urlparse(enhanced_url)
+            params = parse_qs(parsed.query)
+            enhanced_filename = params.get("filename", ["unknown"])[0]
+
             return (
-                "Image enhanced successfully.\n\n"
-                "Display the enhanced image in your response like this:\n"
-                f"![Enhanced image]({enhanced_url})"
+                f"image_md: ![Enhanced image]({enhanced_url})\n"
+                f"image_filename: {enhanced_filename}\n\n"
+                "Use image_md to display the enhanced image in your response."
             )
 
         except asyncio.CancelledError:
