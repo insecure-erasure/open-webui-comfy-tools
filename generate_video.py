@@ -838,12 +838,13 @@ class Tools:
                 f'    <source src="{video_url}" type="video/mp4">\n'
                 f'  </video>\n'
                 f'</div>\n'
-                f'<html>'
+                f'</html>'
             )
 
             return (
-                f"```\n{html_block}\n```\n\n"
-                "Paste this block in your response so the frontend renders the video."
+                f"{html_block}\n\n"
+                "Wrap the HTML block above in triple backticks and include it in your response "
+                "so the frontend renders the video."
             )
 
         except asyncio.CancelledError:
