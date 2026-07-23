@@ -105,7 +105,7 @@ _ENHANCE_WORKFLOW_JSON_RAW = r"""{
       "device": "cuda:0",
       "blocks_to_swap": 36,
       "swap_io_components": false,
-      "offload_device": "none",
+      "offload_device": "cpu",
       "cache_model": false,
       "attention_mode": "sdpa"
     },
