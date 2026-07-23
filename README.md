@@ -12,7 +12,9 @@ Smart Generate Image is a tool that sends image generation requests to ComfyUI. 
 
 It is installed as a regular user tool in **Workspace -> Tools**. It does not require Image Generation to be enabled as a model capability or builtin tool. It uses the image generation settings from **Admin Panel -> Settings -> Images** when the engine is set to ComfyUI.
 
-A companion tool, **Enhance Image**, can upscale previously generated images using SeedVR2.
+Companion tools:
+- **Enhance Image** (`enhance_image.py`) — upscale previously generated images using SeedVR2.
+- **Generate Video** (`generate_video.py`) — generate videos through ComfyUI (text-to-video or image-to-video).
 
 ---
 
@@ -51,6 +53,39 @@ Upscales or enhances a previously generated image using SeedVR2. Only use when t
 |-----------|------|-------------|
 | image_filename | string | The `image_filename` from the last Smart Generate Image response. Pass it as-is. |
 
+**Response format:**
+
+```
+image_md: ![Enhanced image](<url>)
+image_filename: <filename.png>
+
+Use image_md to display the enhanced image in your response.
+```
+
+---
+
+### Generate Video (`generate_video.py`)
+
+Generates a video through ComfyUI (text-to-video or image-to-video). Uses the same `comfyui_image_base_url` valve pattern as the other tools.
+
+**Parameters exposed to the LLM:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| prompt | string | Video description in English, enriched with visual motion details. |
+| image_filename | string (optional) | The `image_filename` from a previous generation. Pass as-is to animate that image. |
+
+**Response format:**
+
+```
+video_md: <full HTML block with video player>
+video_filename: <filename.mp4>
+
+Copy the video_md HTML block exactly as shown above into your response ...
+```
+
+The agent renders the video using an inline HTML block (`<video>` tag) instead of markdown, since markdown cannot display video.
+
 ---
 
 ## Valves
@@ -81,6 +116,10 @@ Configurable by end users from the chat interface.
 | Valve (admin / user) | Type | Default | Description |
 |----------------------|------|---------|-------------|
 | comfyui_image_base_url | string | "" | Public base URL for enhanced image links. Leave empty to use COMFYUI_BASE_URL. |
+
+### Valves (Generate Video)
+
+Same valves as Enhance Image — only `comfyui_image_base_url` (admin / user).
 
 ### Precedence
 
@@ -127,7 +166,8 @@ Pre-configured workflows are available in the `workflows/` directory:
 2. Click **"+"** and paste the contents of `smart_generate_image.py`.
 3. Save as **"Smart Generate Image"**.
 4. Repeat for `enhance_image.py`, save as **"Enhance Image"**.
-5. Enable the tools in the chat tool selector.
+5. Repeat for `generate_video.py`, save as **"Generate Video"**.
+6. Enable the tools in the chat tool selector.
 
 ---
 
