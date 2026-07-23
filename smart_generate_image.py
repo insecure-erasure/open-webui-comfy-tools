@@ -271,11 +271,6 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         if form_data.comfyui_image_base_url
         else image_config.COMFYUI_BASE_URL
     )
-    log.info(
-        "Building image URLs: image_base_url=%s (from form_data=%r)",
-        image_base_url,
-        form_data.comfyui_image_base_url,
-    )
     images = []
     comfy_base = image_config.COMFYUI_BASE_URL.rstrip("/")
     for img in res["data"]:
@@ -445,13 +440,6 @@ class Tools:
                 user_valves.comfyui_image_base_url if user_valves and user_valves.comfyui_image_base_url else ""
             )
             resolved_image_base_url = user_image_base_url or self.valves.comfyui_image_base_url or image_config.COMFYUI_BASE_URL
-            log.info(
-                "Image base URL: user=%r admin=%r resolved=%r comfyui_base=%r",
-                user_image_base_url,
-                self.valves.comfyui_image_base_url,
-                resolved_image_base_url,
-                image_config.COMFYUI_BASE_URL,
-            )
 
             steps_label = str(resolved_steps) if resolved_steps else "workflow default"
 
