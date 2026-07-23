@@ -842,8 +842,8 @@ class Tools:
             )
 
             return (
-                f"video_html: ```\n{html_block}\n```\n\n"
-                "Paste the video_html in your response so the frontend renders the video."
+                f"```\n{html_block}\n```\n\n"
+                "Paste this block in your response so the frontend renders the video."
             )
 
         except asyncio.CancelledError:
