@@ -8,6 +8,7 @@ version: 1.0
 import asyncio
 import json
 import logging
+import random as _random
 import uuid
 from urllib.parse import urlparse, parse_qs
 
@@ -21,25 +22,30 @@ log = logging.getLogger(__name__)
 # =============================================================================
 # Export your video workflow from ComfyUI (WAN2.1, VideoCrafter, etc.)
 # and paste it as the value of _VIDEO_WORKFLOW_JSON_RAW below.
-# Then update the NODE_* constants with the correct node IDs.
 #
-# Expected workflow structure (example for WAN2.1 I2V):
-#   - LoadImage node: reads the input image for animation
-#   - CLIP / text encoding nodes: process the prompt
-#   - WAN2.1 I2V node: generates the video
-#   - VHS VideoCombine node: saves the video file (provides the filename)
+# Use placeholders for values the tool should inject at runtime:
+#   {{PROMPT}}   — the video prompt
+#   {{SEED}}     — seed value (quoted or unquoted, will be replaced before JSON parse)
+#   {{MODEL}}    — model/checkpoint name
+#   {{LORA}}     — LoRA name
+#   {{LENGTH}}   — number of frames / video length
+#
+# Set NODE_OUTPUT below to the node ID that produces the video file
+# (e.g. VHS_VideoCombine node).
 #
 _VIDEO_WORKFLOW_JSON_RAW = r"""{
   "1": {
     "inputs": {
-      "frames": 81,
+      "frames": {{LENGTH}},
       "fps": 16,
       "width": 832,
       "height": 480,
-      "seed": 0,
+      "seed": {{SEED}},
       "steps": 20,
       "cfg": 4.0,
-      "prompt": "",
+      "prompt": "{{PROMPT}}",
+      "model": "{{MODEL}}",
+      "lora": "{{LORA}}",
       "image": [""]
     },
     "class_type": "WanVideoI2V",
@@ -67,15 +73,27 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
 }
 """
 
-_VIDEO_WORKFLOW_JSON: dict = json.loads(_VIDEO_WORKFLOW_JSON_RAW)
+# =============================================================================
+# Node ID - output node that produces the video file
+# =============================================================================
+NODE_OUTPUT: str = "2"
+
 
 # =============================================================================
-# Node IDs - UPDATE THESE TO MATCH YOUR WORKFLOW
+# Placeholder injection
 # =============================================================================
-# After pasting your workflow above, set these to the correct node IDs:
-NODE_LOAD_IMAGE: str = ""      # LoadImage node ID (for I2V; leave "" for T2V)
-NODE_GENERATE: str = "1"       # Main video generation node ID
-NODE_OUTPUT: str = "2"         # Node that saves the video file (e.g. VHS_VideoCombine)
+
+def _inject_placeholders(raw_json: str, replacements: dict[str, object]) -> str:
+    """
+    Replace {{PLACEHOLDER}} patterns in the raw JSON string with actual values.
+
+    This happens *before* JSON parsing, so placeholders can appear in both
+    string values ("{{PROMPT}}") and numeric contexts ("seed": {{SEED}}).
+    """
+    for key, value in replacements.items():
+        placeholder = "{{" + key + "}}"
+        raw_json = raw_json.replace(placeholder, str(value))
+    return raw_json
 
 
 # =============================================================================
@@ -208,6 +226,14 @@ class Tools:
         to animate an image that was just generated.
 
     --- Available Valves ---
+    model_name (admin / user):
+        Model/checkpoint name for video generation. Leave empty for system default.
+    lora (admin / user):
+        LoRA name for video style. Leave empty for no LoRA.
+    length (admin / user):
+        Number of frames / video length. 0 = use workflow default.
+    seed (user only):
+        Seed for reproducibility. -1 = random, >=0 = fixed.
     comfyui_image_base_url (admin / user):
         Public base URL for video links. If empty, defaults
         to COMFYUI_BASE_URL from Admin Panel > Settings > Images.
@@ -216,6 +242,18 @@ class Tools:
     class Valves(BaseModel):
         """Admin-level configuration."""
 
+        model_name: str = Field(
+            default="",
+            description="Model/checkpoint name for video generation. Overrides the workflow default. Leave empty to use what's in the workflow JSON.",
+        )
+        lora: str = Field(
+            default="",
+            description="LoRA name for video style. Leave empty for no LoRA.",
+        )
+        length: int = Field(
+            default=0,
+            description="Number of frames / video length. 0 = use workflow default.",
+        )
         comfyui_image_base_url: str = Field(
             default="",
             description="Public base URL for video links (overrides COMFYUI_BASE_URL). Leave empty to use COMFYUI_BASE_URL.",
@@ -224,9 +262,25 @@ class Tools:
     class UserValves(BaseModel):
         """User-level configuration (overrides admin valve)."""
 
+        model_name: str = Field(
+            default="",
+            description="Your preferred model/checkpoint for video. Overrides the admin valve and the workflow default.",
+        )
+        lora: str = Field(
+            default="",
+            description="Your preferred LoRA for video style. Overrides the admin valve.",
+        )
+        length: int = Field(
+            default=0,
+            description="Number of frames / video length. 0 = use admin valve or workflow default.",
+        )
+        seed: int = Field(
+            default=-1,
+            description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
+        )
         comfyui_image_base_url: str = Field(
             default="",
-            description="Public base URL for video links. Overrides the admin valve and COMFYUI_BASE_URL.",
+            description="Override the admin valve or COMFYUI_BASE_URL for video links.",
         )
 
     def __init__(self):
@@ -274,10 +328,31 @@ class Tools:
             image_config = await get_image_config()
 
             # =================================================================
-            # Resolve video base URL (same pattern as enhance_image)
-            #   UserValves > AdminValves > COMFYUI_BASE_URL
+            # Resolve valves: UserValves > AdminValves > workflow default
             # =================================================================
             user_valves = (__user__ or {}).get("valves", None)
+
+            # Model: UserValves > AdminValves > None (leave workflow default)
+            user_model = (
+                user_valves.model_name if user_valves and user_valves.model_name else ""
+            )
+            resolved_model = user_model or self.valves.model_name or ""
+
+            # LoRA: UserValves > AdminValves > None (leave workflow default = no lora)
+            user_lora = (
+                user_valves.lora if user_valves and user_valves.lora else ""
+            )
+            resolved_lora = user_lora or self.valves.lora or ""
+
+            # Length: UserValves > AdminValves > 0 (workflow default)
+            user_length = user_valves.length if user_valves and user_valves.length else 0
+            resolved_length = user_length or self.valves.length or 0
+
+            # Seed: UserValve. -1 = random, >=0 = fixed
+            user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
+            seed_arg = _random.randint(0, 0xFFFFFFFFFFFFFFFF) if user_seed == -1 else user_seed
+
+            # Base URL: UserValves > AdminValves > COMFYUI_BASE_URL
             user_video_base_url = (
                 user_valves.comfyui_image_base_url
                 if user_valves and user_valves.comfyui_image_base_url
@@ -290,26 +365,28 @@ class Tools:
             )
 
             # =================================================================
-            # Build the workflow inline
+            # Build the workflow: inject placeholders into the raw JSON
             # =================================================================
-            workflow = dict(_VIDEO_WORKFLOW_JSON)
+            replacements = {
+                "PROMPT": prompt,
+                "SEED": seed_arg,
+                "MODEL": resolved_model,
+                "LORA": resolved_lora,
+                "LENGTH": resolved_length,
+            }
 
-            # Inject the prompt into the generation node
-            workflow[NODE_GENERATE]["inputs"]["prompt"] = prompt
-
-            # Inject the input image filename for I2V (if provided)
-            if image_filename and NODE_LOAD_IMAGE:
-                workflow[NODE_LOAD_IMAGE]["inputs"]["image"] = image_filename
-            elif image_filename and not NODE_LOAD_IMAGE:
-                log.warning(
-                    "image_filename was provided but NODE_LOAD_IMAGE is not set "
-                    "in the workflow config. The image will be ignored."
-                )
+            injected_raw = _inject_placeholders(_VIDEO_WORKFLOW_JSON_RAW, replacements)
+            workflow = json.loads(injected_raw)
 
             log.info(
-                "Dispatching video workflow to ComfyUI (%s) - prompt_len=%d, image=%s",
+                "Dispatching video workflow to ComfyUI (%s) - prompt_len=%d, seed=%d, "
+                "model=%s, lora=%s, length=%s, image=%s",
                 image_config.COMFYUI_BASE_URL,
                 len(prompt),
+                seed_arg,
+                resolved_model or "(workflow default)",
+                resolved_lora or "(none)",
+                str(resolved_length) if resolved_length else "(workflow default)",
                 image_filename or "(none)",
             )
 
