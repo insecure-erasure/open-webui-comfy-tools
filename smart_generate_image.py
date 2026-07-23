@@ -44,6 +44,10 @@ class PatchedCreateImageForm(images_router.CreateImageForm):
         default=None,
         description="Seed for reproducibility (defaults to 0 in the tool)",
     )
+    comfyui_image_base_url: str | None = Field(
+        default=None,
+        description="Base URL for image URLs (overrides COMFYUI_BASE_URL for display)",
+    )
 
 
 images_router.CreateImageForm = PatchedCreateImageForm
@@ -257,16 +261,21 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
         raise RuntimeError("ComfyUI returned no image data")
 
     # No download/re-upload - return the URL directly from
-    # the image generation engine using the Base URL configured
-    # in Admin Panel > Settings > Images.
+    # the image generation engine using the image base URL
+    # resolved from: UserValves > AdminValves > COMFYUI_BASE_URL.
     #
-    # PREREQUISITE: The Base URL must be accessible from the
+    # PREREQUISITE: The image base URL must be accessible from the
     # user's browser (or from where the LLM renders the image).
+    image_base_url = (
+        form_data.comfyui_image_base_url
+        if form_data.comfyui_image_base_url
+        else image_config.COMFYUI_BASE_URL
+    )
     images = []
     for img in res["data"]:
         raw_url = img["url"]
         if raw_url.startswith("/"):
-            base = image_config.COMFYUI_BASE_URL.rstrip("/")
+            base = image_base_url.rstrip("/")
             image_url = f"{base}{raw_url}"
         else:
             image_url = raw_url
@@ -318,6 +327,10 @@ class Tools:
             description="Model/checkpoint name. Overrides the Admin UI default. Leave empty to use the Admin UI setting.",
         )
         steps: str = _STEPS_FIELD
+        comfyui_image_base_url: str = Field(
+            default="",
+            description="Public base URL for image links (overrides COMFYUI_BASE_URL). Leave empty to use COMFYUI_BASE_URL.",
+        )
 
     class UserValves(BaseModel):
         """User-level configuration (overrides admin valve and Admin UI)."""
@@ -327,6 +340,10 @@ class Tools:
             description="Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting.",
         )
         steps: str = _STEPS_FIELD
+        comfyui_image_base_url: str = Field(
+            default="",
+            description="Override the admin valve or COMFYUI_BASE_URL for image links.",
+        )
         seed: int = Field(
             default=-1,
             description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
@@ -414,6 +431,12 @@ class Tools:
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
             seed_arg = _random.randint(0, 0xFFFFFFFFFFFFFFFF) if user_seed == -1 else user_seed
 
+            # Resolve image base URL: UserValves > AdminValves > COMFYUI_BASE_URL
+            user_image_base_url = (
+                user_valves.comfyui_image_base_url if user_valves and user_valves.comfyui_image_base_url else ""
+            )
+            resolved_image_base_url = user_image_base_url or self.valves.comfyui_image_base_url or image_config.COMFYUI_BASE_URL
+
             steps_label = str(resolved_steps) if resolved_steps else "workflow default"
 
             if __event_emitter__:
@@ -436,6 +459,7 @@ class Tools:
                     size=size,
                     steps=resolved_steps,
                     seed=seed_arg,
+                    comfyui_image_base_url=resolved_image_base_url,
                 ),
                 user=user,
             )
