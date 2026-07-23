@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 # Placeholders (always injected):
 #   {{PROMPT}}   — the video prompt
 #   {{SEED}}     — seed value
-#   {{IMAGE}}    — input image filename for I2V (empty string for T2V)
+#   {{IMAGE}}    — input image filename (always required, I2V only)
 #
 # Optional overrides (post-parse, only when valve is non-empty):
 #   model, lora, length, negative_prompt
@@ -567,21 +567,25 @@ def _extract_video_filename(outputs: dict, output_node_id: str) -> str:
 
 class Tools:
     """
-    Generate Video - generate a video through ComfyUI (text-to-video or image-to-video).
+    Generate Video - animate an image into a video through ComfyUI (WAN2.1 I2V).
 
     Activate this tool from the tool selector in the chat input.
 
-    Use this when the user asks to generate a video, animate an image,
-    or create a video from a prompt.
+    Use this when the user asks to animate an image that was just generated,
+    or to create a video from an existing image.
+
+    **IMPORTANT:** This is an image-to-video workflow. You MUST always
+    pass image_filename from a previous smart_generate_image or
+    enhance_image response. There is no text-to-video mode.
 
     **Parameters for the agent:**
 
     prompt: The video description. Translate the user's request into English
         internally, then enrich with visual motion details without changing
         the subject or scene.
-    image_filename (optional): The image_filename from a previous
+    image_filename (required): The image_filename from a previous
         smart_generate_image or enhance_image response. Pass it as-is
-        to animate an image that was just generated.
+        to animate that image.
 
     --- Available Valves ---
     model_name (admin / user):
@@ -658,7 +662,7 @@ class Tools:
     async def generate_video(
         self,
         prompt: str,
-        image_filename: str | None = None,
+        image_filename: str,
         __request__=None,
         __user__=None,
         __event_emitter__=None,
@@ -666,13 +670,13 @@ class Tools:
         __message_id__=None,
     ):
         """
-        Generate a video through ComfyUI (text-to-video or image-to-video).
+        Animate an image into a video through ComfyUI (WAN2.1 I2V).
 
-        Use this when the user asks to generate a video or animate an image.
+        Use this when the user asks to animate an image that was just generated.
 
         prompt: Video description in English, enriched with visual motion details.
-        image_filename (optional): The image_filename from smart_generate_image
-            or enhance_image. Pass as-is for image-to-video animation.
+        image_filename: The image_filename from smart_generate_image
+            or enhance_image. Required — this is an image-to-video workflow.
         """
         if __request__ is None:
             log.error("generate_video called without request context")
@@ -741,8 +745,8 @@ class Tools:
             # =================================================================
             # Build the workflow: inject placeholders into the raw JSON
             # =================================================================
-            # IMAGE: the input image filename, or empty string for T2V
-            image_val = image_filename or ""
+            # IMAGE: the input image filename passed by the agent
+            image_val = image_filename
 
             replacements = {
                 "PROMPT": prompt,
@@ -775,7 +779,7 @@ class Tools:
                 resolved_model or "(workflow default)",
                 resolved_lora or "(none — workflow default)",
                 str(resolved_length) if resolved_length else "(workflow default)",
-                image_filename or "(none)",
+                image_filename,
             )
 
             # =================================================================
