@@ -56,6 +56,10 @@ _ENHANCE_WORKFLOW_JSON_RAW = r"""{
       "image1": [
         "424",
         0
+      ],
+      "image2": [
+        "426",
+        0
       ]
     },
     "class_type": "ImageBlend",
