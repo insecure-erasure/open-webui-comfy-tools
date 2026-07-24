@@ -416,19 +416,9 @@ class Tools:
             default="",
             description="Model/checkpoint name. Overrides the workflow default. Leave empty to use the value set in the workflow.",
         )
-        steps: str = Field(
-            default="0",
-            description="Inference steps.",
-            json_schema_extra={
-                "input": {
-                    "type": "select",
-                    "options": _STEPS_OPTIONS,
-                }
-            },
-        )
         max_steps: str = Field(
             default="0",
-            description="Maximum inference steps ceiling. 0 = force workflow default (user steps are ignored). >0 = clamp user/admin steps to this value.",
+            description="Maximum inference steps ceiling. 0 = force workflow default (user steps ignored). >0 = clamp user steps to this value.",
             json_schema_extra={
                 "input": {
                     "type": "select",
@@ -437,8 +427,8 @@ class Tools:
             },
         )
         default_size: str = Field(
-            default="1024x1024",
-            description="Default image size when the LLM does not specify one (e.g., 1024x1024).",
+            default="768x1152",
+            description="Default image size when the LLM does not specify one. Represents a 2:3 aspect ratio (both multiples of 64, ~0.88 MP).",
         )
         comfyui_image_base_url: str = Field(
             default="",
@@ -454,7 +444,7 @@ class Tools:
         )
         steps: str = Field(
             default="0",
-            description="Inference steps.",
+            description="Inference steps. 0 = use workflow default.",
             json_schema_extra={
                 "input": {
                     "type": "select",
@@ -526,33 +516,20 @@ class Tools:
             resolved_model = user_model or self.valves.model_name or None
 
             # Steps:
-            #   max_steps=0 → force workflow default (ignore all steps valves)
-            #   max_steps>0 → resolve UserValves > AdminValves + clamp
+            #   max_steps=0 → force workflow default (ignore user steps)
+            #   max_steps>0 → use UserValve + clamp
             max_steps = int(self.valves.max_steps) if self.valves.max_steps and self.valves.max_steps != "0" else 0
             resolved_steps = None
 
             if max_steps == 0:
-                # Force workflow default – ignore user/admin steps
+                # Force workflow default – ignore user steps
                 resolved_steps = None
             else:
                 user_valve_steps = int(user_valves.steps) if user_valves and user_valves.steps and user_valves.steps != "0" else 0
-                admin_valve_steps = int(self.valves.steps) if self.valves.steps and self.valves.steps != "0" else 0
 
                 if user_valve_steps > 0:
                     resolved_steps = min(user_valve_steps, max_steps)
                     if resolved_steps < user_valve_steps and __event_emitter__:
-                        await __event_emitter__(
-                            {
-                                "type": "notification",
-                                "data": {
-                                    "type": "warning",
-                                    "content": f"\u26a0\ufe0f Steps clamped to {max_steps} (system limit).",
-                                },
-                            }
-                        )
-                elif admin_valve_steps > 0:
-                    resolved_steps = min(admin_valve_steps, max_steps)
-                    if resolved_steps < admin_valve_steps and __event_emitter__:
                         await __event_emitter__(
                             {
                                 "type": "notification",

@@ -17,8 +17,8 @@ El parámetro `size` que el LLM pasa al tool **no controla píxeles absolutos**,
 |---|---|---|
 | `2000x3000` | 2:3 | ~816×1224 |
 | `1920x1080` | 16:9 | ~1336×752 |
+| `768x1152` (default) | 2:3 | ~816×1224 |
 | `1024x1024` | 1:1 | ~1024×1024 |
-| `1x1` | 1:1 | ~1024×1024 |
 
 ### Para cambiar la resolución base
 
