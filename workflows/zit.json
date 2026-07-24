@@ -110,7 +110,7 @@
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "58",
+        "421",
         0
       ],
       "positive": [
@@ -160,13 +160,27 @@
   },
   "84": {
     "inputs": {
-      "string_a": "3",
-      "string_b": "2",
+      "string_a": "",
+      "string_b": "",
       "delimiter": ":"
     },
     "class_type": "StringConcatenate",
     "_meta": {
       "title": "Aspect ratio"
+    }
+  },
+  "421": {
+    "inputs": {
+      "lora_name": "Chroma\\Realistic_Chroma_Slider_alpha.safetensors",
+      "strength_model": 0,
+      "model": [
+        "58",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
     }
   }
 }

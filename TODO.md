@@ -1,26 +1,35 @@
-# TODO
+# TODO: Smart Generate Image v3.0 — Refactor
 
-## Video Generation (WAN2.1) - Implemented
+Remove monkey patches and Admin UI dependencies from Open WebUI.
+Inline workflow, inject values directly into the JSON dict.
 
-`generate_video.py` is complete:
+## Milestones
 
-- Embedded real WAN2.1 I2V workflow (`wan21_i2v.json` as reference)
-- Direct ComfyUI communication via HTTP (`POST /prompt` + `GET /history/{id}`)
-- Placeholders `{{PROMPT}}`, `{{SEED}}`, `{{IMAGE}}`
-- Valves: model, lora, length, negative_prompt, seed, comfyui_image_base_url
-- Resolution: UserValves > AdminValves > workflow default
-- Interrupt on cancellation
-- ~10 min timeout with polling
-- HTML block for video playback
+### Milestone 1 — Inline workflow + node IDs ✅
+- [x] Embed `zit.json` as a raw string at the top of the script
+- [x] Define node ID constants (KSampler, CLIPTextEncode, etc.)
+- [x] Remove monkey patch assignment lines (1, 2 and 3)
+- [x] Remove unused import (`comfyui_module`)
 
-Pending:
-- [ ] End-to-end test with real ComfyUI
+### Milestone 2 — Update Admin Valves
+- [ ] Add `max_steps` (dropdown 0-15, default "0")
+- [ ] Add `default_size` (string, default "1024x1024")
 
-## Refactor pending (smart_generate_image.py)
+### Milestone 3 — Update User Valves
+- [ ] Add `lora_name` (string, default "")
+- [ ] Add `lora_strength` (float, default 0.0)
 
-Remove the 3 monkey patches and replace with direct HTTP communication to ComfyUI:
+### Milestone 4 — Rewrite generation logic
+- [ ] Rewrite the function that builds the workflow with injected values
+- [ ] Inject prompt, model, steps, seed, size and LoRA directly into the dict
+- [ ] Call ComfyUI with `nodes: []` (like enhance_image.py)
+- [ ] Keep GCD reduction for aspect ratio
 
-- Read workflow from `get_image_config()` (public API)
-- Implement own `POST /prompt` + `GET /history/{id}`
-- Keep valves for model, steps, seed and base URL
-- Keep ephemeral behavior (return text, do not use event emitter)
+### Milestone 5 — Final cleanup
+- [ ] Verify no references to `COMFYUI_WORKFLOW` or `COMFYUI_WORKFLOW_NODES` remain
+- [ ] Verify no references to `IMAGE_SIZE` or `IMAGE_STEPS` remain
+- [ ] Verify `COMFYUI_BASE_URL` and `COMFYUI_API_KEY` are still read
+- [ ] Test steps logic with `max_steps=0` (forces workflow default)
+- [ ] Test steps logic with `max_steps>0` (normal clamping)
+- [ ] Test LoRA with empty values and with real values
+- [ ] Test cancellation (interrupt)

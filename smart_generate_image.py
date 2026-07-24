@@ -35,6 +35,215 @@ _STEPS_FIELD = Field(
 )
 
 # =============================================================================
+# Inline workflow JSON — zit.json
+# =============================================================================
+_ZIT_WORKFLOW_JSON_RAW = r"""{
+  "41": {
+    "inputs": {
+      "width": [
+        "69",
+        0
+      ],
+      "height": [
+        "69",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "42": {
+    "inputs": {
+      "stop_at_clip_layer": -2,
+      "clip": [
+        "68",
+        0
+      ]
+    },
+    "class_type": "CLIPSetLastLayer",
+    "_meta": {
+      "title": "CLIP Set Last Layer"
+    }
+  },
+  "43": {
+    "inputs": {
+      "conditioning": [
+        "63",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ZeroOut"
+    }
+  },
+  "51": {
+    "inputs": {
+      "vae_name": "Z-Image_natural_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "52": {
+    "inputs": {
+      "samples": [
+        "66",
+        0
+      ],
+      "vae": [
+        "51",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "58": {
+    "inputs": {
+      "unet_name": "zImageTurbo-p60-refiners-nvfp4.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "61": {
+    "inputs": {
+      "images": [
+        "52",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "63": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "66": {
+    "inputs": {
+      "seed": 0,
+      "steps": 10,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "421",
+        0
+      ],
+      "positive": [
+        "63",
+        0
+      ],
+      "negative": [
+        "43",
+        0
+      ],
+      "latent_image": [
+        "41",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "68": {
+    "inputs": {
+      "clip_name": "qwen3_4b_instruct_2507_mxfp8.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "69": {
+    "inputs": {
+      "megapixel": "1.0",
+      "aspect_ratio": "2:3 (Classic Portrait)",
+      "divisible_by": "64",
+      "custom_ratio": true,
+      "custom_aspect_ratio": [
+        "84",
+        0
+      ]
+    },
+    "class_type": "FluxResolutionNode",
+    "_meta": {
+      "title": "Flux Resolution Calc"
+    }
+  },
+  "84": {
+    "inputs": {
+      "string_a": "",
+      "string_b": "",
+      "delimiter": ":"
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Aspect ratio"
+    }
+  },
+  "421": {
+    "inputs": {
+      "lora_name": "Chroma\\Realistic_Chroma_Slider_alpha.safetensors",
+      "strength_model": 0,
+      "model": [
+        "58",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  }
+}
+"""
+ZIT_WORKFLOW_JSON: dict = json.loads(_ZIT_WORKFLOW_JSON_RAW)
+
+# =============================================================================
+# Node ID constants
+# =============================================================================
+NODE_EMPTY_LATENT = "41"
+NODE_CLIP_SET_LAYER = "42"
+NODE_ZERO_OUT = "43"
+NODE_VAE_LOADER = "51"
+NODE_VAE_DECODE = "52"
+NODE_UNET_LOADER = "58"
+NODE_PREVIEW_IMAGE = "61"
+NODE_CLIP_TEXT = "63"
+NODE_KSAMPLER = "66"
+NODE_CLIP_LOADER = "68"
+NODE_FLUX_RESOLUTION = "69"
+NODE_ASPECT_RATIO = "84"
+NODE_LORA = "421"
+
+# =============================================================================
 # MONKEY PATCH 1: Add seed field to CreateImageForm
 # =============================================================================
 from open_webui.routers import images as images_router
@@ -51,15 +260,11 @@ class PatchedCreateImageForm(images_router.CreateImageForm):
     )
 
 
-images_router.CreateImageForm = PatchedCreateImageForm
-images_router.GenerateImageForm = PatchedCreateImageForm
 
-log.info("MONKEY PATCH 1: CreateImageForm patched with seed field")
 
 # =============================================================================
 # MONKEY PATCH 2: Make _apply_workflow_nodes ignore None values
 # =============================================================================
-from open_webui.utils.images import comfyui as comfyui_module
 
 NODE_TYPE_INPUT_KEYS = {
     "prompt": "text",
@@ -130,9 +335,7 @@ def patched_apply_workflow_nodes(workflow, nodes, model, payload):
                     workflow[node_id]["inputs"][input_key] = node.value
 
 
-comfyui_module._apply_workflow_nodes = patched_apply_workflow_nodes
 
-log.info("MONKEY PATCH 2: _apply_workflow_nodes patched to ignore None values")
 
 # =============================================================================
 # MONKEY PATCH 3: Override image_generations for ComfyUI
@@ -294,9 +497,7 @@ async def patched_image_generations(request, form_data, metadata=None, user=None
     return images
 
 
-images_router.image_generations = patched_image_generations
 
-log.info("MONKEY PATCH 3: image_generations patched for ComfyUI")
 
 # =============================================================================
 # TOOLS CLASS
