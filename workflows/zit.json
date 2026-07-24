@@ -110,7 +110,7 @@
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "422",
+        "423",
         0
       ],
       "positive": [
@@ -169,14 +169,29 @@
       "title": "Aspect ratio"
     }
   },
-  "422": {
+  "423": {
     "inputs": {
       "PowerLoraLoaderHeaderWidget": {
         "type": "PowerLoraLoaderHeaderWidget"
       },
       "lora_1": {
         "on": false,
-        "lora": "",
+        "lora": "Chroma\\chroma-flash-heun_r64-fp32.safetensors",
+        "strength": 1
+      },
+      "lora_2": {
+        "on": false,
+        "lora": "Chroma\\chroma-flash-heun_r128-fp32.safetensors",
+        "strength": 1
+      },
+      "lora_3": {
+        "on": false,
+        "lora": "Chroma\\chroma-flash-heun_r64-fp32.safetensors",
+        "strength": 1
+      },
+      "lora_4": {
+        "on": false,
+        "lora": "FLUX.2\\flux-klein-tryon-comfy.safetensors",
         "strength": 1
       },
       "➕ Add Lora": "",

@@ -141,7 +141,7 @@ _ZIT_WORKFLOW_JSON_RAW = r"""{
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "422",
+        "423",
         0
       ],
       "positive": [
@@ -200,7 +200,7 @@ _ZIT_WORKFLOW_JSON_RAW = r"""{
       "title": "Aspect ratio"
     }
   },
-  "422": {
+  "423": {
     "inputs": {
       "PowerLoraLoaderHeaderWidget": {
         "type": "PowerLoraLoaderHeaderWidget"
@@ -208,7 +208,22 @@ _ZIT_WORKFLOW_JSON_RAW = r"""{
       "lora_1": {
         "on": false,
         "lora": "",
-        "strength": 1
+        "strength": 0
+      },
+      "lora_2": {
+        "on": false,
+        "lora": "",
+        "strength": 0
+      },
+      "lora_3": {
+        "on": false,
+        "lora": "",
+        "strength": 0
+      },
+      "lora_4": {
+        "on": false,
+        "lora": "",
+        "strength": 0
       },
       "\u2795 Add Lora": "",
       "model": [
@@ -239,7 +254,7 @@ NODE_KSAMPLER = "66"
 NODE_CLIP_LOADER = "68"
 NODE_FLUX_RESOLUTION = "69"
 NODE_ASPECT_RATIO = "84"
-NODE_LORA = "422"
+NODE_LORA = "423"
 
 # =============================================================================
 # ComfyUI constants
@@ -460,13 +475,9 @@ class Tools:
             default=-1,
             description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
         )
-        lora_name: str = Field(
-            default="",
-            description="LoRA filename (e.g. 'Chroma\\\\Realistic_Chroma_Slider_alpha.safetensors'). Leave empty to skip LoRA injection.",
-        )
-        lora_strength: float = Field(
-            default=0.0,
-            description="LoRA activation strength (0.0 = disabled, 0.5-1.0 typical range).",
+        lora_config: str = Field(
+            default="[]",
+            description='JSON array of LoRAs. String=only name (strength 1.0), object={"name", "strength"}. Empty name or strength 0 disables it. Applied positionally to lora_1..lora_N. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
         )
 
     def __init__(self):
@@ -553,14 +564,15 @@ class Tools:
             reduced_w = width // gcd
             reduced_h = height // gcd
 
-            # LoRA: only inject if name is non-empty AND strength > 0
-            resolved_lora_name = (
-                user_valves.lora_name if user_valves and user_valves.lora_name else ""
-            )
-            resolved_lora_strength = (
-                float(user_valves.lora_strength) if user_valves and user_valves.lora_strength else 0.0
-            )
-            inject_lora = bool(resolved_lora_name and resolved_lora_strength > 0)
+            # LoRA: parse JSON array from valve, applied positionally to lora_1..lora_N
+            lora_config = []
+            if user_valves and user_valves.lora_config:
+                try:
+                    parsed = json.loads(user_valves.lora_config)
+                    if isinstance(parsed, list):
+                        lora_config = parsed[:8]  # cap at 8 slots max
+                except (json.JSONDecodeError, TypeError):
+                    lora_config = []
 
             # Base URL: UserValves > AdminValves > COMFYUI_BASE_URL
             user_image_base_url = (
@@ -610,22 +622,40 @@ class Tools:
             workflow[NODE_ASPECT_RATIO]["inputs"]["string_a"] = str(reduced_w)
             workflow[NODE_ASPECT_RATIO]["inputs"]["string_b"] = str(reduced_h)
 
-            # LoRA injection — Power Lora Loader (rgthree)
-            if inject_lora:
-                workflow[NODE_LORA]["inputs"]["lora_1"]["on"] = True
-                workflow[NODE_LORA]["inputs"]["lora_1"]["lora"] = resolved_lora_name
-                workflow[NODE_LORA]["inputs"]["lora_1"]["strength"] = resolved_lora_strength
+            # LoRA injection — iterate array positionally over lora_1..lora_N
+            for i, item in enumerate(lora_config, start=1):
+                slot = f"lora_{i}"
+                if slot not in workflow[NODE_LORA]["inputs"]:
+                    break  # no more slots in the workflow
+                if isinstance(item, str):
+                    name = item
+                    strength = 1.0
+                elif isinstance(item, dict):
+                    name = item.get("name", "")
+                    strength = float(item.get("strength", 1.0))
+                else:
+                    continue  # skip invalid entries
+
+                if bool(name) and strength > 0:
+                    workflow[NODE_LORA]["inputs"][slot]["on"] = True
+                    workflow[NODE_LORA]["inputs"][slot]["lora"] = name
+                    workflow[NODE_LORA]["inputs"][slot]["strength"] = strength
+                else:
+                    # Desactivado: vacío todo para que ComfyUI no cargue el modelo
+                    workflow[NODE_LORA]["inputs"][slot]["on"] = False
+                    workflow[NODE_LORA]["inputs"][slot]["lora"] = ""
+                    workflow[NODE_LORA]["inputs"][slot]["strength"] = 0
 
             log.info(
                 "Dispatching image workflow to ComfyUI (%s) - prompt_len=%d, size=%s, "
-                "seed=%d, steps=%s, model=%s, lora=%s",
+                "seed=%d, steps=%s, model=%s, loras=%s",
                 image_config.COMFYUI_BASE_URL,
                 len(prompt),
                 final_size,
                 seed_arg,
                 steps_label,
                 resolved_model or "(workflow default)",
-                f"{resolved_lora_name}@{resolved_lora_strength}" if inject_lora else "(none)",
+                json.dumps(lora_config) if lora_config else "(none)",
             )
 
             # =================================================================
