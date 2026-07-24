@@ -449,6 +449,10 @@ class Tools:
             default="",
             description="Public base URL for image links (overrides COMFYUI_BASE_URL). Leave empty to use COMFYUI_BASE_URL.",
         )
+        lora_config: str = Field(
+            default="[]",
+            description='JSON array of LoRAs. String=only name (strength 1.0), object={"name", "strength"}. Applied positionally. User overrides on name collision.',
+        )
 
     class UserValves(BaseModel):
         """User-level configuration (overrides admin valve)."""
@@ -564,15 +568,53 @@ class Tools:
             reduced_w = width // gcd
             reduced_h = height // gcd
 
-            # LoRA: parse JSON array from valve, applied positionally to lora_1..lora_N
-            lora_config = []
+            # LoRA: combine admin + user. User wins on name collision.
+            # Pop: user can disable a LoRA with strength=0 to free the slot.
+            def _lora_name(item):
+                if isinstance(item, str):
+                    return item
+                if isinstance(item, dict):
+                    return item.get("name", "")
+                return ""
+
+            admin_loras = []
+            try:
+                p = json.loads(self.valves.lora_config)
+                if isinstance(p, list):
+                    admin_loras = p
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            user_loras = []
             if user_valves and user_valves.lora_config:
                 try:
-                    parsed = json.loads(user_valves.lora_config)
-                    if isinstance(parsed, list):
-                        lora_config = parsed[:8]  # cap at 8 slots max
+                    p = json.loads(user_valves.lora_config)
+                    if isinstance(p, list):
+                        user_loras = p
                 except (json.JSONDecodeError, TypeError):
-                    lora_config = []
+                    pass
+
+            user_active = []
+            blocked_names = set()
+            for item in user_loras:
+                name = _lora_name(item)
+                if not name:
+                    continue
+                disabled = False
+                if isinstance(item, dict):
+                    s = float(item.get("strength", 1.0))
+                    if s <= 0:
+                        disabled = True
+                if disabled:
+                    blocked_names.add(name)
+                else:
+                    user_active.append(item)
+                    blocked_names.add(name)
+
+            combined = list(user_active)
+            for item in admin_loras:
+                if _lora_name(item) not in blocked_names:
+                    combined.append(item)
 
             # Base URL: UserValves > AdminValves > COMFYUI_BASE_URL
             user_image_base_url = (
@@ -622,7 +664,10 @@ class Tools:
             workflow[NODE_ASPECT_RATIO]["inputs"]["string_a"] = str(reduced_w)
             workflow[NODE_ASPECT_RATIO]["inputs"]["string_b"] = str(reduced_h)
 
-            # LoRA injection — iterate array positionally over lora_1..lora_N
+            # Cap to available slots and inject
+            max_slots = sum(1 for k in workflow[NODE_LORA]["inputs"] if k.startswith("lora_"))
+            lora_config = combined[:max_slots]
+
             for i, item in enumerate(lora_config, start=1):
                 slot = f"lora_{i}"
                 if slot not in workflow[NODE_LORA]["inputs"]:
