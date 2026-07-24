@@ -119,7 +119,7 @@ _ENHANCE_WORKFLOW_JSON_RAW = r"""{
     "inputs": {
       "source": "temp",
       "url": "",
-      "image": "ComfyUI_temp_uhygy_00001_.png",
+      "image": "",
       "Choose file to upload": null
     },
     "class_type": "LoadImageByUrlOrPath",
