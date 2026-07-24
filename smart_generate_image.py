@@ -108,7 +108,7 @@ _ZIT_WORKFLOW_JSON_RAW = r"""{
   },
   "58": {
     "inputs": {
-      "unet_name": "zImageTurbo-p60-refiners-nvfp4.safetensors",
+      "unet_name": "zImageTurbo-mxfp8.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -216,7 +216,7 @@ _ZIT_WORKFLOW_JSON_RAW = r"""{
       },
       "lora_1": {
         "on": false,
-        "lora": "Chroma\\chroma-flash-heun_r64-fp32.safetensors",
+        "lora": "",
         "strength": 1
       },
       "\u2795 Add Lora": "",
