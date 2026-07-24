@@ -451,7 +451,7 @@ class Tools:
         )
         lora_config: str = Field(
             default="[]",
-            description='JSON array of LoRAs. String=only name (strength 1.0), object={"name", "strength"}. Applied positionally. User overrides on name collision.',
+            description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Applied positionally. User overrides on name collision.',
         )
 
     class UserValves(BaseModel):
@@ -481,7 +481,7 @@ class Tools:
         )
         lora_config: str = Field(
             default="[]",
-            description='JSON array of LoRAs. String=only name (strength 1.0), object={"name", "strength"}. Empty name or strength 0 disables it. Applied positionally to lora_1..lora_N. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
+            description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Empty name or strength 0 disables it. Applied positionally to lora_1..lora_N. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
         )
 
     def __init__(self):
@@ -568,31 +568,70 @@ class Tools:
             reduced_w = width // gcd
             reduced_h = height // gcd
 
-            # LoRA: combine admin + user. User wins on name collision.
+            # LoRA: validate and combine admin + user. User wins on name collision.
             # Pop: user can disable a LoRA with strength=0 to free the slot.
             def _lora_name(item):
                 if isinstance(item, str):
                     return item
                 if isinstance(item, dict):
-                    return item.get("name", "")
+                    return item.get("name", item.get("model", ""))
                 return ""
 
-            admin_loras = []
-            try:
-                p = json.loads(self.valves.lora_config)
-                if isinstance(p, list):
-                    admin_loras = p
-            except (json.JSONDecodeError, TypeError):
-                pass
+            def _load_loras(raw: str, label: str):
+                """Parse a lora_config JSON string. Returns (list, error_or_None)."""
+                if not raw or raw.strip() == "":
+                    return [], None
+                try:
+                    p = json.loads(raw)
+                except json.JSONDecodeError as e:
+                    return [], f"Invalid JSON in {label} lora_config: {e}"
+                except TypeError as e:
+                    return [], f"Invalid type in {label} lora_config: {e}"
+                if not isinstance(p, list):
+                    return [], f"""{label} lora_config must be a JSON array, got {type(p).__name__}. Ex: ["lora.sft"]"""
+                for i, item in enumerate(p):
+                    if isinstance(item, str):
+                        continue
+                    if isinstance(item, dict):
+                        name = item.get("name", item.get("model", None))
+                        if name is not None and not isinstance(name, str):
+                            return [], f"{label} lora_config[{i}] 'name'/'model' must be a string, got {type(name).__name__}"
+                        strength = item.get("strength", None)
+                        if strength is not None and not isinstance(strength, (int, float)):
+                            return [], f"{label} lora_config[{i}] 'strength' must be a number, got {type(strength).__name__}"
+                    else:
+                        return [], f"{label} lora_config[{i}] must be a string or object, got {type(item).__name__}"
+                return p, None
+
+            admin_loras, err = _load_loras(self.valves.lora_config, "admin")
+            if err:
+                if __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "error",
+                                "content": f"LoRA config error: {err}",
+                            },
+                        }
+                    )
+                return f"Error: {err}"
 
             user_loras = []
             if user_valves and user_valves.lora_config:
-                try:
-                    p = json.loads(user_valves.lora_config)
-                    if isinstance(p, list):
-                        user_loras = p
-                except (json.JSONDecodeError, TypeError):
-                    pass
+                user_loras, err = _load_loras(user_valves.lora_config, "user")
+                if err:
+                    if __event_emitter__:
+                        await __event_emitter__(
+                            {
+                                "type": "notification",
+                                "data": {
+                                    "type": "error",
+                                    "content": f"LoRA config error: {err}",
+                                },
+                            }
+                        )
+                    return f"Error: {err}"
 
             user_active = []
             blocked_names = set()
@@ -603,7 +642,7 @@ class Tools:
                 disabled = False
                 if isinstance(item, dict):
                     s = float(item.get("strength", 1.0))
-                    if s <= 0:
+                    if s == 0:
                         disabled = True
                 if disabled:
                     blocked_names.add(name)
@@ -616,6 +655,17 @@ class Tools:
                 if _lora_name(item) not in blocked_names:
                     combined.append(item)
 
+            # Build LoRA lines for status
+            lora_desc_lines = []
+            if combined:
+                for item in combined:
+                    if isinstance(item, str):
+                        lora_desc_lines.append(f"{item} = 1.0")
+                    elif isinstance(item, dict):
+                        name = item.get("name", item.get("model", "?"))
+                        strength = item.get("strength", 1.0)
+                        lora_desc_lines.append(f"{name} = {strength}")
+
             # Base URL: UserValves > AdminValves > COMFYUI_BASE_URL
             user_image_base_url = (
                 user_valves.comfyui_image_base_url if user_valves and user_valves.comfyui_image_base_url else ""
@@ -626,14 +676,19 @@ class Tools:
                 or image_config.COMFYUI_BASE_URL
             )
 
-            steps_label = str(resolved_steps) if resolved_steps else "workflow default"
-
             if __event_emitter__:
+                status_desc = "\U0001f3a8 Generating image"
+                if lora_desc_lines:
+                    status_desc += " with LoRAs..."
+                    for line in lora_desc_lines:
+                        status_desc += f"\n    \u2022 {line}"
+                else:
+                    status_desc += "..."
                 await __event_emitter__(
                     {
                         "type": "status",
                         "data": {
-                            "description": f"\U0001f3a8 Generating image with {steps_label} steps...",
+                            "description": status_desc,
                             "done": False,
                             "hidden": False,
                         },
@@ -668,6 +723,11 @@ class Tools:
             max_slots = sum(1 for k in workflow[NODE_LORA]["inputs"] if k.startswith("lora_"))
             lora_config = combined[:max_slots]
 
+            log.info("LoRA injection: admin_raw=%s user_raw=%s combined=%s",
+                      self.valves.lora_config,
+                      user_valves.lora_config if user_valves else "(no user)",
+                      json.dumps(lora_config))
+
             for i, item in enumerate(lora_config, start=1):
                 slot = f"lora_{i}"
                 if slot not in workflow[NODE_LORA]["inputs"]:
@@ -676,12 +736,12 @@ class Tools:
                     name = item
                     strength = 1.0
                 elif isinstance(item, dict):
-                    name = item.get("name", "")
+                    name = item.get("name", item.get("model", ""))
                     strength = float(item.get("strength", 1.0))
                 else:
                     continue  # skip invalid entries
 
-                if bool(name) and strength > 0:
+                if bool(name) and strength != 0:
                     workflow[NODE_LORA]["inputs"][slot]["on"] = True
                     workflow[NODE_LORA]["inputs"][slot]["lora"] = name
                     workflow[NODE_LORA]["inputs"][slot]["strength"] = strength
