@@ -327,8 +327,8 @@
   "1043": {
     "inputs": {
       "source": "temp",
-      "url": "https://cas-bridge.xethub.hf.co/xet-bridge-us/69da7a9480c72f6e5fb718d2/52d4d6b47372a67ef739c31c19c5f9180be77daf608d7c6a8fbb0cdc656e2d28?Expires=1780681155&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9jYXMtYnJpZGdlLnhldGh1Yi5oZi5jby94ZXQtYnJpZGdlLXVzLzY5ZGE3YTk0ODBjNzJmNmU1ZmI3MThkMi81MmQ0ZDZiNDczNzJhNjdlZjczOWMzMWMxOWM1ZjkxODBiZTc3ZGFmNjA4ZDdjNmE4ZmJiMGNkYzY1NmUyZDI4KiIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc4MDY4MTE1NX19fV19&Signature=MEYCIQDyuDfDowLihaOp0BtWAT5-gKmEQ5WBEjinwHewV-ki6wIhAMfqw%7ELx3tjyIgLKJYdRSvEBPTLHvZTS70jjzRDuF7P2&Key-Pair-Id=K1LYXO563TGWFU&X-Xet-Cas-Uid=699b33bad9f567ac2108a7e5&response-content-disposition=inline%3B+filename*%3DUTF-8%27%27wan21_input_cat.png%3B+filename%3D%22wan21_input_cat.png%22%3B&response-content-type=image%2Fpng&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=cas%2F20260605%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260605T163915Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=579a0f4ed7b9f771cb89b1e7ad66d644d0ea442fcc533f7a84f593cdc3887d24",
-      "image": "ComfyUI_temp_uhygy_00020_.png",
+      "url": "",
+      "image": "",
       "Choose file to upload": null
     },
     "class_type": "LoadImageByUrlOrPath",
