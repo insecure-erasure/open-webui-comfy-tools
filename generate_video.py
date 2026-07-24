@@ -316,10 +316,10 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 10,
-      "save_metadata": true,
+      "save_metadata": false,
       "trim_to_audio": false,
       "pingpong": false,
-      "save_output": true,
+      "save_output": false,
       "images": [
         "1052",
         0
@@ -549,9 +549,12 @@ async def _comfyui_interrupt(base_url: str, api_key: str) -> None:
         log.warning("Failed to interrupt ComfyUI", exc_info=True)
 
 
-def _extract_video_filename(outputs: dict, output_node_id: str) -> str:
+def _extract_video_filename(outputs: dict, output_node_id: str) -> tuple[str, str]:
     """
-    Extract the video filename from the workflow outputs.
+    Extract the video filename and type from the workflow outputs.
+
+    Returns (filename, type). type is "output" or "temp" depending on
+    whether the node saved to disk or only kept the result in memory.
 
     Tries common output keys used by video nodes:
       - "gifs" (VHS_VideoCombine)
@@ -564,8 +567,9 @@ def _extract_video_filename(outputs: dict, output_node_id: str) -> str:
         items = node_output.get(key, [])
         if items and isinstance(items, list) and len(items) > 0:
             filename = items[0].get("filename")
+            img_type = items[0].get("type", "output")
             if filename:
-                return filename
+                return (filename, img_type)
 
     raise RuntimeError(
         f"Could not find a video filename in output node {output_node_id}. "
@@ -809,10 +813,10 @@ class Tools:
             # =================================================================
             # Extract video filename and build URL
             # =================================================================
-            video_filename = _extract_video_filename(outputs, NODE_OUTPUT)
+            video_filename, video_type = _extract_video_filename(outputs, NODE_OUTPUT)
 
             base = resolved_video_base_url.rstrip("/")
-            video_url = f"{base}/api/view?filename={video_filename}"
+            video_url = f"{base}/api/view?filename={video_filename}&type={video_type}"
 
             if __event_emitter__:
                 await __event_emitter__(
@@ -832,9 +836,10 @@ class Tools:
                 f'<style>\n'
                 f'* {{ margin:0; padding:0; box-sizing:border-box; }}\n'
                 f'body {{ background:#0d0d0d; display:flex; align-items:center; justify-content:center; min-height:100vh; }}\n'
+                f'video {{ width:100%; height:100%; display:block; object-fit:contain; }}\n'
                 f'</style>\n'
-                f'<div style="background:#222">\n'
-                f'  <video controls autoplay muted loop playsinline style="width:100%;display:block">\n'
+                f'<div style="background:#222; width:100%; height:100vh; display:flex;">\n'
+                f'  <video controls autoplay muted loop playsinline style="width:100%;height:100%;object-fit:contain;">\n'
                 f'    <source src="{video_url}" type="video/mp4">\n'
                 f'  </video>\n'
                 f'</div>\n'
