@@ -150,7 +150,7 @@ _ZIT_WORKFLOW_JSON_RAW = r"""{
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "421",
+        "422",
         0
       ],
       "positive": [
@@ -209,18 +209,25 @@ _ZIT_WORKFLOW_JSON_RAW = r"""{
       "title": "Aspect ratio"
     }
   },
-  "421": {
+  "422": {
     "inputs": {
-      "lora_name": "Chroma\\Realistic_Chroma_Slider_alpha.safetensors",
-      "strength_model": 0,
+      "PowerLoraLoaderHeaderWidget": {
+        "type": "PowerLoraLoaderHeaderWidget"
+      },
+      "lora_1": {
+        "on": false,
+        "lora": "Chroma\\chroma-flash-heun_r64-fp32.safetensors",
+        "strength": 1
+      },
+      "\u2795 Add Lora": "",
       "model": [
         "58",
         0
       ]
     },
-    "class_type": "LoraLoaderModelOnly",
+    "class_type": "Power Lora Loader (rgthree)",
     "_meta": {
-      "title": "Load LoRA"
+      "title": "Power Lora Loader (rgthree)"
     }
   }
 }
@@ -242,7 +249,7 @@ NODE_KSAMPLER = "66"
 NODE_CLIP_LOADER = "68"
 NODE_FLUX_RESOLUTION = "69"
 NODE_ASPECT_RATIO = "84"
-NODE_LORA = "421"
+NODE_LORA = "422"
 
 # =============================================================================
 # ComfyUI constants
@@ -618,10 +625,11 @@ class Tools:
             workflow[NODE_ASPECT_RATIO]["inputs"]["string_a"] = str(reduced_w)
             workflow[NODE_ASPECT_RATIO]["inputs"]["string_b"] = str(reduced_h)
 
-            # LoRA injection
+            # LoRA injection — Power Lora Loader (rgthree)
             if inject_lora:
-                workflow[NODE_LORA]["inputs"]["lora_name"] = resolved_lora_name
-                workflow[NODE_LORA]["inputs"]["strength_model"] = resolved_lora_strength
+                workflow[NODE_LORA]["inputs"]["lora_1"]["on"] = True
+                workflow[NODE_LORA]["inputs"]["lora_1"]["lora"] = resolved_lora_name
+                workflow[NODE_LORA]["inputs"]["lora_1"]["strength"] = resolved_lora_strength
 
             log.info(
                 "Dispatching image workflow to ComfyUI (%s) - prompt_len=%d, size=%s, "

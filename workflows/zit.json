@@ -110,7 +110,7 @@
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "421",
+        "422",
         0
       ],
       "positive": [
@@ -169,18 +169,25 @@
       "title": "Aspect ratio"
     }
   },
-  "421": {
+  "422": {
     "inputs": {
-      "lora_name": "Chroma\\Realistic_Chroma_Slider_alpha.safetensors",
-      "strength_model": 0,
+      "PowerLoraLoaderHeaderWidget": {
+        "type": "PowerLoraLoaderHeaderWidget"
+      },
+      "lora_1": {
+        "on": false,
+        "lora": "Chroma\\chroma-flash-heun_r64-fp32.safetensors",
+        "strength": 1
+      },
+      "➕ Add Lora": "",
       "model": [
         "58",
         0
       ]
     },
-    "class_type": "LoraLoaderModelOnly",
+    "class_type": "Power Lora Loader (rgthree)",
     "_meta": {
-      "title": "Load LoRA"
+      "title": "Power Lora Loader (rgthree)"
     }
   }
 }
