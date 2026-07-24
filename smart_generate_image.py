@@ -758,7 +758,7 @@ class Tools:
                 len(prompt),
                 final_size,
                 seed_arg,
-                steps_label,
+                resolved_steps or "(workflow default)",
                 resolved_model or "(workflow default)",
                 json.dumps(lora_config) if lora_config else "(none)",
             )
