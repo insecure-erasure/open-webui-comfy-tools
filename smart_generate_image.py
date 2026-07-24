@@ -6,10 +6,11 @@ version: 2.4
 """
 
 import asyncio
+import json
 import logging
 import math
 import random as _random
-from urllib.parse import urlparse, parse_qs
+import uuid
 
 import httpx
 from pydantic import BaseModel, Field
@@ -129,7 +130,7 @@ _ZIT_WORKFLOW_JSON_RAW = r"""{
   },
   "63": {
     "inputs": {
-      "text": "",
+      "text": "{{PROMPT}}",
       "clip": [
         "42",
         0
@@ -142,7 +143,7 @@ _ZIT_WORKFLOW_JSON_RAW = r"""{
   },
   "66": {
     "inputs": {
-      "seed": 0,
+      "seed": {{SEED}},
       "steps": 10,
       "cfg": 1,
       "sampler_name": "euler",
@@ -244,257 +245,136 @@ NODE_ASPECT_RATIO = "84"
 NODE_LORA = "421"
 
 # =============================================================================
-# MONKEY PATCH 1: Add seed field to CreateImageForm
+# ComfyUI constants
 # =============================================================================
-from open_webui.routers import images as images_router
+_COMFY_SEED_MAX: int = 1125899906842624
+_COMFY_QUEUE_MAX_RETRIES = 600       # ~10 min at 1s intervals
+_COMFY_QUEUE_POLL_INTERVAL = 1.0     # seconds
 
 
-class PatchedCreateImageForm(images_router.CreateImageForm):
-    seed: int | None = Field(
-        default=None,
-        description="Seed for reproducibility (defaults to 0 in the tool)",
+# =============================================================================
+# Placeholder injection
+# =============================================================================
+
+def _inject_placeholders(raw_json: str, replacements: dict[str, object]) -> str:
+    """
+    Replace {{PLACEHOLDER}} patterns in the raw JSON string with actual values.
+
+    This happens *before* JSON parsing, so placeholders can appear in both
+    string values ("{{PROMPT}}") and numeric contexts ("seed": {{SEED}}).
+    """
+    for key, value in replacements.items():
+        placeholder = "{{" + key + "}}"
+        raw_json = raw_json.replace(placeholder, str(value))
+    return raw_json
+
+
+# =============================================================================
+# ComfyUI API helpers (direct REST calls, no Open WebUI dependency)
+# =============================================================================
+
+async def _comfyui_queue_prompt(
+    client: httpx.AsyncClient, base_url: str, api_key: str, workflow: dict
+) -> str:
+    """Submit a workflow to ComfyUI and return the prompt_id."""
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    payload = {
+        "prompt": workflow,
+        "client_id": str(uuid.uuid4()),
+    }
+
+    resp = await client.post(
+        f"{base_url.rstrip('/')}/prompt",
+        json=payload,
+        headers=headers,
+        timeout=30,
     )
-    comfyui_image_base_url: str | None = Field(
-        default=None,
-        description="Base URL for image URLs (overrides COMFYUI_BASE_URL for display)",
-    )
+    resp.raise_for_status()
+    data = resp.json()
+    prompt_id = data.get("prompt_id")
+    if not prompt_id:
+        raise RuntimeError(f"ComfyUI did not return a prompt_id: {data}")
+    return prompt_id
 
 
+async def _comfyui_wait_for_output(
+    client: httpx.AsyncClient, base_url: str, api_key: str, prompt_id: str
+) -> dict:
+    """Poll /history/{prompt_id} until the workflow completes. Returns the output dict."""
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
 
+    history_url = f"{base_url.rstrip('/')}/history/{prompt_id}"
 
-# =============================================================================
-# MONKEY PATCH 2: Make _apply_workflow_nodes ignore None values
-# =============================================================================
+    for attempt in range(_COMFY_QUEUE_MAX_RETRIES):
+        resp = await client.get(history_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        history = resp.json()
 
-NODE_TYPE_INPUT_KEYS = {
-    "prompt": "text",
-    "model": "unet_name",
-    "width": "string_a",
-    "height": "string_b",
-    "steps": "steps",
-    "seed": "seed",
-}
+        if prompt_id in history and history[prompt_id].get("outputs"):
+            return history[prompt_id]["outputs"]
 
-
-def patched_apply_workflow_nodes(workflow, nodes, model, payload):
-    """Like the original, but skips assignment when the payload value is None."""
-    for node in nodes:
-        if not node.type:
+        if prompt_id in history and history[prompt_id].get("status", {}).get("completed") is False:
+            await asyncio.sleep(_COMFY_QUEUE_POLL_INTERVAL)
             continue
 
-        input_key = NODE_TYPE_INPUT_KEYS.get(node.type, node.key)
+        await asyncio.sleep(_COMFY_QUEUE_POLL_INTERVAL)
 
-        if node.type == "model":
-            if model is not None:
-                for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][input_key] = model
-
-        elif node.type == "prompt":
-            if payload.prompt is not None:
-                for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][input_key] = payload.prompt
-
-        elif node.type == "width":
-            if payload.width is not None:
-                for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][input_key] = payload.width
-
-        elif node.type == "height":
-            if payload.height is not None:
-                for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][input_key] = payload.height
-
-        elif node.type == "steps":
-            if payload.steps is not None:
-                for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][input_key] = payload.steps
-
-        elif node.type == "seed":
-            if payload.seed is not None:
-                for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][input_key] = payload.seed
-
-        elif node.type == "n":
-            if payload.n is not None:
-                for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][input_key] = payload.n
-
-        elif node.type == "image":
-            if payload.image is not None:
-                if isinstance(payload.image, list):
-                    for idx, node_id in enumerate(node.node_ids):
-                        if idx < len(payload.image):
-                            workflow[node_id]["inputs"][input_key] = payload.image[idx]
-                else:
-                    for node_id in node.node_ids:
-                        workflow[node_id]["inputs"][input_key] = payload.image
-
-        else:
-            if node.value is not None:
-                for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][input_key] = node.value
-
-
-
-
-# =============================================================================
-# MONKEY PATCH 3: Override image_generations for ComfyUI
-# =============================================================================
-_original_image_generations = images_router.image_generations
-
-
-async def patched_image_generations(request, form_data, metadata=None, user=None):
-    from open_webui.routers.images import get_image_config
-    import uuid
-
-    image_config = await get_image_config()
-    engine = image_config.IMAGE_GENERATION_ENGINE
-
-    if engine != "comfyui":
-        return await _original_image_generations(request, form_data, metadata, user)
-
-    log.info("Image generation requested")
-
-    size = "512x512"
-    if image_config.IMAGE_SIZE and "x" in image_config.IMAGE_SIZE:
-        size = image_config.IMAGE_SIZE
-    if form_data.size and "x" in form_data.size:
-        size = form_data.size
-    width, height = tuple(map(int, size.split("x")))
-
-    gcd = math.gcd(width, height)
-    reduced_w = width // gcd
-    reduced_h = height // gcd
-
-    admin_default_model = await images_router.get_image_model(request)
-    effective_model = (
-        form_data.model if form_data.model is not None else admin_default_model
-    )
-    admin_steps = image_config.IMAGE_STEPS
-
-    log.info(
-        "Generating image: prompt_len=%d, size=%s, seed=%s, steps=%s, model=%s",
-        len(form_data.prompt),
-        size,
-        form_data.seed,
-        form_data.steps if form_data.steps is not None else "workflow_default",
-        effective_model or "not_set",
+    raise TimeoutError(
+        f"ComfyUI did not finish within {_COMFY_QUEUE_MAX_RETRIES} seconds "
+        f"(prompt_id={prompt_id})"
     )
 
-    # =========================================================================
-    # Node bindings
-    # =========================================================================
-    from open_webui.utils.images.comfyui import (
-        ComfyUICreateImageForm,
-        ComfyUIWorkflow,
-        comfyui_create_image,
-    )
 
-    configured_node_types = {
-        node["type"] for node in image_config.COMFYUI_WORKFLOW_NODES
-    }
-
-    # =========================================================================
-    # Payload build
-    # =========================================================================
-    data = {
-        "prompt": form_data.prompt,
-        "width": str(reduced_w),
-        "height": str(reduced_h),
-        "n": 1,
-    }
-
-    if form_data.seed is not None:
-        data["seed"] = form_data.seed
-        if "seed" not in configured_node_types:
-            log.warning(
-                "Seed=%d was provided but no 'seed' node binding is configured. "
-                "The value will be ignored by ComfyUI.",
-                form_data.seed,
-            )
-
-    if "steps" in configured_node_types:
-        if form_data.steps is not None:
-            data["steps"] = form_data.steps
-        elif admin_steps is not None:
-            data["steps"] = admin_steps
-
-    if "model" in configured_node_types:
-        data["model"] = effective_model
-
-    log.info("Dispatching to ComfyUI (%s)", image_config.COMFYUI_BASE_URL)
-
-    cf_form = ComfyUICreateImageForm(
-        **{
-            "workflow": ComfyUIWorkflow(
-                **{
-                    "workflow": image_config.COMFYUI_WORKFLOW,
-                    "nodes": image_config.COMFYUI_WORKFLOW_NODES,
-                }
-            ),
-            **data,
-        }
-    )
-
+async def _comfyui_interrupt(base_url: str, api_key: str) -> None:
+    """Interrupt the currently running ComfyUI generation."""
     try:
-        res = await comfyui_create_image(
-            effective_model,
-            cf_form,
-            str(uuid.uuid4()),
-            image_config.COMFYUI_BASE_URL,
-            image_config.COMFYUI_API_KEY,
-        )
-    except asyncio.CancelledError:
-        log.info("Image generation cancelled by user - interrupting ComfyUI")
-        try:
-            interrupt_url = f"{image_config.COMFYUI_BASE_URL.rstrip('/')}/interrupt"
-            headers = {}
-            if image_config.COMFYUI_API_KEY:
-                headers["Authorization"] = f"Bearer {image_config.COMFYUI_API_KEY}"
-            async with httpx.AsyncClient() as client:
-                await client.post(interrupt_url, headers=headers, timeout=5)
-        except Exception:
-            log.warning("Failed to interrupt ComfyUI", exc_info=True)
-        raise
-    except Exception as e:
-        log.error("ComfyUI image generation failed: %s", e)
-        raise
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{base_url.rstrip('/')}/interrupt",
+                headers=headers,
+                timeout=5,
+            )
+    except Exception:
+        log.warning("Failed to interrupt ComfyUI", exc_info=True)
 
-    if res is None or not res.get("data"):
-        log.error("ComfyUI returned no image data")
-        raise RuntimeError("ComfyUI returned no image data")
 
-    # No download/re-upload - return the URL directly from
-    # the image generation engine using the image base URL
-    # resolved from: UserValves > AdminValves > COMFYUI_BASE_URL.
-    #
-    # PREREQUISITE: The image base URL must be accessible from the
-    # user's browser (or from where the LLM renders the image).
-    image_base_url = (
-        form_data.comfyui_image_base_url
-        if form_data.comfyui_image_base_url
-        else image_config.COMFYUI_BASE_URL
+def _extract_image_filename(outputs: dict, output_node_id: str) -> tuple[str, str]:
+    """
+    Extract the image filename and type from the workflow outputs.
+
+    Returns (filename, type). type is "output" or "temp" depending on
+    whether the node saved to disk or only kept the result in memory.
+    """
+    node_output = outputs.get(output_node_id, {})
+
+    for key in ("images",):
+        items = node_output.get(key, [])
+        if items and isinstance(items, list) and len(items) > 0:
+            filename = items[0].get("filename")
+            img_type = items[0].get("type", "output")
+            if filename:
+                return (filename, img_type)
+
+    raise RuntimeError(
+        f"Could not find an image filename in output node {output_node_id}. "
+        f"Available outputs: {json.dumps(node_output, indent=2)}"
     )
-    images = []
-    comfy_base = image_config.COMFYUI_BASE_URL.rstrip("/")
-    for img in res["data"]:
-        raw_url = img["url"]
-        if raw_url.startswith("/"):
-            base = image_base_url.rstrip("/")
-            image_url = f"{base}{raw_url}"
-        elif raw_url.startswith(comfy_base):
-            # Absolute URL from ComfyUI - rewrite the host part
-            image_url = raw_url.replace(comfy_base, image_base_url.rstrip("/"), 1)
-        else:
-            image_url = raw_url
-        images.append({"url": image_url})
 
-    log.info(
-        "Generation complete - %d image(s) - %s",
-        len(images),
-        images[0]["url"],
-    )
-    return images
+
+
+
+
+
+# =============================================================================
+# TOOLS CLASS
 
 
 
@@ -537,20 +417,34 @@ class Tools:
 
         model_name: str = Field(
             default="",
-            description="Model/checkpoint name. Overrides the Admin UI default. Leave empty to use the Admin UI setting.",
+            description="Model/checkpoint name. Overrides the workflow default. Leave empty to use the value set in the workflow.",
         )
         steps: str = _STEPS_FIELD
+        max_steps: str = Field(
+            default="0",
+            description="Maximum inference steps ceiling. 0 = force workflow default (user steps are ignored). >0 = clamp user/admin steps to this value.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _STEPS_OPTIONS,
+                }
+            },
+        )
+        default_size: str = Field(
+            default="1024x1024",
+            description="Default image size when the LLM does not specify one (e.g., 1024x1024).",
+        )
         comfyui_image_base_url: str = Field(
             default="",
             description="Public base URL for image links (overrides COMFYUI_BASE_URL). Leave empty to use COMFYUI_BASE_URL.",
         )
 
     class UserValves(BaseModel):
-        """User-level configuration (overrides admin valve and Admin UI)."""
+        """User-level configuration (overrides admin valve)."""
 
         model_name: str = Field(
             default="",
-            description="Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting.",
+            description="Your preferred model/checkpoint. Overrides the admin valve or the workflow default.",
         )
         steps: str = _STEPS_FIELD
         comfyui_image_base_url: str = Field(
@@ -560,6 +454,14 @@ class Tools:
         seed: int = Field(
             default=-1,
             description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
+        )
+        lora_name: str = Field(
+            default="",
+            description="LoRA filename (e.g. 'Chroma\\\\Realistic_Chroma_Slider_alpha.safetensors'). Leave empty to skip LoRA injection.",
+        )
+        lora_strength: float = Field(
+            default=0.0,
+            description="LoRA activation strength (0.0 = disabled, 0.5-1.0 typical range).",
         )
 
     def __init__(self):
@@ -593,65 +495,90 @@ class Tools:
             return "Error: The tool could not be initialized."
 
         try:
-            from open_webui.models.users import UserModel
+            from open_webui.routers.images import get_image_config
 
-            user = UserModel(**__user__) if __user__ else None
+            image_config = await get_image_config()
 
-            # Resolve model: UserValves > AdminValves > Admin UI default
+            # =================================================================
+            # Resolve valves: UserValves > AdminValves > workflow default
+            # =================================================================
             user_valves = (__user__ or {}).get('valves', None)
+
+            # Model: UserValves > AdminValves > None (workflow default)
             user_model = (
                 user_valves.model_name if user_valves and user_valves.model_name else ""
             )
             resolved_model = user_model or self.valves.model_name or None
 
-            # Resolve steps: UserValves > AdminValves > Admin UI > workflow default
-            # All clamped against IMAGE_STEPS if set, or 15 as safety ceiling.
-            from open_webui.routers.images import get_image_config
-
-            image_config = await get_image_config()
-            admin_steps_config = image_config.IMAGE_STEPS
-            ceiling = 15 if admin_steps_config is None or admin_steps_config <= 0 else admin_steps_config
-
-            user_valve_steps = int(user_valves.steps) if user_valves and user_valves.steps and user_valves.steps != "0" else 0
-            admin_valve_steps = int(self.valves.steps) if self.valves.steps and self.valves.steps != "0" else 0
-
+            # Steps:
+            #   max_steps=0 → force workflow default (ignore all steps valves)
+            #   max_steps>0 → resolve UserValves > AdminValves + clamp
+            max_steps = int(self.valves.max_steps) if self.valves.max_steps and self.valves.max_steps != "0" else 0
             resolved_steps = None
-            if user_valve_steps > 0:
-                resolved_steps = min(user_valve_steps, ceiling)
-                if resolved_steps < user_valve_steps and __event_emitter__:
-                    await __event_emitter__(
-                        {
-                            "type": "notification",
-                            "data": {
-                                "type": "warning",
-                                "content": f"\u26a0\ufe0f Steps clamped to {ceiling} (system limit).",
-                            },
-                        }
-                    )
-            elif admin_valve_steps > 0:
-                resolved_steps = min(admin_valve_steps, ceiling)
-                if resolved_steps < admin_valve_steps and __event_emitter__:
-                    await __event_emitter__(
-                        {
-                            "type": "notification",
-                            "data": {
-                                "type": "warning",
-                                "content": f"\u26a0\ufe0f Steps clamped to {ceiling} (system limit).",
-                            },
-                        }
-                    )
-            elif admin_steps_config is not None and admin_steps_config > 0:
-                resolved_steps = admin_steps_config
 
-            # Resolve seed: UserValve. -1 = generate random, >=0 = fixed.
+            if max_steps == 0:
+                # Force workflow default – ignore user/admin steps
+                resolved_steps = None
+            else:
+                user_valve_steps = int(user_valves.steps) if user_valves and user_valves.steps and user_valves.steps != "0" else 0
+                admin_valve_steps = int(self.valves.steps) if self.valves.steps and self.valves.steps != "0" else 0
+
+                if user_valve_steps > 0:
+                    resolved_steps = min(user_valve_steps, max_steps)
+                    if resolved_steps < user_valve_steps and __event_emitter__:
+                        await __event_emitter__(
+                            {
+                                "type": "notification",
+                                "data": {
+                                    "type": "warning",
+                                    "content": f"\u26a0\ufe0f Steps clamped to {max_steps} (system limit).",
+                                },
+                            }
+                        )
+                elif admin_valve_steps > 0:
+                    resolved_steps = min(admin_valve_steps, max_steps)
+                    if resolved_steps < admin_valve_steps and __event_emitter__:
+                        await __event_emitter__(
+                            {
+                                "type": "notification",
+                                "data": {
+                                    "type": "warning",
+                                    "content": f"\u26a0\ufe0f Steps clamped to {max_steps} (system limit).",
+                                },
+                            }
+                        )
+                # else: resolved_steps stays None → workflow default
+
+            # Seed: UserValve. -1 = random, >=0 = fixed.
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
-            seed_arg = _random.randint(0, 0xFFFFFFFFFFFFFFFF) if user_seed == -1 else user_seed
+            seed_arg = _random.randint(0, _COMFY_SEED_MAX) if user_seed == -1 else min(user_seed, _COMFY_SEED_MAX)
 
-            # Resolve image base URL: UserValves > AdminValves > COMFYUI_BASE_URL
+            # Size: from LLM param or admin valve default_size, then GCD reduction
+            default_size = self.valves.default_size or "1024x1024"
+            final_size = size if size and "x" in size else default_size
+            width, height = tuple(map(int, final_size.split("x")))
+            gcd = math.gcd(width, height)
+            reduced_w = width // gcd
+            reduced_h = height // gcd
+
+            # LoRA: only inject if name is non-empty AND strength > 0
+            resolved_lora_name = (
+                user_valves.lora_name if user_valves and user_valves.lora_name else ""
+            )
+            resolved_lora_strength = (
+                float(user_valves.lora_strength) if user_valves and user_valves.lora_strength else 0.0
+            )
+            inject_lora = bool(resolved_lora_name and resolved_lora_strength > 0)
+
+            # Base URL: UserValves > AdminValves > COMFYUI_BASE_URL
             user_image_base_url = (
                 user_valves.comfyui_image_base_url if user_valves and user_valves.comfyui_image_base_url else ""
             )
-            resolved_image_base_url = user_image_base_url or self.valves.comfyui_image_base_url or image_config.COMFYUI_BASE_URL
+            resolved_image_base_url = (
+                user_image_base_url
+                or self.valves.comfyui_image_base_url
+                or image_config.COMFYUI_BASE_URL
+            )
 
             steps_label = str(resolved_steps) if resolved_steps else "workflow default"
 
@@ -667,18 +594,76 @@ class Tools:
                     }
                 )
 
-            images = await patched_image_generations(
-                request=__request__,
-                form_data=PatchedCreateImageForm(
-                    prompt=prompt,
-                    model=resolved_model,
-                    size=size,
-                    steps=resolved_steps,
-                    seed=seed_arg,
-                    comfyui_image_base_url=resolved_image_base_url,
-                ),
-                user=user,
+            # =================================================================
+            # Build the workflow: inject placeholders into the raw JSON
+            # =================================================================
+            replacements = {
+                "PROMPT": prompt,
+                "SEED": seed_arg,
+            }
+
+            injected_raw = _inject_placeholders(_ZIT_WORKFLOW_JSON_RAW, replacements)
+            workflow = json.loads(injected_raw)
+
+            # =================================================================
+            # Apply optional overrides post-parse (only when valve is non-empty)
+            # =================================================================
+            if resolved_model:
+                workflow[NODE_UNET_LOADER]["inputs"]["unet_name"] = resolved_model
+
+            if resolved_steps is not None:
+                workflow[NODE_KSAMPLER]["inputs"]["steps"] = resolved_steps
+
+            # Inject aspect ratio (GCD-reduced) into the StringConcatenate node
+            workflow[NODE_ASPECT_RATIO]["inputs"]["string_a"] = str(reduced_w)
+            workflow[NODE_ASPECT_RATIO]["inputs"]["string_b"] = str(reduced_h)
+
+            # LoRA injection
+            if inject_lora:
+                workflow[NODE_LORA]["inputs"]["lora_name"] = resolved_lora_name
+                workflow[NODE_LORA]["inputs"]["strength_model"] = resolved_lora_strength
+
+            log.info(
+                "Dispatching image workflow to ComfyUI (%s) - prompt_len=%d, size=%s, "
+                "seed=%d, steps=%s, model=%s, lora=%s",
+                image_config.COMFYUI_BASE_URL,
+                len(prompt),
+                final_size,
+                seed_arg,
+                steps_label,
+                resolved_model or "(workflow default)",
+                f"{resolved_lora_name}@{resolved_lora_strength}" if inject_lora else "(none)",
             )
+
+            # =================================================================
+            # Execute workflow via ComfyUI API
+            # =================================================================
+            comfy_base = image_config.COMFYUI_BASE_URL.rstrip("/")
+            api_key = image_config.COMFYUI_API_KEY or ""
+
+            async with httpx.AsyncClient() as client:
+                prompt_id = await _comfyui_queue_prompt(
+                    client, comfy_base, api_key, workflow
+                )
+
+                log.info("Image workflow queued - prompt_id=%s", prompt_id)
+
+                try:
+                    outputs = await _comfyui_wait_for_output(
+                        client, comfy_base, api_key, prompt_id
+                    )
+                except asyncio.CancelledError:
+                    log.info("Image generation cancelled by user - interrupting ComfyUI")
+                    await _comfyui_interrupt(comfy_base, api_key)
+                    raise
+
+            # =================================================================
+            # Extract image filename and build URL
+            # =================================================================
+            image_filename, image_type = _extract_image_filename(outputs, NODE_PREVIEW_IMAGE)
+
+            base = resolved_image_base_url.rstrip("/")
+            image_url = f"{base}/api/view?filename={image_filename}&type={image_type}"
 
             if __event_emitter__:
                 await __event_emitter__(
@@ -691,13 +676,6 @@ class Tools:
                         },
                     }
                 )
-
-            image_url = images[0]["url"] if images else None
-
-            # Extract filename from the URL
-            parsed = urlparse(image_url)
-            params = parse_qs(parsed.query)
-            image_filename = params.get("filename", ["unknown"])[0]
 
             return (
                 f"image_md: ![Generated image]({image_url})\n"
