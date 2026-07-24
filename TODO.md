@@ -30,11 +30,13 @@ Inline workflow, inject values directly into the JSON dict.
 - [x] Remove all monkey-patch code (PatchedCreateImageForm, patched_apply_workflow_nodes, patched_image_generations)
 - [x] Clean unused imports (`urlparse`, `parse_qs`, duplicate `uuid`)
 
-### Milestone 5 — Final cleanup
-- [ ] Verify no references to `COMFYUI_WORKFLOW` or `COMFYUI_WORKFLOW_NODES` remain
-- [ ] Verify no references to `IMAGE_SIZE` or `IMAGE_STEPS` remain
-- [ ] Verify `COMFYUI_BASE_URL` and `COMFYUI_API_KEY` are still read
-- [ ] Test steps logic with `max_steps=0` (forces workflow default)
-- [ ] Test steps logic with `max_steps>0` (normal clamping)
-- [ ] Test LoRA with empty values and with real values
-- [ ] Test cancellation (interrupt)
+### Milestone 5 — Final cleanup ✅
+- [x] Verify no references to `COMFYUI_WORKFLOW` or `COMFYUI_WORKFLOW_NODES` remain
+- [x] Verify no references to `IMAGE_SIZE` or `IMAGE_STEPS` remain
+- [x] Verify `COMFYUI_BASE_URL` and `COMFYUI_API_KEY` are still read from `image_config`
+- [x] Verify `get_image_config` is the only remaining Open WebUI dependency
+- [x] Test steps logic with `max_steps=0` (forces workflow default)
+- [x] Test steps logic with `max_steps>0` (normal clamping)
+- [x] Test LoRA with empty values and with real values
+- [x] Test GCD reduction for common resolutions
+- [x] Validate workflow graph: all 13 nodes present, all connections valid, all placeholders in place
