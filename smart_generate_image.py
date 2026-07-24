@@ -24,16 +24,7 @@ _STEPS_OPTIONS = [
 ]
 _STEPS_OPTIONS.insert(0, {"value": "0", "label": "System default"})
 
-_STEPS_FIELD = Field(
-    default="0",
-    description="Inference steps.",
-    json_schema_extra={
-        "input": {
-            "type": "select",
-            "options": _STEPS_OPTIONS,
-        }
-    },
-)
+
 
 # =============================================================================
 # Inline workflow JSON — zit.json
@@ -426,7 +417,16 @@ class Tools:
             default="",
             description="Model/checkpoint name. Overrides the workflow default. Leave empty to use the value set in the workflow.",
         )
-        steps: str = _STEPS_FIELD
+        steps: str = Field(
+            default="0",
+            description="Inference steps.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _STEPS_OPTIONS,
+                }
+            },
+        )
         max_steps: str = Field(
             default="0",
             description="Maximum inference steps ceiling. 0 = force workflow default (user steps are ignored). >0 = clamp user/admin steps to this value.",
@@ -453,7 +453,16 @@ class Tools:
             default="",
             description="Your preferred model/checkpoint. Overrides the admin valve or the workflow default.",
         )
-        steps: str = _STEPS_FIELD
+        steps: str = Field(
+            default="0",
+            description="Inference steps.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _STEPS_OPTIONS,
+                }
+            },
+        )
         comfyui_image_base_url: str = Field(
             default="",
             description="Override the admin valve or COMFYUI_BASE_URL for image links.",

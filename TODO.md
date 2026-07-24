@@ -40,3 +40,11 @@ Inline workflow, inject values directly into the JSON dict.
 - [x] Test LoRA with empty values and with real values
 - [x] Test GCD reduction for common resolutions
 - [x] Validate workflow graph: all 13 nodes present, all connections valid, all placeholders in place
+
+### Post-refactor tweaks
+- [x] Replace `LoraLoaderModelOnly` (node 421) with `Power Lora Loader (rgthree)` (node 422)
+- [x] Update KSampler model connection to point to node 422
+- [x] Update LoRA injection to use `lora_1.on/.lora/.strength` structure
+- [x] Clear default LoRA name (empty string, `on=false` — safe even if file missing)
+- [x] Switch default model to `zImageTurbo-mxfp8.safetensors`
+- [x] Verify embedded workflow and `workflows/zit.json` are in sync
