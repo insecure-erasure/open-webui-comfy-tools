@@ -223,7 +223,6 @@ _ZIT_WORKFLOW_JSON_RAW = r"""{
   }
 }
 """
-ZIT_WORKFLOW_JSON: dict = json.loads(_ZIT_WORKFLOW_JSON_RAW)
 
 # =============================================================================
 # Node ID constants
