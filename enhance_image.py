@@ -142,18 +142,13 @@ NODE_OUTPUT: str = "61"
 
 class Tools:
     """
-    Enhance Image - upscale or enhance a previously generated image using SeedVR2.
+    Enhance / upscale a previously generated image.
 
-    Activate this tool from the tool selector in the chat input.
+    Only call when the user explicitly asks to enhance or upscale
+    an image. Pass an image filename or an URL.
 
-    Only use when the user explicitly asks to enhance, upscale, or improve
-    an image that was just generated. Pass the image_filename from the
-    smart_generate_image response - do not modify it.
-
-    --- Available Valves ---
-    comfyui_image_base_url (admin / user):
-        Public base URL for the generated image links. If empty, defaults
-        to COMFYUI_BASE_URL from Admin Panel > Settings > Images.
+    image: The filename previously generated from the smart_generate_image
+        response, or a direct URL to an external image.
     """
 
     class Valves(BaseModel):
@@ -178,7 +173,7 @@ class Tools:
 
     async def enhance_image(
         self,
-        image_filename: str,
+        image: str,
         __request__=None,
         __user__=None,
         __event_emitter__=None,
@@ -186,21 +181,19 @@ class Tools:
         __message_id__=None,
     ):
         """
-        Enhance / upscale a previously generated image using SeedVR2.
+        Enhance / upscale a previously generated image.
 
         Only call when the user explicitly asks to enhance or upscale
-        an image. Pass the image_filename from the smart_generate_image
-        response as-is - do not modify it.
+        an image. Pass an image filename or an URL.
 
-        image_filename: The filename from the smart_generate_image response.
+        image: The filename previously generated from the smart_generate_image
+            response, or a direct URL to an external image.
         """
         if __request__ is None:
             log.error("enhance_image called without request context")
             return "Error: The tool could not be initialized."
 
         try:
-            filename = image_filename
-
             if __event_emitter__:
                 await __event_emitter__(
                     {
@@ -244,13 +237,24 @@ class Tools:
             # =================================================================
             workflow = dict(ENHANCE_WORKFLOW_JSON)
 
-            # Inject the filename into the LoadImageByUrlOrPath node
-            workflow[NODE_LOAD_IMAGE]["inputs"]["image"] = filename
+            # Configure image source (node 426) — auto-detect URL vs filename
+            node_img = workflow[NODE_LOAD_IMAGE]["inputs"]
+            parsed = urlparse(image)
+            if parsed.scheme and parsed.netloc:
+                node_img["source"] = "url"
+                node_img["url"] = image
+                node_img.pop("image", None)
+                node_img.pop("Choose file to upload", None)
+            else:
+                node_img["source"] = "temp"
+                node_img["image"] = image
+                node_img["url"] = ""
 
             log.info(
-                "Dispatching enhance workflow to ComfyUI (%s) - file=%s",
+                "Dispatching enhance workflow to ComfyUI (%s) - %s=%s",
                 image_config.COMFYUI_BASE_URL,
-                filename,
+                "url" if parsed.scheme and parsed.netloc else "file",
+                image,
             )
 
             cf_form = ComfyUICreateImageForm(
