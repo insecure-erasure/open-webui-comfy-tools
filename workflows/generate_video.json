@@ -1,7 +1,7 @@
 {
   "6": {
     "inputs": {
-      "text": "{{PROMPT}}",
+      "text": "",
       "clip": [
         "1044",
         1
@@ -317,7 +317,7 @@
   },
   "1024": {
     "inputs": {
-      "seed": {{SEED}}
+      "seed": 0
     },
     "class_type": "easy seed",
     "_meta": {
