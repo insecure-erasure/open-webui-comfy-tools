@@ -21,14 +21,13 @@ workflow from `cache/tools/<tool_id>/workflow.json` instead, admins can:
 
 - **Branch:** `feat/decouple-workflows`
 - **Root:** `/srv/pi/smart_generate_image/`
-- **Workflows directory:** `workflows/` (already renamed to match script names)
-- **Embedded workflows are currently in sync** with `workflows/*.json` —
-  verified by the diff analysis done in this session.
-- The embedded JSONs use `{{PROMPT}}` and `{{SEED}}` as placeholders that
-  get replaced at runtime via `.replace()`.
-- LoRAs in the embedded workflows are currently empty/disabled (`on: false`,
-  `lora: ""`, `strength: 0`), except for `generate_video.py` where LoRA was
-  recently disabled by commit `08ded78`.
+- **Workflows directory:** `workflows/` — contains canonical JSONs with unique
+  `_meta.title` values for nodes referenced by the tools
+- **No embedded JSONs** in any Python script
+- **No placeholders** (`{{PROMPT}}`, `{{SEED}}`) in any workflow JSON
+- **Node resolution:** by `_meta.title` via `_resolve_node()` helper
+- **Workflow loading:** from `CACHE_DIR / 'tools' / <__id__> / <script_name>.json`
+- All three tools have been verified working in production
 
 ## Background
 
@@ -47,116 +46,93 @@ also be fetched via HTTP if needed.
 
 ## Milestones
 
-### Milestone 1 — Bootstrap workflow to cache on first run
+## Milestones
 
-Each tool writes its embedded workflow to `cache/tools/<id>/workflow.json`
+### ✅ Milestone 1 — Bootstrap workflow to cache on first run (completed)
+
+Each tool writes its embedded workflow to `cache/tools/<id>/<script_name>.json`
 on its first invocation.  Subsequent runs load from disk.
 
-#### Key: how to get the tool's ID at runtime
-
-Open WebUI injects `__id__` as a hidden parameter **into each tool function
-call**.  It is NOT available at class level or in `__init__` — only inside
-the function bodies that the LLM invokes.  The path must be resolved inside
-the function that generates the image/video.
-
-```python
-def generate(self, prompt: str, __id__: str = "") -> str:
-    cache_dir = CACHE_DIR / 'tools' / __id__
-    workflow_path = cache_dir / 'workflow.json'
-```
+**Actual implementation:** `_load_workflow(tool_id, filename)` — reads from
+`CACHE_DIR / 'tools' / <__id__> / <filename>`.  Bootstrap was removed in
+Milestone 2; now it raises a clear error if the file is missing.
 
 #### File naming convention
 
 | Location | Filename |
 |---|---|
 | `workflows/` in Git | `enhance_image.json`, `generate_video.json`, `smart_generate_image.json` |
-| `cache/tools/<id>/` at runtime | `workflow.json` (always, regardless of tool) |
+| `cache/tools/<id>/` at runtime | Same filename as in `workflows/` |
 
-- [ ] Add `_load_workflow(__id__: str)` helper that:
-      1. Resolves `CACHE_DIR / 'tools' / __id__ / 'workflow.json'`
-      2. If the file exists on disk → read and return it
-      3. If missing → write the embedded JSON there (bootstrap), then read it
-- [ ] Apply to `smart_generate_image.py` — replace `json.loads(_ZIT_WORKFLOW_JSON_RAW)`
-- [ ] Apply to `enhance_image.py` — replace `json.loads(_ENHANCE_WORKFLOW_JSON_RAW)`
-- [ ] Apply to `generate_video.py` — replace `json.loads(_VIDEO_WORKFLOW_JSON_RAW)`
+#### Key: how to get the tool's ID at runtime
 
-### Milestone 2 — Remove embedded workflow (optional per tool)
+Open WebUI injects `__id__` as a hidden parameter **into each tool function
+call**:
 
-Once bootstrapping works reliably, the embedded JSON can be dropped,
-leaving only a minimal fallback or an error if the file is missing.
+```python
+def smart_generate_image(self, prompt: str, __id__: str = "") -> str:
+    ...
+```
 
-**Current embedded variable names (to be removed):**
+Task list:
+- [x] Add `_load_workflow(tool_id, filename)` helper
+- [x] Apply to `smart_generate_image.py`
+- [x] Apply to `enhance_image.py`
+- [x] Apply to `generate_video.py`
 
-| Script | Variable to remove | Lines saved |
-|---|---|---|
-| `enhance_image.py` | `_ENHANCE_WORKFLOW_JSON_RAW` | ~115 |
-| `generate_video.py` | `_VIDEO_WORKFLOW_JSON_RAW` | ~410 |
-| `smart_generate_image.py` | `_ZIT_WORKFLOW_JSON_RAW` | ~213 |
+### ✅ Milestone 2 — Remove embedded workflow (completed)
 
-- [ ] Update `_load_workflow()` to raise / log a clear error if the file
-      is not found and there is no embedded fallback
-- [ ] Remove the `_*_WORKFLOW_JSON_RAW` constant and its `json.loads()` line
-      from each script
-- [ ] Remove the `# --- Node ID constants ---` section if workflow-specific
-      (only the embedded JSON references them)
+All embedded JSON constants and their `json.loads()` calls have been removed
+from the three scripts. In their place:
 
-### Milestone 3 — Keep `workflows/` as the source of truth for Git
+- `_load_workflow(tool_id, filename)` — loads from cache, raises if missing
+- `_resolve_node(workflow, title)` — finds nodes by `_meta.title`
+- `_inject_placeholders()` removed — all values are injected post-parse
 
-The `workflows/` directory stays in the repo.  It holds the canonical JSON
-files that should be synced to the container's `cache/tools/<id>/`.
+**Lines saved per script:**
 
-**Current state:** `workflows/` contains:
-- `enhance_image.json`
-- `generate_video.json`
-- `smart_generate_image.json`
+| Script | Lines removed |
+|---|---|
+| `enhance_image.py` | ~121 |
+| `generate_video.py` | ~454 |
+| `smart_generate_image.py` | ~267 |
 
-(Already renamed and in sync with the embedded code.)
+**Additional improvements made during this milestone:**
+- Workflow JSONs are now clean (no `{{PROMPT}}` / `{{SEED}}` placeholders)
+- Node resolution by `_meta.title` instead of fragile numeric IDs
 
-- [ ] Document the sync procedure in README
-- [ ] Optionally add a `Makefile` or script target that copies
-      `workflows/<tool>.json` into the correct cache paths inside the
-      container
+Task list:
+- [x] Update `_load_workflow()` to raise a clear error if file not found
+- [x] Remove `_ENHANCE_WORKFLOW_JSON_RAW` from `enhance_image.py`
+- [x] Remove `_VIDEO_WORKFLOW_JSON_RAW` from `generate_video.py`
+- [x] Remove `_ZIT_WORKFLOW_JSON_RAW` from `smart_generate_image.py`
+- [x] Remove Node ID constants sections
+- [x] Remove `{{PROMPT}}` and `{{SEED}}` from all workflow JSONs
+- [x] Add `_resolve_node()` for title-based node lookup
 
-### Milestone 4 — Update README
+### ❌ Milestone 3 — Keep `workflows/` as source of truth (cancelled)
 
-- [ ] Add a section explaining the workflow loading strategy
-- [ ] Document how to update a workflow in production (copy JSON → cache dir)
-- [ ] Update the Workflows table to reflect the new purpose of `workflows/`
-- [ ] Mention the `cache/tools/<id>/` directory and its HTTP endpoint
-      (`GET /cache/tools/<id>/workflow.json`)
+`workflows/` already serves as the canonical source. No Makefile or sync
+script is needed — admins copy JSONs manually on first deploy (documented
+in README).
 
-### Milestone 5 — Cleanup and verification
+- [x] `workflows/` files already renamed and in sync
+- [ ] ~~Optionally add a Makefile or script target~~ → Cancelled
 
-- [ ] Verify that `workflows/` JSON files are still in sync with the
-      embedded fallbacks (if any remain)
-- [ ] Verify that changing `workflows/enhance_image.json` and copying it
-      to the cache dir takes effect without editing the tool code
-- [ ] Verify the same for `generate_video` and `smart_generate_image`
-- [ ] Verify that `GET /cache/tools/<tool_id>/workflow.json` returns the
-      file with proper auth
-- [ ] Run the existing comparison script to confirm `workflows/` JSONs
-      match the embedded fallbacks:
-      ```bash
-      cd /srv/pi/smart_generate_image && python3 << 'PYEOF'
-      import re, json
-      def extract_raw(filepath, varname):
-          content = open(filepath).read()
-          pattern = rf'{varname}\s*=\s*r"""(.*?)"""\s*\n'
-          m = re.search(pattern, content, re.DOTALL)
-          return json.loads(m.group(1)) if m else None
-      def normalize(s):
-          return json.dumps(json.loads(s), indent=2, sort_keys=True)
-      for script, var, wf_file in [
-          ('enhance_image.py', '_ENHANCE_WORKFLOW_JSON_RAW', 'workflows/enhance_image.json'),
-          ('generate_video.py', '_VIDEO_WORKFLOW_JSON_RAW', 'workflows/generate_video.json'),
-          ('smart_generate_image.py', '_ZIT_WORKFLOW_JSON_RAW', 'workflows/smart_generate_image.json'),
-      ]:
-          emb = normalize(json.dumps(extract_raw(script, var)))
-          fle = normalize(open(wf_file).read())
-          ok = "✅" if emb == fle else "❌"
-          print(f'{ok} {script} ↔ {wf_file}')
-      PYEOF
-      ```
+### ✅ Milestone 4 — Update README (completed)
+
+- [x] Add a section explaining the workflow loading strategy
+- [x] Document how to update a workflow in production (copy JSON → cache dir)
+- [x] Update the Workflows table to reflect the new purpose of `workflows/`
+- [x] Add FAQ entries for missing workflow file and workflow update
+
+### ✅ Milestone 5 — Cleanup and verification (completed)
+
+- [x] Verify that `workflows/` JSON files are valid (no placeholders, parseable)
+- [x] Verify that changing `workflows/enhance_image.json` takes effect after
+      copying to the cache dir (tested in production)
+- [x] Verify the same for `generate_video` and `smart_generate_image`
+- [x] All three tools confirmed working in production
 
 ---
 

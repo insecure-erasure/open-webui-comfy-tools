@@ -142,22 +142,24 @@ Configure these in **Admin Panel -> Settings -> Images**:
 
 - Image Generation Engine: ComfyUI
 - ComfyUI Base URL: your ComfyUI server address
-- ComfyUI Workflow: exported workflow JSON
-- ComfyUI Workflow Nodes: define which nodes receive each parameter
 - Image Size: default dimensions
 - Image Steps: default inference steps (acts as ceiling for Valves)
 
-For seed support, configure a "seed" node in Workflow Nodes.
-
 ### Workflows
 
-Pre-configured workflows are available in the `workflows/` directory:
+Pre-configured workflows are available in the `workflows/` directory. Each tool
+loads its workflow JSON from the tool's cache directory at runtime — no workflow
+is embedded in the Python scripts.
 
-| File | Description |
-|------|-------------|
-| `zit.json` | Base workflow (zImageTurbo, no upscaler) |
-| `zit-seedvr2.json` | Workflow with SeedVR2 upscaler integrated |
-| `seedvr2-upscale.json` | Standalone SeedVR2 upscale workflow (used by Enhance Image) |
+| File | Used by | Description |
+|------|---------|-------------|
+| `smart_generate_image.json` | Smart Generate Image | zImageTurbo image generation |
+| `enhance_image.json` | Enhance Image | SeedVR2 standalone upscale |
+| `generate_video.json` | Generate Video | WAN2.1 image-to-video |
+
+All workflow JSONs are clean — no placeholders, no template variables. Values
+like prompt, seed, model, or LoRA are injected at runtime via Python after
+parsing.
 
 ---
 
@@ -170,6 +172,26 @@ Pre-configured workflows are available in the `workflows/` directory:
 5. Repeat for `generate_video.py`, save as **"Generate Video"**.
 6. Enable the tools in the chat tool selector.
 
+### Post-installation: deploy the workflow JSONs
+
+Each tool reads its workflow from the cache directory
+`CACHE_DIR / 'tools' / <tool_id> / <filename>.json` at runtime.  On first
+invocation, if the file is not found, the tool will log an error with the
+expected path.
+
+To deploy, copy the corresponding workflow JSON from `workflows/` into the
+tool's cache directory inside the Open WebUI container:
+
+```bash
+# Example: deploy the image generation workflow
+# Inside the Open WebUI container:
+cp workflows/smart_generate_image.json /app/backend/data/cache/tools/smart_generate_image/smart_generate_image.json
+```
+
+The cache directory is created automatically when the tool is first saved.
+It persists container restarts (lives under `DATA_DIR`, typically a Docker
+volume).
+
 ---
 
 ## Requirements
@@ -177,7 +199,6 @@ Pre-configured workflows are available in the `workflows/` directory:
 - Open WebUI (any recent version with Tools support)
 - ComfyUI server running and accessible
 - Native Tool Calling enabled
-- ComfyUI workflow configured in Admin Panel -> Settings -> Images
 - Image Generation Engine set to ComfyUI
 - [ComfyUI-LoadImageURL](https://github.com/insecure-erasure/ComfyUI-LoadImageURL) custom node (required by Enhance Image)
 
@@ -218,3 +239,17 @@ A: Admins configure them in Workspace -> Tools -> Smart Generate Image -> Valves
 
 **Q: Enhance Image fails with an image loading error.**  
 A: Ensure the [ComfyUI-LoadImageURL](https://github.com/insecure-erasure/ComfyUI-LoadImageURL) custom node is installed in ComfyUI's `custom_nodes/` directory.
+
+**Q: The tool fails with "Workflow file not found at ..."**  
+A: The workflow JSON needs to be copied into the tool's cache directory. See the
+[Post-installation](#post-installation-deploy-the-workflow-jsons) section.
+
+**Q: How do I update a workflow without editing the tool code?**  
+A: Replace the JSON file in the tool's cache directory
+(`/app/backend/data/cache/tools/<tool_id>/<filename>.json`) with your updated
+workflow. The tool reads it from disk on every invocation.
+
+**Q: How do I know which nodes the tool modifies by title?**  
+A: Each tool resolves nodes by `_meta.title`. Check the source code for
+`_resolve_node(workflow, "...")` calls to see which titles are expected.
+The error message lists all available titles if a match fails.
