@@ -8,6 +8,7 @@ version: 1.0
 import asyncio
 import json
 import logging
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 import httpx
@@ -15,129 +16,62 @@ from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
 
-# =============================================================================
-# Workflow JSON - SeedVR2 upscale (exact copy from ComfyUI export)
-# =============================================================================
-_ENHANCE_WORKFLOW_JSON_RAW = r"""{
-  "61": {
-    "inputs": {
-      "images": [
-        "423",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Preview Image"
-    }
-  },
-  "421": {
-    "inputs": {
-      "model": "ema_vae_fp16.safetensors",
-      "device": "cuda:0",
-      "encode_tiled": true,
-      "encode_tile_size": 1024,
-      "encode_tile_overlap": 128,
-      "decode_tiled": true,
-      "decode_tile_size": 1024,
-      "decode_tile_overlap": 128,
-      "tile_debug": "false",
-      "offload_device": "none",
-      "cache_model": false
-    },
-    "class_type": "SeedVR2LoadVAEModel",
-    "_meta": {
-      "title": "SeedVR2 (Down)Load VAE Model"
-    }
-  },
-  "423": {
-    "inputs": {
-      "blend_factor": 0.15,
-      "blend_mode": "normal",
-      "image1": [
-        "424",
-        0
-      ],
-      "image2": [
-        "426",
-        0
-      ]
-    },
-    "class_type": "ImageBlend",
-    "_meta": {
-      "title": "Image Blend"
-    }
-  },
-  "424": {
-    "inputs": {
-      "seed": 0,
-      "resolution": 2048,
-      "max_resolution": 2048,
-      "batch_size": 1,
-      "uniform_batch_size": false,
-      "color_correction": "lab",
-      "temporal_overlap": 0,
-      "prepend_frames": 0,
-      "input_noise_scale": 0.01,
-      "latent_noise_scale": 0,
-      "offload_device": "cpu",
-      "enable_debug": false,
-      "image": [
-        "426",
-        0
-      ],
-      "dit": [
-        "425",
-        0
-      ],
-      "vae": [
-        "421",
-        0
-      ]
-    },
-    "class_type": "SeedVR2VideoUpscaler",
-    "_meta": {
-      "title": "SeedVR2 Video Upscaler (v2.5.24)"
-    }
-  },
-  "425": {
-    "inputs": {
-      "model": "seedvr2_ema_7b-Q4_K_M.gguf",
-      "device": "cuda:0",
-      "blocks_to_swap": 36,
-      "swap_io_components": false,
-      "offload_device": "cpu",
-      "cache_model": false,
-      "attention_mode": "sdpa"
-    },
-    "class_type": "SeedVR2LoadDiTModel",
-    "_meta": {
-      "title": "SeedVR2 (Down)Load DiT Model"
-    }
-  },
-  "426": {
-    "inputs": {
-      "source": "temp",
-      "url": "",
-      "image": "",
-      "Choose file to upload": null
-    },
-    "class_type": "LoadImageByUrlOrPath",
-    "_meta": {
-      "title": "Load Image (URL/Path)"
-    }
-  }
-}
-"""
-
-ENHANCE_WORKFLOW_JSON: dict = json.loads(_ENHANCE_WORKFLOW_JSON_RAW)
 
 # =============================================================================
-# Node IDs from the workflow
+# Workflow node resolver — finds nodes by _meta.title (must be unique)
 # =============================================================================
-NODE_LOAD_IMAGE: str = "426"
-NODE_ENHANCE: str = "424"
-NODE_OUTPUT: str = "61"
+
+def _resolve_node(workflow: dict, title: str) -> tuple[str, dict]:
+    """
+    Find a workflow node by its _meta.title.
+
+    Returns (node_id, node_dict). Titles must be unique in the workflow.
+    """
+    for node_id, node in workflow.items():
+        if node.get("_meta", {}).get("title") == title:
+            return (node_id, node)
+    raise KeyError(
+        f"Node with title {title!r} not found in workflow. "
+        "Available titles: "
+        + ", ".join(
+            n.get("_meta", {}).get("title", "(no title)")
+            for n in workflow.values()
+        )
+    )
+
+
+# =============================================================================
+# Workflow loader — cache/tools/<tool_id>/filename.json
+# =============================================================================
+
+def _load_workflow(tool_id: str, filename: str) -> str:
+    """
+    Load the workflow JSON from the tool's cache directory.
+
+    Resolves CACHE_DIR / 'tools' / <tool_id> / <filename>.
+    Returns the raw JSON string, ready for json.loads() followed by
+    _resolve_node().
+
+    Raises RuntimeError if the tool_id is empty or the file is not found.
+    """
+    if not tool_id:
+        raise RuntimeError(
+            "No tool_id provided. The tool must run inside Open WebUI "
+            "to resolve the workflow from cache."
+        )
+
+    from open_webui.config import CACHE_DIR
+
+    workflow_path = CACHE_DIR / 'tools' / tool_id / filename
+
+    if not workflow_path.exists():
+        raise FileNotFoundError(
+            f"Workflow file not found at {workflow_path}. "
+            f"Copy workflows/{filename} to that path."
+        )
+
+    log.info("Loading workflow from %s", workflow_path)
+    return workflow_path.read_text(encoding='utf-8')
 
 
 class Tools:
@@ -179,6 +113,7 @@ class Tools:
         __event_emitter__=None,
         __chat_id__=None,
         __message_id__=None,
+        __id__: str = "",
     ):
         """
         Enhance / upscale a previously generated image.
@@ -233,12 +168,14 @@ class Tools:
             )
 
             # =================================================================
-            # Build the workflow inline
+            # Build the workflow: load from cache and parse
             # =================================================================
-            workflow = dict(ENHANCE_WORKFLOW_JSON)
+            raw_workflow = _load_workflow(__id__, "enhance_image.json")
+            workflow = json.loads(raw_workflow)
 
-            # Configure image source (node 426) — auto-detect URL vs filename
-            node_img = workflow[NODE_LOAD_IMAGE]["inputs"]
+            # Configure image source — auto-detect URL vs filename
+            _, load_image = _resolve_node(workflow, "Load Image (URL/Path)")
+            node_img = load_image["inputs"]
             parsed = urlparse(image)
             if parsed.scheme and parsed.netloc:
                 node_img["source"] = "url"
