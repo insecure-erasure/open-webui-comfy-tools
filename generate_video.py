@@ -375,8 +375,8 @@ _VIDEO_WORKFLOW_JSON_RAW = r"""{
         "type": "PowerLoraLoaderHeaderWidget"
       },
       "lora_1": {
-        "on": true,
-        "lora": "WAN2.1/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-r64-lora.safetensors",
+        "on": false,
+        "lora": "",
         "strength": 1
       },
       "➕ Add Lora": "",
