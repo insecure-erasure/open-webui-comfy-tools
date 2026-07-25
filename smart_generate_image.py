@@ -13,6 +13,7 @@ import random as _random
 import uuid
 
 import httpx
+from pathlib import Path
 from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
@@ -265,6 +266,48 @@ _COMFY_QUEUE_POLL_INTERVAL = 1.0     # seconds
 
 
 # =============================================================================
+# Workflow loader — cache/tools/<tool_id>/filename.json with bootstrap fallback
+# =============================================================================
+
+def _load_workflow(raw_json_fallback: str, tool_id: str, filename: str) -> str:
+    """
+    Load the workflow JSON from the tool's cache directory.
+
+    1. Resolves CACHE_DIR / 'tools' / <tool_id> / <filename>
+    2. If the file exists on disk → read and return it (raw, with placeholders)
+    3. If missing → write the embedded JSON there (bootstrap), then return fallback
+
+    Returns the raw JSON string, ready for _inject_placeholders().
+    """
+    if not tool_id:
+        log.info("No tool_id provided — using embedded workflow fallback")
+        return raw_json_fallback
+
+    try:
+        from open_webui.config import CACHE_DIR
+
+        workflow_path = CACHE_DIR / 'tools' / tool_id / filename
+
+        if workflow_path.exists():
+            log.info("Loading workflow from %s", workflow_path)
+            return workflow_path.read_text(encoding='utf-8')
+
+        # Bootstrap: write the embedded fallback to disk
+        workflow_path.parent.mkdir(parents=True, exist_ok=True)
+        workflow_path.write_text(raw_json_fallback, encoding='utf-8')
+        log.info("Bootstrapped workflow to %s", workflow_path)
+
+    except Exception as e:
+        log.warning(
+            "Failed to load workflow from cache (tool_id=%s, filename=%s): %s. "
+            "Using embedded fallback.",
+            tool_id, filename, e,
+        )
+
+    return raw_json_fallback
+
+
+# =============================================================================
 # Placeholder injection
 # =============================================================================
 
@@ -497,6 +540,7 @@ class Tools:
         __event_emitter__=None,
         __chat_id__=None,
         __message_id__=None,
+        __id__: str = "",
     ):
         """
         Generate one image with optional control over size.
@@ -703,7 +747,10 @@ class Tools:
                 "SEED": seed_arg,
             }
 
-            injected_raw = _inject_placeholders(_ZIT_WORKFLOW_JSON_RAW, replacements)
+            raw_workflow = _load_workflow(
+                _ZIT_WORKFLOW_JSON_RAW, __id__, "smart_generate_image.json"
+            )
+            injected_raw = _inject_placeholders(raw_workflow, replacements)
             workflow = json.loads(injected_raw)
 
             # =================================================================
