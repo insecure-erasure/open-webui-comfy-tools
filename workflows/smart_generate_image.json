@@ -90,7 +90,7 @@
   },
   "63": {
     "inputs": {
-      "text": "",
+      "text": "{{PROMPT}}",
       "clip": [
         "42",
         0
@@ -103,7 +103,7 @@
   },
   "66": {
     "inputs": {
-      "seed": 0,
+      "seed": {{SEED}},
       "steps": 10,
       "cfg": 1,
       "sampler_name": "euler",
@@ -176,25 +176,25 @@
       },
       "lora_1": {
         "on": false,
-        "lora": "Chroma\\chroma-flash-heun_r64-fp32.safetensors",
-        "strength": 1
+        "lora": "",
+        "strength": 0
       },
       "lora_2": {
         "on": false,
-        "lora": "Chroma\\chroma-flash-heun_r128-fp32.safetensors",
-        "strength": 1
+        "lora": "",
+        "strength": 0
       },
       "lora_3": {
         "on": false,
-        "lora": "Chroma\\chroma-flash-heun_r64-fp32.safetensors",
-        "strength": 1
+        "lora": "",
+        "strength": 0
       },
       "lora_4": {
         "on": false,
-        "lora": "FLUX.2\\flux-klein-tryon-comfy.safetensors",
-        "strength": 1
+        "lora": "",
+        "strength": 0
       },
-      "➕ Add Lora": "",
+      "\u2795 Add Lora": "",
       "model": [
         "58",
         0
