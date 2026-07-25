@@ -91,7 +91,46 @@ files that should be copied into the container's `cache/tools/<id>/`.
 
 ---
 
-## Notes
+## Implementation notes
+
+### `CACHE_DIR` path resolution
+
+`CACHE_DIR` is defined in `open_webui/config.py` (line 176):
+
+```python
+CACHE_DIR = DATA_DIR / 'cache'
+```
+
+Tools can import it directly — Open WebUI's `replace_imports()`
+automatically translates `from config import ...` to
+`from open_webui.config import ...`:
+
+```python
+from open_webui.config import CACHE_DIR
+from pathlib import Path
+
+workflow_path = CACHE_DIR / 'tools' / 'smart_generate_image' / 'workflow.json'
+```
+
+In a Docker deployment `DATA_DIR` defaults to `/app/backend/data/`, so the
+full path resolves to:
+
+```
+/app/backend/data/cache/tools/<tool_id>/workflow.json
+```
+
+### Alternative: HTTP access via `GET /cache/{path}`
+
+The same files are also served over HTTP with `get_verified_user` auth:
+
+```
+GET /cache/tools/<tool_id>/workflow.json
+```
+
+This is useful if the tool needs to expose a downloadable URL. The endpoint
+is defined in `open_webui/main.py`.
+
+### Persistence
 
 - The `cache/tools/<id>/` directory survives container restarts because it
   lives under `DATA_DIR` (typically a Docker volume mounted at
