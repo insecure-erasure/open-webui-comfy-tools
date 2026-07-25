@@ -28,234 +28,26 @@ _STEPS_OPTIONS.insert(0, {"value": "0", "label": "System default"})
 
 
 # =============================================================================
-# Inline workflow JSON — zit.json
+# Workflow node resolver — finds nodes by _meta.title (must be unique)
 # =============================================================================
-_ZIT_WORKFLOW_JSON_RAW = r"""{
-  "41": {
-    "inputs": {
-      "width": [
-        "69",
-        0
-      ],
-      "height": [
-        "69",
-        1
-      ],
-      "batch_size": 1
-    },
-    "class_type": "EmptyLatentImage",
-    "_meta": {
-      "title": "Empty Latent Image"
-    }
-  },
-  "42": {
-    "inputs": {
-      "stop_at_clip_layer": -2,
-      "clip": [
-        "68",
-        0
-      ]
-    },
-    "class_type": "CLIPSetLastLayer",
-    "_meta": {
-      "title": "CLIP Set Last Layer"
-    }
-  },
-  "43": {
-    "inputs": {
-      "conditioning": [
-        "63",
-        0
-      ]
-    },
-    "class_type": "ConditioningZeroOut",
-    "_meta": {
-      "title": "ZeroOut"
-    }
-  },
-  "51": {
-    "inputs": {
-      "vae_name": "Z-Image_natural_vae.safetensors"
-    },
-    "class_type": "VAELoader",
-    "_meta": {
-      "title": "Load VAE"
-    }
-  },
-  "52": {
-    "inputs": {
-      "samples": [
-        "66",
-        0
-      ],
-      "vae": [
-        "51",
-        0
-      ]
-    },
-    "class_type": "VAEDecode",
-    "_meta": {
-      "title": "VAE Decode"
-    }
-  },
-  "58": {
-    "inputs": {
-      "unet_name": "zImageTurbo-mxfp8.safetensors",
-      "weight_dtype": "default"
-    },
-    "class_type": "UNETLoader",
-    "_meta": {
-      "title": "Load Diffusion Model"
-    }
-  },
-  "61": {
-    "inputs": {
-      "images": [
-        "52",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Preview Image"
-    }
-  },
-  "63": {
-    "inputs": {
-      "text": "{{PROMPT}}",
-      "clip": [
-        "42",
-        0
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP Text Encode (Prompt)"
-    }
-  },
-  "66": {
-    "inputs": {
-      "seed": {{SEED}},
-      "steps": 10,
-      "cfg": 1,
-      "sampler_name": "euler",
-      "scheduler": "simple",
-      "denoise": 1,
-      "model": [
-        "423",
-        0
-      ],
-      "positive": [
-        "63",
-        0
-      ],
-      "negative": [
-        "43",
-        0
-      ],
-      "latent_image": [
-        "41",
-        0
-      ]
-    },
-    "class_type": "KSampler",
-    "_meta": {
-      "title": "KSampler"
-    }
-  },
-  "68": {
-    "inputs": {
-      "clip_name": "qwen3_4b_instruct_2507_mxfp8.safetensors",
-      "type": "lumina2",
-      "device": "default"
-    },
-    "class_type": "CLIPLoader",
-    "_meta": {
-      "title": "Load CLIP"
-    }
-  },
-  "69": {
-    "inputs": {
-      "megapixel": "1.0",
-      "aspect_ratio": "2:3 (Classic Portrait)",
-      "divisible_by": "64",
-      "custom_ratio": true,
-      "custom_aspect_ratio": [
-        "84",
-        0
-      ]
-    },
-    "class_type": "FluxResolutionNode",
-    "_meta": {
-      "title": "Flux Resolution Calc"
-    }
-  },
-  "84": {
-    "inputs": {
-      "string_a": "",
-      "string_b": "",
-      "delimiter": ":"
-    },
-    "class_type": "StringConcatenate",
-    "_meta": {
-      "title": "Aspect ratio"
-    }
-  },
-  "423": {
-    "inputs": {
-      "PowerLoraLoaderHeaderWidget": {
-        "type": "PowerLoraLoaderHeaderWidget"
-      },
-      "lora_1": {
-        "on": false,
-        "lora": "",
-        "strength": 0
-      },
-      "lora_2": {
-        "on": false,
-        "lora": "",
-        "strength": 0
-      },
-      "lora_3": {
-        "on": false,
-        "lora": "",
-        "strength": 0
-      },
-      "lora_4": {
-        "on": false,
-        "lora": "",
-        "strength": 0
-      },
-      "\u2795 Add Lora": "",
-      "model": [
-        "58",
-        0
-      ]
-    },
-    "class_type": "Power Lora Loader (rgthree)",
-    "_meta": {
-      "title": "Power Lora Loader (rgthree)"
-    }
-  }
-}
-"""
 
-# =============================================================================
-# Node ID constants
-# =============================================================================
-NODE_EMPTY_LATENT = "41"
-NODE_CLIP_SET_LAYER = "42"
-NODE_ZERO_OUT = "43"
-NODE_VAE_LOADER = "51"
-NODE_VAE_DECODE = "52"
-NODE_UNET_LOADER = "58"
-NODE_PREVIEW_IMAGE = "61"
-NODE_CLIP_TEXT = "63"
-NODE_KSAMPLER = "66"
-NODE_CLIP_LOADER = "68"
-NODE_FLUX_RESOLUTION = "69"
-NODE_ASPECT_RATIO = "84"
-NODE_LORA = "423"
+def _resolve_node(workflow: dict, title: str) -> tuple[str, dict]:
+    """
+    Find a workflow node by its _meta.title.
+
+    Returns (node_id, node_dict). Titles must be unique in the workflow.
+    """
+    for node_id, node in workflow.items():
+        if node.get("_meta", {}).get("title") == title:
+            return (node_id, node)
+    raise KeyError(
+        f"Node with title {title!r} not found in workflow. "
+        "Available titles: "
+        + ", ".join(
+            n.get("_meta", {}).get("title", "(no title)")
+            for n in workflow.values()
+        )
+    )
 
 # =============================================================================
 # ComfyUI constants
@@ -269,42 +61,36 @@ _COMFY_QUEUE_POLL_INTERVAL = 1.0     # seconds
 # Workflow loader — cache/tools/<tool_id>/filename.json with bootstrap fallback
 # =============================================================================
 
-def _load_workflow(raw_json_fallback: str, tool_id: str, filename: str) -> str:
+def _load_workflow(tool_id: str, filename: str) -> str:
     """
     Load the workflow JSON from the tool's cache directory.
 
-    1. Resolves CACHE_DIR / 'tools' / <tool_id> / <filename>
-    2. If the file exists on disk → read and return it (raw, with placeholders)
-    3. If missing → write the embedded JSON there (bootstrap), then return fallback
+    Resolves CACHE_DIR / 'tools' / <tool_id> / <filename>.
+    Returns the raw JSON string (with placeholders), ready for
+    _inject_placeholders().
 
-    Returns the raw JSON string, ready for _inject_placeholders().
+    Raises RuntimeError if the tool_id is empty or the file is not found.
     """
     if not tool_id:
-        log.info("No tool_id provided — using embedded workflow fallback")
-        return raw_json_fallback
-
-    try:
-        from open_webui.config import CACHE_DIR
-
-        workflow_path = CACHE_DIR / 'tools' / tool_id / filename
-
-        if workflow_path.exists():
-            log.info("Loading workflow from %s", workflow_path)
-            return workflow_path.read_text(encoding='utf-8')
-
-        # Bootstrap: write the embedded fallback to disk
-        workflow_path.parent.mkdir(parents=True, exist_ok=True)
-        workflow_path.write_text(raw_json_fallback, encoding='utf-8')
-        log.info("Bootstrapped workflow to %s", workflow_path)
-
-    except Exception as e:
-        log.warning(
-            "Failed to load workflow from cache (tool_id=%s, filename=%s): %s. "
-            "Using embedded fallback.",
-            tool_id, filename, e,
+        raise RuntimeError(
+            "No tool_id provided. The tool must run inside Open WebUI "
+            "to resolve the workflow from cache. First invocation bootstraps "
+            "the workflow; subsequent runs use the cached copy."
         )
 
-    return raw_json_fallback
+    from open_webui.config import CACHE_DIR
+
+    workflow_path = CACHE_DIR / 'tools' / tool_id / filename
+
+    if not workflow_path.exists():
+        raise FileNotFoundError(
+            f"Workflow file not found at {workflow_path}. "
+            "Run the tool at least once inside Open WebUI to bootstrap it, "
+            f"or copy the workflow JSON manually to that path."
+        )
+
+    log.info("Loading workflow from %s", workflow_path)
+    return workflow_path.read_text(encoding='utf-8')
 
 
 # =============================================================================
@@ -747,27 +533,32 @@ class Tools:
                 "SEED": seed_arg,
             }
 
-            raw_workflow = _load_workflow(
-                _ZIT_WORKFLOW_JSON_RAW, __id__, "smart_generate_image.json"
-            )
+            raw_workflow = _load_workflow(__id__, "smart_generate_image.json")
             injected_raw = _inject_placeholders(raw_workflow, replacements)
             workflow = json.loads(injected_raw)
+
+            # Resolve workflow nodes by _meta.title (unique identifiers)
+            _, unet_loader = _resolve_node(workflow, "Load Diffusion Model")
+            _, ksampler = _resolve_node(workflow, "KSampler")
+            _, aspect_ratio = _resolve_node(workflow, "Aspect ratio")
+            _, lora_node = _resolve_node(workflow, "Power Lora Loader (rgthree)")
+            preview_image_id, _ = _resolve_node(workflow, "Preview Image")
 
             # =================================================================
             # Apply optional overrides post-parse (only when valve is non-empty)
             # =================================================================
             if resolved_model:
-                workflow[NODE_UNET_LOADER]["inputs"]["unet_name"] = resolved_model
+                unet_loader["inputs"]["unet_name"] = resolved_model
 
             if resolved_steps is not None:
-                workflow[NODE_KSAMPLER]["inputs"]["steps"] = resolved_steps
+                ksampler["inputs"]["steps"] = resolved_steps
 
             # Inject aspect ratio (GCD-reduced) into the StringConcatenate node
-            workflow[NODE_ASPECT_RATIO]["inputs"]["string_a"] = str(reduced_w)
-            workflow[NODE_ASPECT_RATIO]["inputs"]["string_b"] = str(reduced_h)
+            aspect_ratio["inputs"]["string_a"] = str(reduced_w)
+            aspect_ratio["inputs"]["string_b"] = str(reduced_h)
 
             # Cap to available slots and inject
-            max_slots = sum(1 for k in workflow[NODE_LORA]["inputs"] if k.startswith("lora_"))
+            max_slots = sum(1 for k in lora_node["inputs"] if k.startswith("lora_"))
             lora_config = combined[:max_slots]
 
             log.info("LoRA injection: admin_raw=%s user_raw=%s combined=%s",
@@ -777,7 +568,7 @@ class Tools:
 
             for i, item in enumerate(lora_config, start=1):
                 slot = f"lora_{i}"
-                if slot not in workflow[NODE_LORA]["inputs"]:
+                if slot not in lora_node["inputs"]:
                     break  # no more slots in the workflow
                 if isinstance(item, str):
                     name = item
@@ -789,14 +580,14 @@ class Tools:
                     continue  # skip invalid entries
 
                 if bool(name) and strength != 0:
-                    workflow[NODE_LORA]["inputs"][slot]["on"] = True
-                    workflow[NODE_LORA]["inputs"][slot]["lora"] = name
-                    workflow[NODE_LORA]["inputs"][slot]["strength"] = strength
+                    lora_node["inputs"][slot]["on"] = True
+                    lora_node["inputs"][slot]["lora"] = name
+                    lora_node["inputs"][slot]["strength"] = strength
                 else:
                     # Desactivado: vacío todo para que ComfyUI no cargue el modelo
-                    workflow[NODE_LORA]["inputs"][slot]["on"] = False
-                    workflow[NODE_LORA]["inputs"][slot]["lora"] = ""
-                    workflow[NODE_LORA]["inputs"][slot]["strength"] = 0
+                    lora_node["inputs"][slot]["on"] = False
+                    lora_node["inputs"][slot]["lora"] = ""
+                    lora_node["inputs"][slot]["strength"] = 0
 
             log.info(
                 "Dispatching image workflow to ComfyUI (%s) - prompt_len=%d, size=%s, "
@@ -835,7 +626,7 @@ class Tools:
             # =================================================================
             # Extract image filename and build URL
             # =================================================================
-            image_filename, image_type = _extract_image_filename(outputs, NODE_PREVIEW_IMAGE)
+            image_filename, image_type = _extract_image_filename(outputs, preview_image_id)
 
             base = resolved_image_base_url.rstrip("/")
             image_url = f"{base}/api/view?filename={image_filename}&type={image_type}"
