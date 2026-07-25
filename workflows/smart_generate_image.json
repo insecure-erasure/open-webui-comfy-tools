@@ -90,7 +90,7 @@
   },
   "63": {
     "inputs": {
-      "text": "{{PROMPT}}",
+      "text": "",
       "clip": [
         "42",
         0
@@ -103,7 +103,7 @@
   },
   "66": {
     "inputs": {
-      "seed": {{SEED}},
+      "seed": 0,
       "steps": 10,
       "cfg": 1,
       "sampler_name": "euler",

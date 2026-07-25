@@ -66,8 +66,8 @@ def _load_workflow(tool_id: str, filename: str) -> str:
     Load the workflow JSON from the tool's cache directory.
 
     Resolves CACHE_DIR / 'tools' / <tool_id> / <filename>.
-    Returns the raw JSON string (with placeholders), ready for
-    _inject_placeholders().
+    Returns the raw JSON string, ready for json.loads() followed by
+    _resolve_node().
 
     Raises RuntimeError if the tool_id is empty or the file is not found.
     """
@@ -91,23 +91,6 @@ def _load_workflow(tool_id: str, filename: str) -> str:
 
     log.info("Loading workflow from %s", workflow_path)
     return workflow_path.read_text(encoding='utf-8')
-
-
-# =============================================================================
-# Placeholder injection
-# =============================================================================
-
-def _inject_placeholders(raw_json: str, replacements: dict[str, object]) -> str:
-    """
-    Replace {{PLACEHOLDER}} patterns in the raw JSON string with actual values.
-
-    This happens *before* JSON parsing, so placeholders can appear in both
-    string values ("{{PROMPT}}") and numeric contexts ("seed": {{SEED}}).
-    """
-    for key, value in replacements.items():
-        placeholder = "{{" + key + "}}"
-        raw_json = raw_json.replace(placeholder, str(value))
-    return raw_json
 
 
 # =============================================================================
@@ -526,23 +509,24 @@ class Tools:
                 )
 
             # =================================================================
-            # Build the workflow: inject placeholders into the raw JSON
+            # Build the workflow: load raw JSON and parse it directly
             # =================================================================
-            replacements = {
-                "PROMPT": prompt,
-                "SEED": seed_arg,
-            }
-
             raw_workflow = _load_workflow(__id__, "smart_generate_image.json")
-            injected_raw = _inject_placeholders(raw_workflow, replacements)
-            workflow = json.loads(injected_raw)
+            workflow = json.loads(raw_workflow)
 
             # Resolve workflow nodes by _meta.title (unique identifiers)
+            _, text_encoder = _resolve_node(workflow, "CLIP Text Encode (Prompt)")
             _, unet_loader = _resolve_node(workflow, "Load Diffusion Model")
             _, ksampler = _resolve_node(workflow, "KSampler")
             _, aspect_ratio = _resolve_node(workflow, "Aspect ratio")
             _, lora_node = _resolve_node(workflow, "Power Lora Loader (rgthree)")
             preview_image_id, _ = _resolve_node(workflow, "Preview Image")
+
+            # =================================================================
+            # Inject dynamic values (formerly done via {{PLACEHOLDER}})
+            # =================================================================
+            text_encoder["inputs"]["text"] = prompt
+            ksampler["inputs"]["seed"] = seed_arg
 
             # =================================================================
             # Apply optional overrides post-parse (only when valve is non-empty)
