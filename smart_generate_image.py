@@ -102,8 +102,7 @@ def _resolve_node(workflow: dict, title: str) -> tuple[str, dict]:
 # ComfyUI constants
 # =============================================================================
 _COMFY_SEED_MAX: int = 1125899906842624
-_COMFY_QUEUE_MAX_RETRIES = 60        # ~60s at 1s intervals
-_COMFY_QUEUE_POLL_INTERVAL = 1.0     # seconds
+_COMFY_QUEUE_TIMEOUT = 60           # seconds
 
 
 # =============================================================================
@@ -183,7 +182,7 @@ async def _comfyui_wait_for_output(
 
     history_url = f"{base_url.rstrip('/')}/history/{prompt_id}"
 
-    for attempt in range(_COMFY_QUEUE_MAX_RETRIES):
+    for _ in range(_COMFY_QUEUE_TIMEOUT):
         resp = await client.get(history_url, headers=headers, timeout=10)
         resp.raise_for_status()
         history = resp.json()
@@ -191,15 +190,11 @@ async def _comfyui_wait_for_output(
         if prompt_id in history and history[prompt_id].get("outputs"):
             return history[prompt_id]["outputs"]
 
-        if prompt_id in history and history[prompt_id].get("status", {}).get("completed") is False:
-            await asyncio.sleep(_COMFY_QUEUE_POLL_INTERVAL)
-            continue
-
-        await asyncio.sleep(_COMFY_QUEUE_POLL_INTERVAL)
+        await asyncio.sleep(1.0)
 
     raise TimeoutError(
-        f"ComfyUI did not finish within {_COMFY_QUEUE_MAX_RETRIES} tries "
-        f"(~{_COMFY_QUEUE_MAX_RETRIES * _COMFY_QUEUE_POLL_INTERVAL:.0f}s, prompt_id={prompt_id})"
+        f"ComfyUI did not finish within {_COMFY_QUEUE_TIMEOUT}s "
+        f"(prompt_id={prompt_id})"
     )
 
 
