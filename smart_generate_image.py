@@ -263,23 +263,16 @@ def _extract_image_filename(outputs: dict, output_node_id: str) -> tuple[str, st
 
 class Tools:
     """
-    Smart Generate Image - generate images through ComfyUI with control over aspect ratio.
+    Smart Generate Image - generate images with control over aspect ratio.
 
     Activate this tool from the tool selector in the chat input.
-
-    The response includes:
-      - image_md: markdown to display the image in the conversation
-      - image_filename: the filename on ComfyUI (not directly accessible
-        from the filesystem)
-
-    Use image_md to show the image to the user.
 
     prompt: Image generation prompt. Translate the user's request into English
         internally, then enrich with visual details without changing the subject
         or scene. Do not add superfluous details. Write the final prompt in English.
     aspect_ratio (optional): Only provide when the user explicitly requests a
-        specific aspect ratio. Format as W:H (e.g., 16:9). Leave empty for the
-        admin's default.
+        specific aspect ratio. Format as W:H (e.g., 16:9). Preferably omitted to
+        use system defaults.
     """
 
     class Valves(BaseModel):
@@ -384,15 +377,12 @@ class Tools:
         """
         Generate one image with optional control over aspect ratio.
 
-        Returns image_md (for displaying) and image_filename (for reference).
-        The filename is not directly accessible from the filesystem.
-
         prompt: Image generation prompt. Translate the user's request into English internally,
             then enrich with visual details without changing the subject or scene. Do not add
             superfluous details. Write the final prompt in English.
         aspect_ratio (optional): Only provide when the user explicitly requests a
-            specific aspect ratio. Format as W:H (e.g., 16:9). Leave empty for the
-            admin's default.
+            specific aspect ratio. Format as W:H (e.g., 16:9). Preferably omitted to
+            use system defaults.
         """
         if __request__ is None:
             log.error("smart_generate_image called without request context")
