@@ -89,9 +89,9 @@
   },
   "69": {
     "inputs": {
-      "megapixel": "",
-      "aspect_ratio": "",
-      "divisible_by": "",
+      "megapixel": "1.0",
+      "aspect_ratio": "2:3 (Classic Portrait)",
+      "divisible_by": "64",
       "custom_ratio": true,
       "custom_aspect_ratio": [
         "84",

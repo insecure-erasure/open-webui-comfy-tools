@@ -643,7 +643,8 @@ class Tools:
             flux_resolution["inputs"]["megapixel"] = self.valves.megapixel or "1.0"
             aspect_ratio["inputs"]["string_a"] = str(reduced_w)
             aspect_ratio["inputs"]["string_b"] = str(reduced_h)
-            flux_resolution["inputs"]["divisible_by"] = model_cfg["vae_scale_factor"]
+            flux_resolution["inputs"]["aspect_ratio"] = "2:3 (Classic Portrait)"
+            flux_resolution["inputs"]["divisible_by"] = str(model_cfg["vae_scale_factor"])
 
             # Prompt
             prompt_node["inputs"]["value"] = prompt
