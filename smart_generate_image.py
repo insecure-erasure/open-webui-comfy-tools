@@ -102,7 +102,8 @@ def _resolve_node(workflow: dict, title: str) -> tuple[str, dict]:
 # ComfyUI constants
 # =============================================================================
 _COMFY_SEED_MAX: int = 1125899906842624
-_COMFY_QUEUE_TIMEOUT = 60           # seconds
+_COMFY_QUEUE_MAX_RETRIES = 60        # ~60s at 1s intervals
+_COMFY_QUEUE_POLL_INTERVAL = 1.0     # seconds
 
 
 # =============================================================================
@@ -182,24 +183,24 @@ async def _comfyui_wait_for_output(
 
     history_url = f"{base_url.rstrip('/')}/history/{prompt_id}"
 
-    async def _poll():
-        while True:
-            resp = await client.get(history_url, headers=headers, timeout=10)
-            resp.raise_for_status()
-            history = resp.json()
+    for attempt in range(_COMFY_QUEUE_MAX_RETRIES):
+        resp = await client.get(history_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        history = resp.json()
 
-            if prompt_id in history and history[prompt_id].get("outputs"):
-                return history[prompt_id]["outputs"]
+        if prompt_id in history and history[prompt_id].get("outputs"):
+            return history[prompt_id]["outputs"]
 
-            await asyncio.sleep(1.0)
+        if prompt_id in history and history[prompt_id].get("status", {}).get("completed") is False:
+            await asyncio.sleep(_COMFY_QUEUE_POLL_INTERVAL)
+            continue
 
-    try:
-        return await asyncio.wait_for(_poll(), timeout=_COMFY_QUEUE_TIMEOUT)
-    except asyncio.TimeoutError:
-        raise TimeoutError(
-            f"ComfyUI did not finish within {_COMFY_QUEUE_TIMEOUT}s "
-            f"(prompt_id={prompt_id})"
-        )
+        await asyncio.sleep(_COMFY_QUEUE_POLL_INTERVAL)
+
+    raise TimeoutError(
+        f"ComfyUI did not finish within {_COMFY_QUEUE_MAX_RETRIES} tries "
+        f"(~{_COMFY_QUEUE_MAX_RETRIES * _COMFY_QUEUE_POLL_INTERVAL:.0f}s, prompt_id={prompt_id})"
+    )
 
 
 async def _comfyui_interrupt(base_url: str, api_key: str) -> None:
