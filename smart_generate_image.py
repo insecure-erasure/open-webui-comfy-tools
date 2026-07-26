@@ -301,8 +301,8 @@ class Tools:
             description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Applied positionally. User overrides on name collision.',
         )
         model_family: str = Field(
-            default="",
-            description="Default model family. Overrides the built-in default (Z-Image Turbo). Leave empty to use the UserValve or the built-in default.",
+            default="zit",
+            description="Default model family. Users can override this from their valves.",
             json_schema_extra={
                 "input": {
                     "type": "select",
@@ -341,8 +341,8 @@ class Tools:
             description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Empty name or strength 0 disables it. Applied positionally to lora_1..lora_N. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
         )
         model_family: str = Field(
-            default="zit",
-            description="Model family. Select Z-Image Turbo or FLUX.2 Klein.",
+            default="",
+            description="Model family. Overrides the admin valve. Leave empty to use the admin valve default.",
             json_schema_extra={
                 "input": {
                     "type": "select",
