@@ -27,6 +27,7 @@ _STEPS_OPTIONS.insert(0, {"value": "0", "label": "Model default"})
 
 # Model family options for the model_family valve
 _MODEL_FAMILY_OPTIONS = [
+    {"value": "", "label": "System default"},
     {"value": "zit", "label": "Z-Image Turbo"},
     {"value": "flux.2", "label": "FLUX.2 Klein"},
 ]
