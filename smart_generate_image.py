@@ -35,6 +35,8 @@ _MAX_STEPS_OPTIONS = [
 ]
 
 # Model family options for the model_family valve
+_DEFAULT_ASPECT_RATIO = "2:3"
+
 _MODEL_FAMILY_OPTIONS = [
     {"value": "", "label": "System default"},
     {"value": "zit", "label": "Z-Image Turbo"},
@@ -301,8 +303,8 @@ class Tools:
             description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Applied positionally. User overrides on name collision.',
         )
         default_aspect_ratio: str = Field(
-            default="2:3",
-            description="Default aspect ratio when the LLM does not specify one. Format W:H (e.g. 16:9). Legacy WxH format also accepted.",
+            default=_DEFAULT_ASPECT_RATIO,
+            description=f"Default aspect ratio when the LLM does not specify one. Format W:H (e.g. 16:9). Legacy WxH format also accepted. Default: {_DEFAULT_ASPECT_RATIO}.",
         )
         megapixel: str = Field(
             default="1.0",
@@ -458,7 +460,7 @@ class Tools:
             seed_arg = _random.randint(0, _COMFY_SEED_MAX) if user_seed == -1 else min(user_seed, _COMFY_SEED_MAX)
 
             # Aspect ratio: from LLM param or admin valve default, normalised by GCD
-            raw_aspect = aspect_ratio or self.valves.default_aspect_ratio or "2:3"
+            raw_aspect = aspect_ratio or self.valves.default_aspect_ratio or _DEFAULT_ASPECT_RATIO
             if "x" in raw_aspect or "X" in raw_aspect:
                 raw_aspect = raw_aspect.lower().replace("x", ":")
             parts = raw_aspect.split(":")
