@@ -1,0 +1,363 @@
+{
+  "202": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_mynbi_00035_.png&type=temp&subfolder=&rand=0.6423053781652182"
+          },
+          {
+            "name": "B",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_mynbi_00036_.png&type=temp&subfolder=&rand=0.1704987527286559"
+          }
+        ]
+      },
+      "image_a": [
+        "240",
+        0
+      ],
+      "image_b": [
+        "228",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "217": {
+    "inputs": {
+      "images": [
+        "240",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "221": {
+    "inputs": {
+      "text": [
+        "248",
+        0
+      ],
+      "clip": [
+        "234",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "222": {
+    "inputs": {
+      "samples": [
+        "227",
+        0
+      ],
+      "vae": [
+        "233",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "223": {
+    "inputs": {
+      "pixels": [
+        "228",
+        0
+      ],
+      "vae": [
+        "233",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "224": {
+    "inputs": {
+      "conditioning": [
+        "221",
+        0
+      ],
+      "latent": [
+        "223",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent"
+    }
+  },
+  "225": {
+    "inputs": {
+      "conditioning": [
+        "221",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "226": {
+    "inputs": {
+      "conditioning": [
+        "225",
+        0
+      ],
+      "latent": [
+        "223",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent"
+    }
+  },
+  "227": {
+    "inputs": {
+      "seed": 963880637461774,
+      "steps": 6,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "234",
+        0
+      ],
+      "positive": [
+        "224",
+        0
+      ],
+      "negative": [
+        "226",
+        0
+      ],
+      "latent_image": [
+        "230",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "228": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "megapixels": 1,
+      "resolution_steps": 1,
+      "image": [
+        "245",
+        0
+      ]
+    },
+    "class_type": "ImageScaleToTotalPixels",
+    "_meta": {
+      "title": "ImageScaleToTotalPixels"
+    }
+  },
+  "229": {
+    "inputs": {
+      "image": [
+        "228",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Image Size"
+    }
+  },
+  "230": {
+    "inputs": {
+      "width": [
+        "229",
+        0
+      ],
+      "height": [
+        "229",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyFlux2LatentImage",
+    "_meta": {
+      "title": "Empty Flux 2 Latent"
+    }
+  },
+  "231": {
+    "inputs": {
+      "unet_name": "flux-2-klein-9b-nvfp4.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "233": {
+    "inputs": {
+      "vae_name": "flux2-vae-small-bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "234": {
+    "inputs": {
+      "PowerLoraLoaderHeaderWidget": {
+        "type": "PowerLoraLoaderHeaderWidget"
+      },
+      "lora_1": {
+        "on": false,
+        "lora": "",
+        "strength": 0
+      },
+      "lora_2": {
+        "on": false,
+        "lora": "",
+        "strength": 0
+      },
+      "lora_3": {
+        "on": false,
+        "lora": "",
+        "strength": 0
+      },
+      "lora_4": {
+        "on": false,
+        "lora": "",
+        "strength": 0
+      },
+      "➕ Add Lora": "",
+      "model": [
+        "231",
+        0
+      ],
+      "clip": [
+        "246",
+        0
+      ]
+    },
+    "class_type": "Power Lora Loader (rgthree)",
+    "_meta": {
+      "title": "Power Lora Loader (rgthree)"
+    }
+  },
+  "240": {
+    "inputs": {
+      "upscale_model": [
+        "241",
+        0
+      ],
+      "image": [
+        "222",
+        0
+      ]
+    },
+    "class_type": "ImageUpscaleWithModel",
+    "_meta": {
+      "title": "Upscale Image (using Model)"
+    }
+  },
+  "241": {
+    "inputs": {
+      "model_name": "1xSkinContrast-SuperUltraCompact.safetensors"
+    },
+    "class_type": "UpscaleModelLoader",
+    "_meta": {
+      "title": "Load Upscale Model"
+    }
+  },
+  "245": {
+    "inputs": {
+      "source": "temp",
+      "url": "",
+      "image": "ComfyUI_temp_chrac_00001_.png",
+      "Choose file to upload": null
+    },
+    "class_type": "LoadImageByUrlOrPath",
+    "_meta": {
+      "title": "Load Image (URL/Path)"
+    }
+  },
+  "246": {
+    "inputs": {
+      "clip_name": "qwen_3_8b_nvfp4.safetensors",
+      "type": "stable_diffusion",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "247": {
+    "inputs": {
+      "string_a": "## Edition description",
+      "string_b": [
+        "249",
+        0
+      ],
+      "delimiter": "\\n"
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate"
+    }
+  },
+  "248": {
+    "inputs": {
+      "string_a": [
+        "247",
+        0
+      ],
+      "string_b": "\n## Features preservation\n* Keep the subject's facial expression unchanged.\n* Keep lighting, shadows and color grading.\n* Keep background unchanged and consistent with the original scene.\n\nHigh fidelity, photorealistic, seamless edit, no artifacts, no distortion.",
+      "delimiter": "\\n"
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate"
+    }
+  },
+  "249": {
+    "inputs": {
+      "value": "Change the subject's ethnicity to that of a black female with the same hairstyle"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "String (Multiline)"
+    }
+  },
+  "250": {
+    "inputs": {
+      "value": "Remove the subject's clothing to make her appear completely nude while preserving facial identity, body proportions and overall anatomy.\n\nMaintain original lighting, shadows, color grading, skin texture, and image sharpness. Keep background unchanged and consistent with the original scene.\n\nHigh fidelity, photorealistic, seamless edit, no artifacts, no distortion."
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Scratchpad"
+    }
+  }
+}
