@@ -242,7 +242,7 @@ Optional details the AI can handle:
 
 - **Size**: "... at 2000x3000"
 
-Model, steps, and seed are controlled via Valves and Admin UI settings, not from the chat prompt.
+Model family, specific model, steps, and seed are controlled via Valves, not from the chat prompt.
 
 ---
 
@@ -255,7 +255,13 @@ A: Check that the ComfyUI Base URL (or comfyui_image_base_url valve) is accessib
 A: Configure a "seed" node in Admin Panel -> Settings -> Images -> ComfyUI Workflow Nodes.
 
 **Q: How do I change the model or steps?**  
-A: Admins configure them in Workspace -> Tools -> Smart Generate Image -> Valves. Users can override from the chat interface. Alternatively, set defaults in Admin Panel -> Settings -> Images.
+A: Select the model family (Z-Image Turbo or FLUX.2 Klein) in your user valves. For a specific model filename within a family, use the `model_name` valve. Steps are controlled via the `steps` user valve, subject to the admin's `max_steps` policy.
+
+**Q: What's the difference between model_family and model_name?**  
+A: `model_family` selects a preset configuration (diffusion model, text encoder, VAE, scheduler, CFG, sampler — everything). `model_name` overrides only the diffusion model file within that family. Usually you only need to set `model_family`.
+
+**Q: I changed steps but nothing happened.**  
+A: The admin has `max_steps` set to `-1` (Model default), which forces the model family's default steps regardless of user settings. Ask your admin to set it to `0` (User decides) or a specific ceiling.
 
 **Q: Enhance Image fails with an image loading error.**  
 A: Ensure the [ComfyUI-LoadImageURL](https://github.com/insecure-erasure/ComfyUI-LoadImageURL) custom node is installed in ComfyUI's `custom_nodes/` directory.
