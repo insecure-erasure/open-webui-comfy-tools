@@ -663,7 +663,10 @@ class Tools:
             sampler_select["inputs"]["sampler_name"] = model_cfg["sampler"]
 
             # Scheduler (BasicScheduler) - empty for flux.2 (uses Flux2Scheduler internally)
-            basic_scheduler["inputs"]["scheduler"] = model_cfg["scheduler"]
+            # Only override if non-empty; otherwise leave the workflow default ("simple")
+            # to avoid ComfyUI validation errors on unused-but-connected nodes.
+            if model_cfg["scheduler"]:
+                basic_scheduler["inputs"]["scheduler"] = model_cfg["scheduler"]
 
             # Sigma selector: 1 = BasicScheduler (ZIT), 2 = Flux2Scheduler (FLUX.2)
             sigma_switch["inputs"]["select"] = model_cfg["sigma_selector_index"]
