@@ -14,6 +14,7 @@ It is installed as a regular user tool in **Workspace -> Tools**. It does not re
 
 Companion tools:
 - **Enhance Image** (`enhance_image.py`) — upscale previously generated images using SeedVR2.
+- **Edit Image** (`edit_image.py`) — edit previously generated images using Flux 2 with steps and LoRA control.
 - **Generate Video** (`generate_video.py`) — generate videos through ComfyUI (text-to-video or image-to-video).
 
 ---
@@ -112,6 +113,14 @@ Configurable by end users from the chat interface.
 | comfyui_image_base_url | string | "" | Override the admin valve or COMFYUI_BASE_URL for image links. |
 | seed | int | -1 | Seed. -1 = random, >=0 = fixed seed for reproducibility. |
 
+### Valves (Edit Image)
+
+| Valve (admin / user) | Type | Default | Description |
+|----------------------|------|---------|-------------|
+| comfyui_image_base_url | string | "" | Public base URL for edited image links. Leave empty to use COMFYUI_BASE_URL. |
+| steps | dropdown | 0 (System default) | Inference steps (1-15). 0 = use workflow default (6). |
+| lora_config | string | [] | JSON array of LoRAs. Applied positionally to lora_1..lora_4. User wins on name collision. |
+
 ### Valves (Enhance Image)
 
 | Valve (admin / user) | Type | Default | Description |
@@ -155,6 +164,7 @@ is embedded in the Python scripts.
 |------|---------|-------------|
 | `smart_generate_image.json` | Smart Generate Image | zImageTurbo image generation |
 | `enhance_image.json` | Enhance Image | SeedVR2 standalone upscale |
+| `edit_image.json` | Edit Image | Flux 2 image editing |
 | `generate_video.json` | Generate Video | WAN2.1 image-to-video |
 
 All workflow JSONs are clean — no placeholders, no template variables. Values
