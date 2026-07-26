@@ -300,6 +300,16 @@ class Tools:
             default="[]",
             description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Applied positionally. User overrides on name collision.',
         )
+        model_family: str = Field(
+            default="",
+            description="Default model family. Overrides the built-in default (Z-Image Turbo). Leave empty to use the UserValve or the built-in default.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _MODEL_FAMILY_OPTIONS,
+                }
+            },
+        )
 
     class UserValves(BaseModel):
         """User-level configuration (overrides admin valve)."""
@@ -382,8 +392,11 @@ class Tools:
             # =================================================================
             user_valves = (__user__ or {}).get('valves', None)
 
-            # Model family: from user valve, fallback to zit
-            model_family = user_valves.model_family if user_valves and user_valves.model_family else "zit"
+            # Model family: UserValves > AdminValves > "zit" (built-in default)
+            model_family = (
+                user_valves.model_family if user_valves and user_valves.model_family
+                else self.valves.model_family or "zit"
+            )
             if model_family not in MODEL_CONFIGS:
                 model_family = "zit"
             model_cfg = MODEL_CONFIGS[model_family]

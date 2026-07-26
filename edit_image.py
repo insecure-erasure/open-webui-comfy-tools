@@ -355,7 +355,7 @@ class Tools:
             # =================================================================
             # 2. Set the edit prompt (the user-facing description)
             # =================================================================
-            _, edit_node = _resolve_node(workflow, "Prompt input")
+            _, edit_node = _resolve_node(workflow, "Prompt")
             edit_node["inputs"]["value"] = edit_prompt
 
             # =================================================================
