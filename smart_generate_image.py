@@ -25,10 +25,10 @@ _STEPS_OPTIONS = [
 ]
 _STEPS_OPTIONS.insert(0, {"value": "0", "label": "Model default"})
 
-# Separate options for max_steps admin valve (includes -1 = user decides)
+# Separate options for max_steps admin valve (-1 = model default, 0 = user decides)
 _MAX_STEPS_OPTIONS = [
-    {"value": "-1", "label": "User decides"},
-    {"value": "0", "label": "Model default"},
+    {"value": "0", "label": "User decides"},
+    {"value": "-1", "label": "Model default"},
 ] + [
     {"value": str(i), "label": str(i)}
     for i in range(15, 0, -1)
@@ -290,7 +290,7 @@ class Tools:
         )
         max_steps: str = Field(
             default="0",
-            description="Steps policy. 0 = force model default (ignore user). -1 = user decides (no clamp). 1-15 = clamp user steps to this ceiling.",
+            description="Steps policy. 0 = user decides (no clamp). -1 = force model default (ignore user). 1-15 = clamp user steps to this ceiling.",
             json_schema_extra={
                 "input": {
                     "type": "select",
@@ -422,22 +422,24 @@ class Tools:
             resolved_model = user_model or self.valves.model_name or model_cfg["model"]
 
             # Steps:
-            #   max_steps=-1 → user decides (no clamp)
-            #   max_steps=0  → force model config default (ignore user)
+            #   max_steps=0  → user decides (no clamp)
+            #   max_steps=-1 → force model config default (ignore user)
             #   max_steps>0  → clamp user steps to this ceiling
             model_default_steps = model_cfg["steps"]
             raw_max_steps = self.valves.max_steps
             max_steps = int(raw_max_steps) if raw_max_steps and raw_max_steps != "0" else 0
+            if raw_max_steps == "-1":
+                max_steps = -1  # preserve -1 (0 is a valid value in the dropdown)
 
             def _get_user_steps():
                 if user_valves and user_valves.steps and user_valves.steps != "0":
                     return int(user_valves.steps)
                 return 0
 
-            if max_steps == 0:
+            if max_steps == -1:
                 # Force model config default – ignore user steps
                 resolved_steps = model_default_steps
-            elif max_steps == -1:
+            elif max_steps == 0:
                 # User decides, no clamp
                 user_valve_steps = _get_user_steps()
                 resolved_steps = user_valve_steps if user_valve_steps > 0 else model_default_steps
