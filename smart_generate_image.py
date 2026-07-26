@@ -301,6 +301,10 @@ class Tools:
             default="[]",
             description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Applied positionally. User overrides on name collision.',
         )
+        megapixel: str = Field(
+            default="1.0",
+            description="Target megapixel value for the generated image. Controls total resolution independent of aspect ratio.",
+        )
         model_family: str = Field(
             default="zit",
             description="Default model family. Users can override this from their valves.",
@@ -613,7 +617,8 @@ class Tools:
             # VAE
             vae_loader["inputs"]["vae_name"] = model_cfg["vae"]
 
-            # Resolution: aspect ratio + divisible_by
+            # Resolution: megapixel + aspect ratio + divisible_by
+            flux_resolution["inputs"]["megapixel"] = self.valves.megapixel or "1.0"
             aspect_ratio["inputs"]["string_a"] = str(reduced_w)
             aspect_ratio["inputs"]["string_b"] = str(reduced_h)
             flux_resolution["inputs"]["divisible_by"] = model_cfg["vae_scale_factor"]
