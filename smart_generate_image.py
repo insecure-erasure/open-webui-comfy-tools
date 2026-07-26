@@ -18,12 +18,12 @@ from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
 
-# Shared dropdown options for the steps valve (15 down to 1, plus "System default")
+# Shared dropdown options for the steps valve (15 down to 1, plus "Model default")
 _STEPS_OPTIONS = [
     {"value": str(i), "label": str(i)}
     for i in range(15, 0, -1)
 ]
-_STEPS_OPTIONS.insert(0, {"value": "0", "label": "System default"})
+_STEPS_OPTIONS.insert(0, {"value": "0", "label": "Model default"})
 
 # Model family options for the model_family valve
 _MODEL_FAMILY_OPTIONS = [
