@@ -36,6 +36,8 @@ _MAX_STEPS_OPTIONS = [
 
 # Model family options for the model_family valve
 _DEFAULT_ASPECT_RATIO = "2:3"
+_DEFAULT_MEGAPIXEL = "1.0"
+_DEFAULT_MODEL_FAMILY = "zit"
 
 _MODEL_FAMILY_OPTIONS = [
     {"value": "", "label": "System default"},
@@ -285,8 +287,8 @@ class Tools:
             description="Public base URL for image links (overrides COMFYUI_BASE_URL). Leave empty to use COMFYUI_BASE_URL.",
         )
         model_family: str = Field(
-            default="zit",
-            description="Default model family. Users can override this from their valves.",
+            default=_DEFAULT_MODEL_FAMILY,
+            description=f"Default model family. Users can override this from their valves. Default: {_DEFAULT_MODEL_FAMILY}.",
             json_schema_extra={
                 "input": {
                     "type": "select",
@@ -307,8 +309,8 @@ class Tools:
             description=f"Default aspect ratio when the LLM does not specify one. Format W:H (e.g. 16:9). Legacy WxH format also accepted. Default: {_DEFAULT_ASPECT_RATIO}.",
         )
         megapixel: str = Field(
-            default="1.0",
-            description="Target megapixel value for the generated image. Controls total resolution independent of aspect ratio.",
+            default=_DEFAULT_MEGAPIXEL,
+            description=f"Target megapixel value for the generated image. Controls total resolution independent of aspect ratio. Default: {_DEFAULT_MEGAPIXEL}.",
         )
         max_steps: str = Field(
             default="0",
@@ -400,13 +402,13 @@ class Tools:
             # =================================================================
             user_valves = (__user__ or {}).get('valves', None)
 
-            # Model family: UserValves > AdminValves > "zit" (built-in default)
+            # Model family: UserValves > AdminValves > built-in default
             model_family = (
                 user_valves.model_family if user_valves and user_valves.model_family
-                else self.valves.model_family or "zit"
+                else self.valves.model_family or _DEFAULT_MODEL_FAMILY
             )
             if model_family not in MODEL_CONFIGS:
-                model_family = "zit"
+                model_family = _DEFAULT_MODEL_FAMILY
             model_cfg = MODEL_CONFIGS[model_family]
 
             # Model: UserValves > AdminValves > model_cfg
@@ -647,7 +649,7 @@ class Tools:
             vae_loader["inputs"]["vae_name"] = model_cfg["vae"]
 
             # Resolution: megapixel + aspect ratio + divisible_by
-            flux_resolution["inputs"]["megapixel"] = self.valves.megapixel or "1.0"
+            flux_resolution["inputs"]["megapixel"] = self.valves.megapixel or _DEFAULT_MEGAPIXEL
             aspect_ratio["inputs"]["string_a"] = str(reduced_w)
             aspect_ratio["inputs"]["string_b"] = str(reduced_h)
             flux_resolution["inputs"]["aspect_ratio"] = "2:3 (Classic Portrait)"
