@@ -164,6 +164,19 @@ class Tools:
             return "Error: The tool could not be initialized."
 
         try:
+            # Immediate feedback: let the user know editing has started
+            if __event_emitter__:
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {
+                            "description": "\U0001f3a8 Editing image...",
+                            "done": False,
+                            "hidden": False,
+                        },
+                    }
+                )
+
             from open_webui.routers.images import get_image_config
             from open_webui.utils.images.comfyui import (
                 ComfyUICreateImageForm,
@@ -301,14 +314,11 @@ class Tools:
                 or image_config.COMFYUI_BASE_URL
             )
 
-            if __event_emitter__:
-                status_desc = "\U0001f3a8 Editing image"
-                if lora_desc_lines:
-                    status_desc += " with LoRAs..."
-                    for line in lora_desc_lines:
-                        status_desc += f"\n    \u2022 {line}"
-                else:
-                    status_desc += "..."
+            # Progress update: show resolved LoRAs if any
+            if __event_emitter__ and lora_desc_lines:
+                status_desc = "\U0001f3a8 Editing image with LoRAs..."
+                for line in lora_desc_lines:
+                    status_desc += f"\n    \u2022 {line}"
                 await __event_emitter__(
                     {
                         "type": "status",
