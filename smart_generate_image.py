@@ -263,7 +263,7 @@ def _extract_image_filename(outputs: dict, output_node_id: str) -> tuple[str, st
 
 class Tools:
     """
-    Smart Generate Image - generate images through ComfyUI with control over size.
+    Smart Generate Image - generate images through ComfyUI with control over aspect ratio.
 
     Activate this tool from the tool selector in the chat input.
 
@@ -277,42 +277,17 @@ class Tools:
     prompt: Image generation prompt. Translate the user's request into English
         internally, then enrich with visual details without changing the subject
         or scene. Do not add superfluous details. Write the final prompt in English.
-    size (optional): Only provide when the user explicitly requests specific
-        dimensions. Format as WxH (e.g., 2000x3000).
+    aspect_ratio (optional): Only provide when the user explicitly requests a
+        specific aspect ratio. Format as W:H (e.g., 16:9). Leave empty for the
+        admin's default.
     """
 
     class Valves(BaseModel):
         """Admin-level configuration."""
 
-        model_name: str = Field(
-            default="",
-            description="Model/checkpoint name. Overrides the workflow default. Leave empty to use the value set in the workflow.",
-        )
-        max_steps: str = Field(
-            default="0",
-            description="Steps policy. 0 = user decides (no clamp). -1 = force model default (ignore user). 1-15 = clamp user steps to this ceiling.",
-            json_schema_extra={
-                "input": {
-                    "type": "select",
-                    "options": _MAX_STEPS_OPTIONS,
-                }
-            },
-        )
-        default_size: str = Field(
-            default="768x1152",
-            description="Default image size when the LLM does not specify one. Represents a 2:3 aspect ratio (both multiples of 64, ~0.88 MP).",
-        )
         comfyui_image_base_url: str = Field(
             default="",
             description="Public base URL for image links (overrides COMFYUI_BASE_URL). Leave empty to use COMFYUI_BASE_URL.",
-        )
-        lora_config: str = Field(
-            default="[]",
-            description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Applied positionally. User overrides on name collision.',
-        )
-        megapixel: str = Field(
-            default="1.0",
-            description="Target megapixel value for the generated image. Controls total resolution independent of aspect ratio.",
         )
         model_family: str = Field(
             default="zit",
@@ -324,35 +299,39 @@ class Tools:
                 }
             },
         )
+        model_name: str = Field(
+            default="",
+            description="Model/checkpoint name. Overrides the workflow default. Leave empty to use the value set in the workflow.",
+        )
+        lora_config: str = Field(
+            default="[]",
+            description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Applied positionally. User overrides on name collision.',
+        )
+        default_aspect_ratio: str = Field(
+            default="2:3",
+            description="Default aspect ratio when the LLM does not specify one. Format W:H (e.g. 16:9). Legacy WxH format also accepted.",
+        )
+        megapixel: str = Field(
+            default="1.0",
+            description="Target megapixel value for the generated image. Controls total resolution independent of aspect ratio.",
+        )
+        max_steps: str = Field(
+            default="0",
+            description="Steps policy. 0 = user decides (no clamp). -1 = force model default (ignore user). 1-15 = clamp user steps to this ceiling.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _MAX_STEPS_OPTIONS,
+                }
+            },
+        )
 
     class UserValves(BaseModel):
         """User-level configuration (overrides admin valve)."""
 
-        model_name: str = Field(
-            default="",
-            description="Your preferred model/checkpoint. Overrides the admin valve or the workflow default.",
-        )
-        steps: str = Field(
-            default="0",
-            description="Inference steps. 0 = use workflow default.",
-            json_schema_extra={
-                "input": {
-                    "type": "select",
-                    "options": _STEPS_OPTIONS,
-                }
-            },
-        )
         comfyui_image_base_url: str = Field(
             default="",
             description="Override the admin valve or COMFYUI_BASE_URL for image links.",
-        )
-        seed: int = Field(
-            default=-1,
-            description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
-        )
-        lora_config: str = Field(
-            default="[]",
-            description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Empty name or strength 0 disables it. Applied positionally to lora_1..lora_N. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
         )
         model_family: str = Field(
             default="",
@@ -364,6 +343,28 @@ class Tools:
                 }
             },
         )
+        model_name: str = Field(
+            default="",
+            description="Your preferred model/checkpoint. Overrides the admin valve or the workflow default.",
+        )
+        lora_config: str = Field(
+            default="[]",
+            description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Empty name or strength 0 disables it. Applied positionally to lora_1..lora_N. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
+        )
+        steps: str = Field(
+            default="0",
+            description="Inference steps. 0 = use workflow default.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _STEPS_OPTIONS,
+                }
+            },
+        )
+        seed: int = Field(
+            default=-1,
+            description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
+        )
 
     def __init__(self):
         self.valves = self.Valves()
@@ -372,7 +373,7 @@ class Tools:
     async def smart_generate_image(
         self,
         prompt: str,
-        size: str | None = None,
+        aspect_ratio: str | None = None,
         __request__=None,
         __user__=None,
         __event_emitter__=None,
@@ -381,7 +382,7 @@ class Tools:
         __id__: str = "",
     ):
         """
-        Generate one image with optional control over size.
+        Generate one image with optional control over aspect ratio.
 
         Returns image_md (for displaying) and image_filename (for reference).
         The filename is not directly accessible from the filesystem.
@@ -389,8 +390,9 @@ class Tools:
         prompt: Image generation prompt. Translate the user's request into English internally,
             then enrich with visual details without changing the subject or scene. Do not add
             superfluous details. Write the final prompt in English.
-        size (optional): Only provide when the user explicitly requests specific
-            dimensions. Format as WxH (e.g., 2000x3000).
+        aspect_ratio (optional): Only provide when the user explicitly requests a
+            specific aspect ratio. Format as W:H (e.g., 16:9). Leave empty for the
+            admin's default.
         """
         if __request__ is None:
             log.error("smart_generate_image called without request context")
@@ -465,13 +467,26 @@ class Tools:
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
             seed_arg = _random.randint(0, _COMFY_SEED_MAX) if user_seed == -1 else min(user_seed, _COMFY_SEED_MAX)
 
-            # Size: from LLM param or admin valve default_size, then GCD reduction
-            default_size = self.valves.default_size or "1024x1024"
-            final_size = size if size and "x" in size else default_size
-            width, height = tuple(map(int, final_size.split("x")))
-            gcd = math.gcd(width, height)
-            reduced_w = width // gcd
-            reduced_h = height // gcd
+            # Aspect ratio: from LLM param or admin valve default, normalised by GCD
+            raw_aspect = aspect_ratio or self.valves.default_aspect_ratio or "2:3"
+            if "x" in raw_aspect or "X" in raw_aspect:
+                raw_aspect = raw_aspect.lower().replace("x", ":")
+            parts = raw_aspect.split(":")
+            if len(parts) != 2:
+                raise ValueError(
+                    f"Invalid aspect ratio format: {raw_aspect!r}. "
+                    "Use W:H (e.g. 16:9) or WxH (e.g. 1920x1080)."
+                )
+            try:
+                w, h = int(parts[0]), int(parts[1])
+            except ValueError:
+                raise ValueError(
+                    f"Invalid numbers in aspect ratio: {raw_aspect!r}. "
+                    "Both parts must be integers."
+                )
+            gcd = math.gcd(w, h)
+            reduced_w = w // gcd
+            reduced_h = h // gcd
 
             # LoRA: validate and combine admin + user. User wins on name collision.
             # Pop: user can disable a LoRA with strength=0 to free the slot.
@@ -707,11 +722,11 @@ class Tools:
 
             log.info(
                 "Dispatching image workflow to ComfyUI (%s) - family=%s, prompt_len=%d, "
-                "size=%s, seed=%d, steps=%d, model=%s, loras=%s",
+                "aspect_ratio=%s, seed=%d, steps=%d, model=%s, loras=%s",
                 image_config.COMFYUI_BASE_URL,
                 model_family,
                 len(prompt),
-                final_size,
+                f"{reduced_w}:{reduced_h}",
                 seed_arg,
                 resolved_steps,
                 resolved_model,
