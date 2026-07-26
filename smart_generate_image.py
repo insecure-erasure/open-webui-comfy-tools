@@ -25,6 +25,41 @@ _STEPS_OPTIONS = [
 ]
 _STEPS_OPTIONS.insert(0, {"value": "0", "label": "System default"})
 
+# Model family options for the model_family valve
+_MODEL_FAMILY_OPTIONS = [
+    {"value": "zit", "label": "Z-Image Turbo"},
+    {"value": "flux.2", "label": "FLUX.2 Klein"},
+]
+
+# =============================================================================
+# Model family configurations
+# =============================================================================
+MODEL_CONFIGS = {
+    "zit": {
+        "model": "zImageTurbo-mxfp8.safetensors",
+        "text_encoder": "qwen3_4b_instruct_2507_mxfp8.safetensors",
+        "vae": "Z-Image_half_natural_vae.safetensors",
+        "vae_scale_factor": 16,
+        "cfg": 1.0,
+        "steps": 10,
+        "sampler": "euler",
+        "scheduler": "simple",
+        "clip_type": "lumina2",
+        "sigma_selector_index": 1,
+    },
+    "flux.2": {
+        "model": "flux-2-klein-9b-nvfp4.safetensors",
+        "text_encoder": "qwen_3_8b_nvfp4.safetensors",
+        "vae": "flux2-vae-small-bf16.safetensors",
+        "vae_scale_factor": 64,
+        "cfg": 1.0,
+        "steps": 8,
+        "sampler": "euler",
+        "scheduler": "",
+        "clip_type": "flux2",
+        "sigma_selector_index": 2,
+    },
+}
 
 
 # =============================================================================
@@ -295,6 +330,16 @@ class Tools:
             default="[]",
             description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Empty name or strength 0 disables it. Applied positionally to lora_1..lora_N. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
         )
+        model_family: str = Field(
+            default="zit",
+            description="Model family. Select Z-Image Turbo or FLUX.2 Klein.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _MODEL_FAMILY_OPTIONS,
+                }
+            },
+        )
 
     def __init__(self):
         self.valves = self.Valves()
@@ -337,21 +382,27 @@ class Tools:
             # =================================================================
             user_valves = (__user__ or {}).get('valves', None)
 
-            # Model: UserValves > AdminValves > None (workflow default)
+            # Model family: from user valve, fallback to zit
+            model_family = user_valves.model_family if user_valves and user_valves.model_family else "zit"
+            if model_family not in MODEL_CONFIGS:
+                model_family = "zit"
+            model_cfg = MODEL_CONFIGS[model_family]
+
+            # Model: UserValves > AdminValves > model_cfg
             user_model = (
                 user_valves.model_name if user_valves and user_valves.model_name else ""
             )
-            resolved_model = user_model or self.valves.model_name or None
+            resolved_model = user_model or self.valves.model_name or model_cfg["model"]
 
             # Steps:
-            #   max_steps=0 → force workflow default (ignore user steps)
+            #   max_steps=0 → force model config default (ignore user steps)
             #   max_steps>0 → use UserValve + clamp
+            model_default_steps = model_cfg["steps"]
             max_steps = int(self.valves.max_steps) if self.valves.max_steps and self.valves.max_steps != "0" else 0
-            resolved_steps = None
 
             if max_steps == 0:
-                # Force workflow default – ignore user steps
-                resolved_steps = None
+                # Force model config default – ignore user steps
+                resolved_steps = model_default_steps
             else:
                 user_valve_steps = int(user_valves.steps) if user_valves and user_valves.steps and user_valves.steps != "0" else 0
 
@@ -367,7 +418,8 @@ class Tools:
                                 },
                             }
                         )
-                # else: resolved_steps stays None → workflow default
+                else:
+                    resolved_steps = model_default_steps
 
             # Seed: UserValve. -1 = random, >=0 = fixed.
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
@@ -514,34 +566,69 @@ class Tools:
             raw_workflow = _load_workflow(__id__, "smart_generate_image.json")
             workflow = json.loads(raw_workflow)
 
+            # =================================================================
             # Resolve workflow nodes by _meta.title (unique identifiers)
-            _, text_encoder = _resolve_node(workflow, "CLIP Text Encode (Prompt)")
+            # =================================================================
             _, unet_loader = _resolve_node(workflow, "Load Diffusion Model")
-            _, ksampler = _resolve_node(workflow, "KSampler")
+            _, clip_loader = _resolve_node(workflow, "Load CLIP")
+            _, vae_loader = _resolve_node(workflow, "Load VAE")
+            _, flux_resolution = _resolve_node(workflow, "Flux Resolution Calc")
             _, aspect_ratio = _resolve_node(workflow, "Aspect ratio")
+            _, prompt_node = _resolve_node(workflow, "Prompt")
+            _, text_encoder = _resolve_node(workflow, "CLIP Text Encode (Prompt)")
+            _, steps_node = _resolve_node(workflow, "Steps")
+            _, cfg_guider = _resolve_node(workflow, "CFGGuider")
+            _, sampler_select = _resolve_node(workflow, "KSamplerSelect")
+            _, basic_scheduler = _resolve_node(workflow, "BasicScheduler")
+            _, sigma_switch = _resolve_node(workflow, "Switch (SIGMAS)")
+            _, random_noise = _resolve_node(workflow, "RandomNoise")
             _, lora_node = _resolve_node(workflow, "Power Lora Loader (rgthree)")
             preview_image_id, _ = _resolve_node(workflow, "Preview Image")
 
             # =================================================================
-            # Inject dynamic values (formerly done via {{PLACEHOLDER}})
+            # Inject model config values into workflow nodes
             # =================================================================
-            text_encoder["inputs"]["text"] = prompt
-            ksampler["inputs"]["seed"] = seed_arg
 
-            # =================================================================
-            # Apply optional overrides post-parse (only when valve is non-empty)
-            # =================================================================
-            if resolved_model:
-                unet_loader["inputs"]["unet_name"] = resolved_model
+            # Diffusion model
+            unet_loader["inputs"]["unet_name"] = resolved_model
 
-            if resolved_steps is not None:
-                ksampler["inputs"]["steps"] = resolved_steps
+            # Text encoder (CLIP)
+            clip_loader["inputs"]["clip_name"] = model_cfg["text_encoder"]
+            clip_loader["inputs"]["type"] = model_cfg["clip_type"]
 
-            # Inject aspect ratio (GCD-reduced) into the StringConcatenate node
+            # VAE
+            vae_loader["inputs"]["vae_name"] = model_cfg["vae"]
+
+            # Resolution: aspect ratio + divisible_by
             aspect_ratio["inputs"]["string_a"] = str(reduced_w)
             aspect_ratio["inputs"]["string_b"] = str(reduced_h)
+            flux_resolution["inputs"]["divisible_by"] = model_cfg["vae_scale_factor"]
 
-            # Cap to available slots and inject
+            # Prompt
+            prompt_node["inputs"]["value"] = prompt
+
+            # Steps
+            steps_node["inputs"]["value"] = resolved_steps
+            basic_scheduler["inputs"]["steps"] = resolved_steps
+
+            # Seed -> RandomNoise
+            random_noise["inputs"]["noise_seed"] = seed_arg
+
+            # CFG
+            cfg_guider["inputs"]["cfg"] = model_cfg["cfg"]
+
+            # Sampler
+            sampler_select["inputs"]["sampler_name"] = model_cfg["sampler"]
+
+            # Scheduler (BasicScheduler) - empty for flux.2 (uses Flux2Scheduler internally)
+            basic_scheduler["inputs"]["scheduler"] = model_cfg["scheduler"]
+
+            # Sigma selector: 1 = BasicScheduler (ZIT), 2 = Flux2Scheduler (FLUX.2)
+            sigma_switch["inputs"]["select"] = model_cfg["sigma_selector_index"]
+
+            # =================================================================
+            # Inject LoRAs
+            # =================================================================
             max_slots = sum(1 for k in lora_node["inputs"] if k.startswith("lora_"))
             lora_config = combined[:max_slots]
 
@@ -574,14 +661,15 @@ class Tools:
                     lora_node["inputs"][slot]["strength"] = 0
 
             log.info(
-                "Dispatching image workflow to ComfyUI (%s) - prompt_len=%d, size=%s, "
-                "seed=%d, steps=%s, model=%s, loras=%s",
+                "Dispatching image workflow to ComfyUI (%s) - family=%s, prompt_len=%d, "
+                "size=%s, seed=%d, steps=%d, model=%s, loras=%s",
                 image_config.COMFYUI_BASE_URL,
+                model_family,
                 len(prompt),
                 final_size,
                 seed_arg,
-                resolved_steps or "(workflow default)",
-                resolved_model or "(workflow default)",
+                resolved_steps,
+                resolved_model,
                 json.dumps(lora_config) if lora_config else "(none)",
             )
 
