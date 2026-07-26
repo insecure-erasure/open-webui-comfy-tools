@@ -102,7 +102,7 @@ def _resolve_node(workflow: dict, title: str) -> tuple[str, dict]:
 # ComfyUI constants
 # =============================================================================
 _COMFY_SEED_MAX: int = 1125899906842624
-_COMFY_QUEUE_MAX_RETRIES = 600       # ~10 min at 1s intervals
+_COMFY_QUEUE_MAX_RETRIES = 60        # ~60s at 1s intervals
 _COMFY_QUEUE_POLL_INTERVAL = 1.0     # seconds
 
 
@@ -198,8 +198,8 @@ async def _comfyui_wait_for_output(
         await asyncio.sleep(_COMFY_QUEUE_POLL_INTERVAL)
 
     raise TimeoutError(
-        f"ComfyUI did not finish within {_COMFY_QUEUE_MAX_RETRIES} seconds "
-        f"(prompt_id={prompt_id})"
+        f"ComfyUI did not finish within {_COMFY_QUEUE_MAX_RETRIES} tries "
+        f"(~{_COMFY_QUEUE_MAX_RETRIES * _COMFY_QUEUE_POLL_INTERVAL:.0f}s, prompt_id={prompt_id})"
     )
 
 
