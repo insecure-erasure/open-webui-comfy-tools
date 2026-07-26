@@ -23,7 +23,8 @@ Companion tools:
 
 ### Smart Generate Image (`smart_generate_image.py`)
 
-Generates images through ComfyUI with control over prompt and size. Model, steps, and seed are configured via Valves.
+Generates images through ComfyUI with support for multiple model families (Z-Image Turbo and FLUX.2 Klein).
+Model, steps, seed, and model family are configured via Valves.
 
 **Parameters exposed to the LLM:**
 
@@ -98,9 +99,13 @@ Configurable by admins in **Workspace -> Tools -> Smart Generate Image -> Valves
 
 | Valve | Type | Default | Description |
 |-------|------|---------|-------------|
-| model_name | string | "" | Model/checkpoint name. Overrides the Admin UI default. Leave empty to use the Admin UI setting. |
-| steps | dropdown | 0 (System default) | Inference steps (1-15, descending). 0 = inherit from Admin UI or use workflow default. |
+| model_family | dropdown | zit | Default model family: Z-Image Turbo or FLUX.2 Klein. Users can override. |
+| model_name | string | "" | Specific model filename. Overrides the model_family default. Leave empty to use the model_family default. |
+| max_steps | dropdown | 0 | Steps policy. **0** = user decides (no clamp). **-1** = force model default (ignore user). **1-15** = clamp user steps to ceiling. |
+| default_size | string | 768x1152 | Default image size when the LLM does not specify one. |
+| megapixel | string | 1.0 | Target megapixel value. Controls total resolution independent of aspect ratio. |
 | comfyui_image_base_url | string | "" | Public base URL for image links. Overrides COMFYUI_BASE_URL. Leave empty to use COMFYUI_BASE_URL. |
+| lora_config | JSON string | [] | JSON array of LoRAs. Applied positionally. User wins on name collision. |
 
 ### User Valves (Smart Generate Image)
 
@@ -108,10 +113,12 @@ Configurable by end users from the chat interface.
 
 | Valve | Type | Default | Description |
 |-------|------|---------|-------------|
-| model_name | string | "" | Your preferred model/checkpoint. Overrides the admin valve and the Admin UI setting. |
-| steps | dropdown | 0 (System default) | Inference steps (1-15, descending). 0 = inherit from admin valve or Admin UI setting. |
+| model_family | dropdown | "" (System default) | Override the admin valve model family. Select Z-Image Turbo or FLUX.2 Klein explicitly. |
+| model_name | string | "" | Specific model filename. Overrides admin valve and model_family default. |
+| steps | dropdown | 0 (Model default) | Inference steps. 0 = use model family default. 1-15 = explicit value (subject to admin max_steps policy). |
 | comfyui_image_base_url | string | "" | Override the admin valve or COMFYUI_BASE_URL for image links. |
 | seed | int | -1 | Seed. -1 = random, >=0 = fixed seed for reproducibility. |
+| lora_config | JSON string | [] | JSON array of LoRAs. Applied positionally. Empty name or strength 0 disables it. Overrides admin on name collision. |
 
 ### Valves (Edit Image)
 
@@ -133,15 +140,18 @@ Same valves as Enhance Image — only `comfyui_image_base_url` (admin / user).
 
 ### Precedence
 
-**Model resolution:** UserValves > AdminValves > Admin UI (get_image_model) > None
+**Model family resolution:** UserValves > AdminValves > `"zit"` (built-in default)
 
-**Steps resolution:** UserValves > AdminValves > Admin UI (IMAGE_STEPS) > workflow default
+**Model resolution:** UserValves `model_name` > AdminValves `model_name` > `MODEL_CONFIGS[family]["model"]`
+
+**Steps resolution:**
+- `max_steps=0` (default): user decides freely. User "Model default" → model family default.
+- `max_steps=-1`: force model family default, user steps are ignored.
+- `max_steps=1-15`: user steps clamped to this ceiling. Warning toast on clamp.
 
 **Seed resolution:** UserValve. -1 = random (auto-generated), >=0 = fixed.
 
 **Image base URL resolution:** UserValves > AdminValves > COMFYUI_BASE_URL
-
-Both UserValves and AdminValves for steps are clamped against the Admin UI IMAGE_STEPS ceiling (or 15 as safety fallback). When clamping occurs, a warning toast is shown to the user.
 
 ---
 
@@ -162,7 +172,7 @@ is embedded in the Python scripts.
 
 | File | Used by | Description |
 |------|---------|-------------|
-| `smart_generate_image.json` | Smart Generate Image | zImageTurbo image generation |
+| `smart_generate_image.json` | Smart Generate Image | Z-Image Turbo / FLUX.2 Klein image generation |
 | `enhance_image.json` | Enhance Image | SeedVR2 standalone upscale |
 | `edit_image.json` | Edit Image | Flux 2 image editing |
 | `generate_video.json` | Generate Video | WAN2.1 image-to-video |
