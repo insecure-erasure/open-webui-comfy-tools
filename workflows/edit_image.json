@@ -344,20 +344,11 @@
   },
   "249": {
     "inputs": {
-      "value": "Change the subject's ethnicity to that of a black female with the same hairstyle"
+      "value": ""
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
-      "title": "String (Multiline)"
-    }
-  },
-  "250": {
-    "inputs": {
-      "value": "Remove the subject's clothing to make her appear completely nude while preserving facial identity, body proportions and overall anatomy.\n\nMaintain original lighting, shadows, color grading, skin texture, and image sharpness. Keep background unchanged and consistent with the original scene.\n\nHigh fidelity, photorealistic, seamless edit, no artifacts, no distortion."
-    },
-    "class_type": "PrimitiveStringMultiline",
-    "_meta": {
-      "title": "Scratchpad"
+      "title": "Prompt input"
     }
   }
 }

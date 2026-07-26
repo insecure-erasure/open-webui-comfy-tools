@@ -86,7 +86,7 @@ def _load_workflow(tool_id: str, filename: str) -> str:
 
 class Tools:
     """
-    Edit a previously generated image using Flux 2.
+    Edit a previously generated image.
 
     Only call when the user explicitly asks to edit or modify an existing
     image that was generated in this conversation. Pass an image filename
@@ -147,7 +147,7 @@ class Tools:
         __id__: str = "",
     ):
         """
-        Edit a previously generated image using Flux 2.
+        Edit a previously generated image.
 
         Only call when the user explicitly asks to edit or modify an
         existing image. Pass an image filename or a direct URL.
@@ -164,18 +164,6 @@ class Tools:
             return "Error: The tool could not be initialized."
 
         try:
-            if __event_emitter__:
-                await __event_emitter__(
-                    {
-                        "type": "status",
-                        "data": {
-                            "description": "\U0001f3a8 Editing image...",
-                            "done": False,
-                            "hidden": False,
-                        },
-                    }
-                )
-
             from open_webui.routers.images import get_image_config
             from open_webui.utils.images.comfyui import (
                 ComfyUICreateImageForm,
@@ -287,6 +275,17 @@ class Tools:
                 if _lora_name(item) not in blocked_names:
                     combined.append(item)
 
+            # Build LoRA lines for status
+            lora_desc_lines = []
+            if combined:
+                for item in combined:
+                    if isinstance(item, str):
+                        lora_desc_lines.append(f"{item} = 1.0")
+                    elif isinstance(item, dict):
+                        name = item.get("name", item.get("model", "?"))
+                        strength = item.get("strength", 1.0)
+                        lora_desc_lines.append(f"{name} = {strength}")
+
             # =================================================================
             # Resolve image base URL for the output link
             #   UserValves > AdminValves > COMFYUI_BASE_URL
@@ -301,6 +300,25 @@ class Tools:
                 or self.valves.comfyui_image_base_url
                 or image_config.COMFYUI_BASE_URL
             )
+
+            if __event_emitter__:
+                status_desc = "\U0001f3a8 Editing image"
+                if lora_desc_lines:
+                    status_desc += " with LoRAs..."
+                    for line in lora_desc_lines:
+                        status_desc += f"\n    \u2022 {line}"
+                else:
+                    status_desc += "..."
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {
+                            "description": status_desc,
+                            "done": False,
+                            "hidden": False,
+                        },
+                    }
+                )
 
             # =================================================================
             # Build the workflow: load from cache and parse
@@ -327,7 +345,7 @@ class Tools:
             # =================================================================
             # 2. Set the edit prompt (the user-facing description)
             # =================================================================
-            _, edit_node = _resolve_node(workflow, "String (Multiline)")
+            _, edit_node = _resolve_node(workflow, "Prompt input")
             edit_node["inputs"]["value"] = edit_prompt
 
             # =================================================================
