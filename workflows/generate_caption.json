@@ -1,0 +1,63 @@
+{
+  "4": {
+    "inputs": {
+      "source": "temp",
+      "url": "https://i.redd.it/sqkrvea4rh4h1.jpeg",
+      "image": "ComfyUI_temp_qpmzj_00004_.png",
+      "Choose file to upload": null
+    },
+    "class_type": "LoadImageByUrlOrPath",
+    "_meta": {
+      "title": "Load Image (URL/Path)"
+    }
+  },
+  "5": {
+    "inputs": {
+      "model": "florence-2-large-interleaved",
+      "precision": "bf16",
+      "convert_to_safetensors": false
+    },
+    "class_type": "Florence2ModelLoader",
+    "_meta": {
+      "title": "Florence2ModelLoader"
+    }
+  },
+  "9": {
+    "inputs": {
+      "text_input": "",
+      "task": "nsfw_detailed_caption",
+      "fill_mask": false,
+      "keep_model_loaded": false,
+      "max_new_tokens": 1024,
+      "num_beams": 4,
+      "do_sample": false,
+      "output_mask_select": "",
+      "seed": 1,
+      "image": [
+        "4",
+        0
+      ],
+      "florence2_model": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "Florence2Run",
+    "_meta": {
+      "title": "Florence2Run"
+    }
+  },
+  "30": {
+    "inputs": {
+      "text_0": "This is a photograph featuring a woman standing in front of a mirror. She has blonde hair styled in braids and is wearing makeup, including eyeliner and mascara. The woman is nude, revealing her breasts and nipples. She is posing with one hand on her hip and the other resting on her thigh. In the background, there is another woman reflected in the mirror, wearing a red dress. To the left of the mirror, there is a bed with white sheets and pillows, and a lamp on a nightstand. On the floor, there are two bottles of wine: one is partially opened and the other is closed. The lighting in the room is dim with pink and purple hues, creating a cozy ambiance. The woman's expression is neutral, and she is looking directly at the camera. The overall style of the image suggests it may have been taken at a nightclub or a party venue.",
+      "text": [
+        "9",
+        2
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Show Text 🐍"
+    }
+  }
+}
