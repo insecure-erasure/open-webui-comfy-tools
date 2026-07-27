@@ -757,6 +757,7 @@ class Tools:
             # =================================================================
             # Inject per-path values
             # =================================================================
+            path_details = []
             for path_name, cfg in path_configs.items():
                 nodes = path_nodes[path_name]
 
@@ -802,16 +803,26 @@ class Tools:
                             nodes["lora"]["inputs"][slot]["lora"] = name
                             nodes["lora"]["inputs"][slot]["strength"] = strength
 
+                # Build detail string for this path
+                path_lora_str = json.dumps(path_loras) if path_loras else "(none)"
+                path_details.append(
+                    f"{path_name}: model={resolved_dm}, sampler={cfg['sampler']}, "
+                    f"scheduler={cfg['scheduler']}, steps={cfg['steps']}, cfg={cfg['cfg']}, "
+                    f"loras={path_lora_str}"
+                )
+
             log.info(
                 "Dispatching %s workflow to ComfyUI (%s) - prompt_len=%d, seed=%d, "
-                "length=%s, image=%s, loras=%s",
+                "length=%s, image=%s, neg_prompt=%s, loras=%s, paths=[%s]",
                 resolved_version,
                 image_config.COMFYUI_BASE_URL,
                 len(prompt),
                 seed_arg,
                 resolved_length,
                 image,
+                repr(resolved_neg) if resolved_neg else "(none)",
                 json.dumps(parsed_loras) if parsed_loras else "(none)",
+                "; ".join(path_details),
             )
 
             # =================================================================
