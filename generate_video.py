@@ -1,8 +1,8 @@
 """
 title: Generate Video
 author: A. Martin
-description: Generate videos through ComfyUI (e.g. WAN2.1 text-to-video or image-to-video)
-version: 2.0
+description: Generate videos through ComfyUI (WAN2.1 / WAN2.2 image-to-video)
+version: 3.0
 """
 
 import asyncio
@@ -17,6 +17,92 @@ import httpx
 from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
+
+# =============================================================================
+# Model version options for the dropdown valve
+# =============================================================================
+_MODEL_VERSION_OPTIONS = [
+    {"value": "wan21", "label": "Wan 2.1"},
+    {"value": "wan22", "label": "Wan 2.2"},
+]
+
+# =============================================================================
+# Length guardrails — valid values are 4n+1 (WAN temporal VAE stride)
+# =============================================================================
+_MIN_FRAMES = 81
+_MAX_FRAMES = 161
+_FRAMES_OPTIONS = [
+    {"value": "0", "label": "System default"},
+    {"value": "81", "label": "81"},
+    {"value": "97", "label": "97"},
+    {"value": "113", "label": "113"},
+    {"value": "129", "label": "129"},
+    {"value": "145", "label": "145"},
+    {"value": "161", "label": "161"},
+]
+
+
+def _snap_to_valid_frames(n: int) -> int:
+    """Snap to nearest valid frame count (4n + 1, clamped to [_MIN_FRAMES, _MAX_FRAMES])."""
+    n = max(_MIN_FRAMES, min(n, _MAX_FRAMES))
+    # Nearest 4n+1
+    snapped = ((n - 1) // 4) * 4 + 1
+    # Check if rounding to next 4n+1 is closer
+    if n - snapped > 2:
+        snapped += 4
+    return min(snapped, _MAX_FRAMES)
+
+
+# =============================================================================
+# Model family configurations
+# =============================================================================
+VIDEO_MODEL_CONFIGS = {
+    "wan21": {
+        "workflow_file": "generate_video.json",
+        "diffusion_model": "Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-nvfp4.safetensors",
+        "sampler": "euler",
+        "scheduler": "simple",
+        "steps": 4,
+        "cfg": 1.0,
+        "model_sampling_shift": 5,
+        "nag_scale": 11,
+        "nag_alpha": 0.25,
+        "nag_tau": 2.5,
+    },
+    "wan22": {
+        "workflow_file": "generate_video_wan22.json",
+        "high": {
+            "diffusion_model": "Wan2.2-I2V-A14B-Moe-Distill-Lightx2v-high-nvfp4.safetensors",
+            "sampler": "heun",
+            "scheduler": "simple",
+            "steps": 4,
+            "cfg": 1.0,
+            "start_at_step": 0,
+            "end_at_step": 2,
+            "add_noise": "enable",
+            "return_with_leftover_noise": "enable",
+            "model_sampling_shift": 5,
+            "nag_scale": 11,
+            "nag_alpha": 0.25,
+            "nag_tau": 2.5,
+        },
+        "low": {
+            "diffusion_model": "Wan2.2-I2V-A14B-Moe-Distill-Lightx2v-low-nvfp4.safetensors",
+            "sampler": "euler",
+            "scheduler": "simple",
+            "steps": 4,
+            "cfg": 1.0,
+            "start_at_step": 2,
+            "end_at_step": 10000,
+            "add_noise": "disable",
+            "return_with_leftover_noise": "disable",
+            "model_sampling_shift": 5,
+            "nag_scale": 11,
+            "nag_alpha": 0.25,
+            "nag_tau": 2.5,
+        },
+    },
+}
 
 
 # =============================================================================
@@ -193,6 +279,118 @@ def _extract_video_filename(outputs: dict, output_node_id: str) -> tuple[str, st
 
 
 # =============================================================================
+# LoRA helpers
+# =============================================================================
+
+def _parse_lora_config(raw: str, label: str) -> tuple[list, str | None]:
+    """
+    Parse a lora_config JSON string.
+
+    Expected format: JSON array of objects. Each object has:
+      - model (str, required): LoRA filename
+      - strength (float, optional, default 1.0): LoRA strength
+      - path (str, optional): "high" / "low". Omit for all paths.
+
+    Returns (list, error_or_None).
+    """
+    if not raw or raw.strip() == "" or raw.strip() == "[]":
+        return [], None
+    try:
+        p = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as e:
+        return [], f"Invalid JSON in {label} lora_config: {e}"
+    if not isinstance(p, list):
+        return [], f"{label} lora_config must be a JSON array, got {type(p).__name__}"
+    for i, item in enumerate(p):
+        if not isinstance(item, dict):
+            return [], f"{label} lora_config[{i}] must be an object, got {type(item).__name__}"
+        if "model" not in item or not isinstance(item["model"], str):
+            return [], f"{label} lora_config[{i}] must have a 'model' string field"
+        strength = item.get("strength", None)
+        if strength is not None and not isinstance(strength, (int, float)):
+            return [], f"{label} lora_config[{i}] 'strength' must be a number, got {type(strength).__name__}"
+        path_val = item.get("path", None)
+        if path_val is not None and path_val not in ("high", "low"):
+            return [], f"{label} lora_config[{i}] 'path' must be 'high', 'low', or omitted"
+    return p, None
+
+
+def _filter_loras_for_path(lora_list: list, path_name: str) -> list:
+    """
+    Filter LoRAs applicable to a specific path/ram.
+
+    Items without 'path' apply to all paths.
+    Items with 'path' matching path_name apply to that path only.
+    """
+    return [
+        item for item in lora_list
+        if item.get("path", path_name) == path_name
+    ]
+
+
+# =============================================================================
+# Diffusion model helpers
+# =============================================================================
+
+def _parse_diffusion_model_config(raw: str, label: str) -> tuple[list | dict | None, str | None]:
+    """
+    Parse a diffusion_model config JSON string.
+
+    Can be either:
+      - A single object: {"model": "filename.safetensors"}
+      - An array of objects: [{"model": "...", "path": "high"}, ...]
+
+    Returns (parsed, error_or_None).
+    """
+    if not raw or raw.strip() == "":
+        return None, None
+    try:
+        p = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as e:
+        return None, f"Invalid JSON in {label} diffusion_model: {e}"
+    # Single object
+    if isinstance(p, dict):
+        if "model" not in p or not isinstance(p["model"], str):
+            return None, f"{label} diffusion_model object must have a 'model' string field"
+        return p, None
+    # Array
+    if isinstance(p, list):
+        for i, item in enumerate(p):
+            if not isinstance(item, dict):
+                return None, f"{label} diffusion_model[{i}] must be an object, got {type(item).__name__}"
+            if "model" not in item or not isinstance(item["model"], str):
+                return None, f"{label} diffusion_model[{i}] must have a 'model' string field"
+            path_val = item.get("path", None)
+            if path_val is not None and path_val not in ("high", "low"):
+                return None, f"{label} diffusion_model[{i}] 'path' must be 'high', 'low', or omitted"
+        return p, None
+    return None, f"{label} diffusion_model must be a JSON object or array"
+
+
+def _resolve_diffusion_model_for_path(
+    config: dict | list | None, path_name: str, default_model: str
+) -> str:
+    """
+    Resolve the diffusion model filename for a specific path.
+
+    - If config is None: return default_model
+    - If config is a single object without 'path': return its model
+    - If config is an array: find item with matching path, or fallback to default
+    """
+    if config is None:
+        return default_model
+    if isinstance(config, dict):
+        return config.get("model", default_model)
+    if isinstance(config, list):
+        for item in config:
+            if item.get("path") == path_name:
+                return item.get("model", default_model)
+        # No matching path item → use default
+        return default_model
+    return default_model
+
+
+# =============================================================================
 # TOOL
 # =============================================================================
 
@@ -215,21 +413,39 @@ class Tools:
     class Valves(BaseModel):
         """Admin-level configuration."""
 
-        model_name: str = Field(
-            default="",
-            description="Model/checkpoint name for video generation. Overrides the workflow default. Leave empty to use what's in the workflow JSON.",
+        model_version: str = Field(
+            default="wan21",
+            description="Video model version.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _MODEL_VERSION_OPTIONS,
+                }
+            },
         )
-        lora: str = Field(
+        diffusion_model: str = Field(
             default="",
-            description="LoRA name for video style. Leave empty for no LoRA.",
+            description='JSON with diffusion model(s). Single object for Wan 2.1: {"model": "..."}. Array for Wan 2.2: [{"model": "...", "path": "high"}, ...]. Leave empty to use the built-in defaults.',
         )
-        length: int = Field(
-            default=0,
-            description="Number of frames / video length. 0 = use workflow default.",
+        lora_config: str = Field(
+            default="[]",
+            description='JSON array of LoRAs. Each object: {"model": "...", "strength": 1.0, "path": "high"|"low"}. Omit "path" for all ramas.',
+        )
+        length: str = Field(
+            default="81",
+            description="Maximum number of frames / video length. Acts as a ceiling for user values. -1 = no ceiling. Must be 4n+1.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": [
+                        {"value": "-1", "label": "User decides (no ceiling)"},
+                    ] + [o for o in _FRAMES_OPTIONS if o["value"] != "0"],
+                }
+            },
         )
         negative_prompt: str = Field(
             default="",
-            description="Negative prompt. Leave empty to use the workflow default.",
+            description="Negative prompt. Leave empty to use the built-in default.",
         )
         comfyui_image_base_url: str = Field(
             default="",
@@ -239,21 +455,37 @@ class Tools:
     class UserValves(BaseModel):
         """User-level configuration (overrides admin valve)."""
 
-        model_name: str = Field(
+        model_version: str = Field(
             default="",
-            description="Your preferred model/checkpoint for video. Overrides the admin valve and the workflow default.",
+            description="Video model version. Overrides the admin valve.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _MODEL_VERSION_OPTIONS,
+                }
+            },
         )
-        lora: str = Field(
+        diffusion_model: str = Field(
             default="",
-            description="Your preferred LoRA for video style. Overrides the admin valve.",
+            description='JSON with diffusion model(s). Overrides the admin valve and built-in defaults.',
         )
-        length: int = Field(
-            default=0,
-            description="Number of frames / video length. 0 = use admin valve or workflow default.",
+        lora_config: str = Field(
+            default="[]",
+            description='JSON array of LoRAs. Overrides the admin valve.',
+        )
+        length: str = Field(
+            default="0",
+            description="Number of frames / video length. 0 = use admin value. Must be 4n+1.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _FRAMES_OPTIONS,
+                }
+            },
         )
         negative_prompt: str = Field(
             default="",
-            description="Your preferred negative prompt. Leave empty to use the admin valve or workflow default.",
+            description="Your preferred negative prompt. Leave empty to use the admin valve or built-in default.",
         )
         seed: int = Field(
             default=-1,
@@ -309,27 +541,99 @@ class Tools:
             image_config = await get_image_config()
 
             # =================================================================
-            # Resolve valves: UserValves > AdminValves > workflow default
+            # Resolve valves: UserValves > AdminValves > built-in defaults
             # =================================================================
             user_valves = (__user__ or {}).get("valves", None)
 
-            # Model: UserValves > AdminValves > leave workflow default
-            resolved_model = (
-                user_valves.model_name if user_valves and user_valves.model_name
-                else self.valves.model_name or ""
+            # Model version: UserValves > AdminValves > "wan21"
+            resolved_version = (
+                user_valves.model_version if user_valves and user_valves.model_version
+                else self.valves.model_version or "wan21"
             )
+            if resolved_version not in VIDEO_MODEL_CONFIGS:
+                resolved_version = "wan21"
+            version_cfg = VIDEO_MODEL_CONFIGS[resolved_version]
 
-            # LoRA: UserValves > AdminValves > leave workflow default
-            resolved_lora = (
-                user_valves.lora if user_valves and user_valves.lora
-                else self.valves.lora or ""
+            # Detect architecture: dual (has "high") or single
+            is_dual = "high" in version_cfg
+
+            # Diffusion model(s): UserValves > AdminValves > version_cfg
+            raw_diffusion = (
+                user_valves.diffusion_model if user_valves and user_valves.diffusion_model
+                else self.valves.diffusion_model or ""
             )
+            parsed_diffusion, err = _parse_diffusion_model_config(raw_diffusion, "user" if user_valves and user_valves.diffusion_model else "admin")
+            if err:
+                if __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "error",
+                                "content": f"Diffusion model config error: {err}",
+                            },
+                        }
+                    )
+                return f"Error: {err}"
 
-            # Length: UserValves > AdminValves > leave workflow default
-            user_length = user_valves.length if user_valves and user_valves.length else 0
-            resolved_length = user_length or self.valves.length or 0
+            # LoRA config: UserValves > AdminValves
+            raw_lora = (
+                user_valves.lora_config if user_valves and user_valves.lora_config
+                else self.valves.lora_config or "[]"
+            )
+            parsed_loras, err = _parse_lora_config(raw_lora, "user" if user_valves and user_valves.lora_config else "admin")
+            if err:
+                if __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "error",
+                                "content": f"LoRA config error: {err}",
+                            },
+                        }
+                    )
+                return f"Error: {err}"
 
-            # Negative prompt: UserValves > AdminValves > leave workflow default
+            # Length: UserValves > AdminValves. Admin valve acts as ceiling.
+            # Valves are dropdown strings — parse as int.
+            admin_raw = int(self.valves.length) if self.valves.length and self.valves.length != "-1" else -1
+            user_raw = int(user_valves.length) if user_valves and user_valves.length and user_valves.length != "0" else 0
+
+            if admin_raw == -1:
+                # No admin ceiling — user decides freely (but still snap to valid)
+                if user_raw > 0:
+                    resolved_length = user_raw
+                else:
+                    resolved_length = 81
+            else:
+                # Admin ceiling applies
+                if user_raw > 0:
+                    resolved_length = min(user_raw, admin_raw)
+                    if resolved_length < user_raw:
+                        if __event_emitter__:
+                            await __event_emitter__(
+                                {
+                                    "type": "notification",
+                                    "data": {
+                                        "type": "warning",
+                                        "content": f"\u26a0\ufe0f Video length clamped to {admin_raw} frames (admin ceiling).",
+                                    },
+                                }
+                            )
+                else:
+                    resolved_length = admin_raw
+
+            # Snap to valid 4n+1 and apply guardrails
+            snapped = _snap_to_valid_frames(resolved_length)
+            if snapped != resolved_length:
+                log.warning(
+                    "Video length %d snapped to %d (must be 4n+1 in [%d, %d])",
+                    resolved_length, snapped, _MIN_FRAMES, _MAX_FRAMES
+                )
+                resolved_length = snapped
+
+            # Negative prompt: UserValves > AdminValves > leave empty (= use version default)
             resolved_neg = (
                 user_valves.negative_prompt if user_valves and user_valves.negative_prompt
                 else self.valves.negative_prompt or ""
@@ -354,33 +658,84 @@ class Tools:
             # =================================================================
             # Build the workflow: load from cache and parse
             # =================================================================
-            raw_workflow = _load_workflow(__id__, "generate_video.json")
+            raw_workflow = _load_workflow(__id__, version_cfg["workflow_file"])
             workflow = json.loads(raw_workflow)
 
-            # Resolve workflow nodes by _meta.title (unique identifiers)
+            # =================================================================
+            # Resolve common nodes (exist in both workflows)
+            # =================================================================
             _, positive_prompt = _resolve_node(workflow, "Positive Prompt")
-            _, negative_prompt = _resolve_node(workflow, "Negative Prompt")
+            _, negative_prompt_node = _resolve_node(workflow, "Negative Prompt")
+            _, default_neg_node = _resolve_node(workflow, "Default Wan negative prompt")
             _, load_image = _resolve_node(workflow, "Load Image (URL/Path)")
-            _, unet_loader = _resolve_node(workflow, "Load Diffusion Model")
-            _, lora_node = _resolve_node(workflow, "Power Lora Loader (rgthree)")
+            _, vae_loader = _resolve_node(workflow, "Load VAE")
+            _, clip_loader = _resolve_node(workflow, "CLIPLoader (GGUF)")
             _, wan_img2vid = _resolve_node(workflow, "WanImageToVideo")
             _, easy_seed = _resolve_node(workflow, "EasySeed")
+            _, conditioning_concat = _resolve_node(workflow, "Conditioning (Concat)")
+            _, unsharpen = _resolve_node(workflow, "Unsharpen mask")
+            _, image_blend = _resolve_node(workflow, "Image Blend")
+            _, rtx_sr = _resolve_node(workflow, "RTX Video Super Resolution")
+            _, frame_interp = _resolve_node(workflow, "Frame Interpolate")
+            _, frame_interp_loader = _resolve_node(workflow, "Load Frame Interpolation Model")
             output_node_id, _ = _resolve_node(workflow, "Output MP4")
 
+            # CLIP Vision nodes — may not exist in all workflows
+            try:
+                _, clip_vision_encode = _resolve_node(workflow, "CLIP Vision Encode")
+            except KeyError:
+                clip_vision_encode = None
+
             # =================================================================
-            # Inject dynamic values (formerly done via {{PLACEHOLDER}})
+            # Resolve path-specific nodes (single or dual)
+            # =================================================================
+            if is_dual:
+                path_configs = {
+                    "high": version_cfg["high"],
+                    "low": version_cfg["low"],
+                }
+                path_nodes = {}
+                for path_name in ("high", "low"):
+                    suffix = f" {path_name.upper()}"
+                    _, unet = _resolve_node(workflow, f"Load Diffusion Model{suffix}")
+                    _, lora_n = _resolve_node(workflow, f"Power Lora Loader (rgthree){suffix}")
+                    _, msampling = _resolve_node(workflow, f"ModelSamplingSD3{suffix}")
+                    _, nag = _resolve_node(workflow, f"NAG {path_name.upper()}")
+                    _, ksampler = _resolve_node(workflow, f"KSampler {path_name.upper()}")
+                    path_nodes[path_name] = {
+                        "unet": unet,
+                        "lora": lora_n,
+                        "msampling": msampling,
+                        "nag": nag,
+                        "ksampler": ksampler,
+                    }
+            else:
+                path_configs = {"main": version_cfg}
+                _, unet = _resolve_node(workflow, "Load Diffusion Model")
+                _, lora_n = _resolve_node(workflow, "Power Lora Loader (rgthree)")
+                _, msampling = _resolve_node(workflow, "ModelSamplingSD3")
+                _, nag = _resolve_node(workflow, "NAG HIGH")
+                _, ksampler = _resolve_node(workflow, "KSampler")
+                path_nodes = {
+                    "main": {
+                        "unet": unet,
+                        "lora": lora_n,
+                        "msampling": msampling,
+                        "nag": nag,
+                        "ksampler": ksampler,
+                    }
+                }
+
+            # =================================================================
+            # Inject common values
             # =================================================================
             positive_prompt["inputs"]["text"] = prompt
             easy_seed["inputs"]["seed"] = seed_arg
 
-            # =================================================================
-            # Configure image source — post-parse
-            # =================================================================
+            # Configure image source
             node_img = load_image["inputs"]
             parsed = urlparse(image)
             if parsed.scheme and parsed.netloc:
-                # URL mode — image is optional, remove it to avoid validation
-                # against the temp files list
                 node_img["source"] = "url"
                 node_img["url"] = image
                 node_img.pop("image", None)
@@ -390,29 +745,76 @@ class Tools:
                 node_img["image"] = image
                 node_img["url"] = ""
 
-            # =================================================================
-            # Apply optional overrides (only when valve is non-empty)
-            # =================================================================
-            if resolved_model:
-                unet_loader["inputs"]["unet_name"] = resolved_model
-            if resolved_lora:
-                lora_node["inputs"]["lora_1"]["on"] = True
-                lora_node["inputs"]["lora_1"]["lora"] = resolved_lora
-            if resolved_length:
-                wan_img2vid["inputs"]["length"] = resolved_length
+            # VAE and CLIP — always injected from defaults
+            vae_loader["inputs"]["vae_name"] = "wan_2.1_vae.safetensors"
+            clip_loader["inputs"]["clip_name"] = "umt5-xxl-encoder-Q5_K_M.gguf"
+            clip_loader["inputs"]["type"] = "wan"
+
+            # Length — always injected (default 81)
+            wan_img2vid["inputs"]["length"] = resolved_length
+
+            # Negative prompt (optional) — inject into the user Negative Prompt node
             if resolved_neg:
-                negative_prompt["inputs"]["text"] = resolved_neg
+                negative_prompt_node["inputs"]["text"] = resolved_neg
+
+            # =================================================================
+            # Inject per-path values
+            # =================================================================
+            for path_name, cfg in path_configs.items():
+                nodes = path_nodes[path_name]
+
+                # Diffusion model
+                resolved_dm = _resolve_diffusion_model_for_path(
+                    parsed_diffusion, path_name, cfg["diffusion_model"]
+                )
+                nodes["unet"]["inputs"]["unet_name"] = resolved_dm
+
+                # Sampler + KSampler params
+                nodes["ksampler"]["inputs"]["sampler_name"] = cfg["sampler"]
+                nodes["ksampler"]["inputs"]["scheduler"] = cfg["scheduler"]
+                nodes["ksampler"]["inputs"]["steps"] = cfg["steps"]
+                nodes["ksampler"]["inputs"]["cfg"] = cfg["cfg"]
+
+                # Dual-specific KSampler params — only in dual paths
+                if is_dual:
+                    nodes["ksampler"]["inputs"]["start_at_step"] = cfg["start_at_step"]
+                    nodes["ksampler"]["inputs"]["end_at_step"] = cfg["end_at_step"]
+                    nodes["ksampler"]["inputs"]["add_noise"] = cfg["add_noise"]
+                    nodes["ksampler"]["inputs"]["return_with_leftover_noise"] = cfg["return_with_leftover_noise"]
+
+                # ModelSamplingSD3
+                nodes["msampling"]["inputs"]["shift"] = cfg["model_sampling_shift"]
+
+                # NAG
+                nodes["nag"]["inputs"]["nag_scale"] = cfg["nag_scale"]
+                nodes["nag"]["inputs"]["nag_alpha"] = cfg["nag_alpha"]
+                nodes["nag"]["inputs"]["nag_tau"] = cfg["nag_tau"]
+
+                # LoRAs for this path
+                path_loras = _filter_loras_for_path(parsed_loras, path_name)
+                if path_loras:
+                    lora_slots = [k for k in nodes["lora"]["inputs"] if k.startswith("lora_")]
+                    for i, item in enumerate(path_loras[:len(lora_slots)]):
+                        slot = f"lora_{i + 1}"
+                        if slot not in nodes["lora"]["inputs"]:
+                            break
+                        name = item["model"]
+                        strength = float(item.get("strength", 1.0))
+                        if name:
+                            nodes["lora"]["inputs"][slot]["on"] = True
+                            nodes["lora"]["inputs"][slot]["lora"] = name
+                            nodes["lora"]["inputs"][slot]["strength"] = strength
 
             log.info(
-                "Dispatching video workflow to ComfyUI (%s) - prompt_len=%d, seed=%d, "
-                "model=%s, lora=%s, length=%s, image=%s",
+                "Dispatching %s workflow to ComfyUI (%s) - prompt_len=%d, seed=%d, "
+                "length=%s, image=%s, loras=%s",
+                resolved_version,
                 image_config.COMFYUI_BASE_URL,
                 len(prompt),
                 seed_arg,
-                resolved_model or "(workflow default)",
-                resolved_lora or "(none — workflow default)",
-                str(resolved_length) if resolved_length else "(workflow default)",
+                resolved_length,
                 image,
+                json.dumps(parsed_loras) if parsed_loras else "(none)",
             )
 
             # =================================================================

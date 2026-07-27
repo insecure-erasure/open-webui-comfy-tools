@@ -1,0 +1,493 @@
+{
+  "6": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "97",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Positive Prompt"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+      "clip": [
+        "97",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Default Wan negative prompt"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "875",
+        0
+      ],
+      "vae": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "39": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "54": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "501",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3 HIGH"
+    }
+  },
+  "55": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "502",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3 LOW"
+    }
+  },
+  "97": {
+    "inputs": {
+      "clip_name": "umt5-xxl-encoder-Q5_K_M.gguf",
+      "type": "wan"
+    },
+    "class_type": "CLIPLoaderGGUF",
+    "_meta": {
+      "title": "CLIPLoader (GGUF)"
+    }
+  },
+  "99": {
+    "inputs": {
+      "frame_rate": 36,
+      "loop_count": 0,
+      "filename_prefix": "WAN22_Remix/output",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 10,
+      "save_metadata": false,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": false,
+      "images": [
+        "1063",
+        0
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Output MP4"
+    }
+  },
+  "405": {
+    "inputs": {
+      "generation_width": 480,
+      "generation_height": 640,
+      "aspect_ratio_preservation": "keep_input",
+      "image": [
+        "994",
+        0
+      ]
+    },
+    "class_type": "WanVideoImageResizeToClosest",
+    "_meta": {
+      "title": "WanVideo Image Resize To Closest"
+    }
+  },
+  "460": {
+    "inputs": {
+      "sage_attention": "disabled",
+      "allow_compile": false,
+      "model": [
+        "992",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "SageAttention HIGH"
+    }
+  },
+  "461": {
+    "inputs": {
+      "sage_attention": "disabled",
+      "allow_compile": false,
+      "model": [
+        "993",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "SageAttention LOW"
+    }
+  },
+  "501": {
+    "inputs": {
+      "nag_scale": 11,
+      "nag_alpha": 0.25,
+      "nag_tau": 2.5,
+      "input_type": "default",
+      "model": [
+        "460",
+        0
+      ],
+      "conditioning": [
+        "1072",
+        0
+      ]
+    },
+    "class_type": "WanVideoNAG",
+    "_meta": {
+      "title": "NAG HIGH"
+    }
+  },
+  "502": {
+    "inputs": {
+      "nag_scale": 11,
+      "nag_alpha": 0.25,
+      "nag_tau": 2.5,
+      "input_type": "default",
+      "model": [
+        "461",
+        0
+      ],
+      "conditioning": [
+        "1072",
+        0
+      ]
+    },
+    "class_type": "WanVideoNAG",
+    "_meta": {
+      "title": "NAG LOW"
+    }
+  },
+  "822": {
+    "inputs": {
+      "unet_name": "Wan2.2-I2V-A14B-Moe-Distill-Lightx2v-high-nvfp4.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model HIGH"
+    }
+  },
+  "823": {
+    "inputs": {
+      "unet_name": "Wan2.2-I2V-A14B-Moe-Distill-Lightx2v-low-nvfp4.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model LOW"
+    }
+  },
+  "875": {
+    "inputs": {
+      "add_noise": "disable",
+      "noise_seed": [
+        "996",
+        0
+      ],
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 2,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "55",
+        0
+      ],
+      "positive": [
+        "995",
+        0
+      ],
+      "negative": [
+        "995",
+        1
+      ],
+      "latent_image": [
+        "876",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler LOW"
+    }
+  },
+  "876": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": [
+        "996",
+        0
+      ],
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "heun",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "enable",
+      "model": [
+        "54",
+        0
+      ],
+      "positive": [
+        "995",
+        0
+      ],
+      "negative": [
+        "995",
+        1
+      ],
+      "latent_image": [
+        "995",
+        2
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler HIGH"
+    }
+  },
+  "992": {
+    "inputs": {
+      "PowerLoraLoaderHeaderWidget": {
+        "type": "PowerLoraLoaderHeaderWidget"
+      },
+      "lora_1": {
+        "on": false,
+        "lora": "Wan2.2-I2V-A14B-Moe-Distill-Lightx2v-high-nvfp4-r64-lora_bf16.safetensors",
+        "strength": 1
+      },
+      "➕ Add Lora": "",
+      "model": [
+        "822",
+        0
+      ],
+      "clip": [
+        "97",
+        0
+      ]
+    },
+    "class_type": "Power Lora Loader (rgthree)",
+    "_meta": {
+      "title": "Power Lora Loader (rgthree) HIGH"
+    }
+  },
+  "993": {
+    "inputs": {
+      "PowerLoraLoaderHeaderWidget": {
+        "type": "PowerLoraLoaderHeaderWidget"
+      },
+      "lora_1": {
+        "on": false,
+        "lora": "Wan2.2-I2V-A14B-Moe-Distill-Lightx2v-low-nvfp4-r64-lora_bf16.safetensors",
+        "strength": 1
+      },
+      "➕ Add Lora": "",
+      "model": [
+        "823",
+        0
+      ],
+      "clip": [
+        "97",
+        0
+      ]
+    },
+    "class_type": "Power Lora Loader (rgthree)",
+    "_meta": {
+      "title": "Power Lora Loader (rgthree) LOW"
+    }
+  },
+  "994": {
+    "inputs": {
+      "source": "temp",
+      "url": "https://huggingface.co/InsecureErasure/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-NVFP4/resolve/main/assets/wan21_input_cat.png",
+      "image": "ComfyUI_temp_ekhjy_00004_.png",
+      "Choose file to upload": null
+    },
+    "class_type": "LoadImageByUrlOrPath",
+    "_meta": {
+      "title": "Load Image (URL/Path)"
+    }
+  },
+  "995": {
+    "inputs": {
+      "width": [
+        "405",
+        1
+      ],
+      "height": [
+        "405",
+        2
+      ],
+      "length": 81,
+      "batch_size": 1,
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "1072",
+        0
+      ],
+      "vae": [
+        "39",
+        0
+      ],
+      "start_image": [
+        "405",
+        0
+      ]
+    },
+    "class_type": "WanImageToVideo",
+    "_meta": {
+      "title": "WanImageToVideo"
+    }
+  },
+  "996": {
+    "inputs": {
+      "seed": 364719945291949
+    },
+    "class_type": "easy seed",
+    "_meta": {
+      "title": "EasySeed"
+    }
+  },
+  "1063": {
+    "inputs": {
+      "multiplier": 3,
+      "interp_model": [
+        "1064",
+        0
+      ],
+      "images": [
+        "1070",
+        0
+      ]
+    },
+    "class_type": "FrameInterpolate",
+    "_meta": {
+      "title": "Frame Interpolate"
+    }
+  },
+  "1064": {
+    "inputs": {
+      "model_name": "rife_v4.26.safetensors"
+    },
+    "class_type": "FrameInterpolationModelLoader",
+    "_meta": {
+      "title": "Load Frame Interpolation Model"
+    }
+  },
+  "1065": {
+    "inputs": {
+      "blend_factor": 0.75,
+      "blend_mode": "normal",
+      "image1": [
+        "1068",
+        0
+      ],
+      "image2": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "ImageBlend",
+    "_meta": {
+      "title": "Image Blend"
+    }
+  },
+  "1068": {
+    "inputs": {
+      "strength": 0.5,
+      "use_gpu": true,
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "FastUnsharpSharpen",
+    "_meta": {
+      "title": "Unsharpen mask"
+    }
+  },
+  "1070": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.scale": 2,
+      "quality": "ULTRA",
+      "images": [
+        "1065",
+        0
+      ]
+    },
+    "class_type": "RTXVideoSuperResolution",
+    "_meta": {
+      "title": "RTX Video Super Resolution"
+    }
+  },
+  "1072": {
+    "inputs": {
+      "conditioning_to": [
+        "7",
+        0
+      ],
+      "conditioning_from": [
+        "1073",
+        0
+      ]
+    },
+    "class_type": "ConditioningConcat",
+    "_meta": {
+      "title": "Conditioning (Concat)"
+    }
+  },
+  "1073": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "97",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative Prompt"
+    }
+  }
+}
