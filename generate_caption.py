@@ -200,11 +200,14 @@ def _extract_caption(outputs: dict, output_node_id: str) -> str:
 
 class Tools:
     """
-    Generate a caption / description of an image.
+    Generate a caption / description of an image (in English).
 
     Only call when the user asks what an image depicts. Also use this
     before editing or enhancing an image to give yourself visual context —
     you cannot see the image directly. Pass an image filename or an URL.
+
+    The returned caption is always in English regardless of the image
+    content or the user's language.
 
     image: The filename previously generated from the smart_generate_image
         response, or a direct URL to an external image.
@@ -224,11 +227,14 @@ class Tools:
         __id__: str = "",
     ):
         """
-        Generate a caption / description of an image.
+        Generate a caption / description of an image (in English).
 
         Only call when the user asks what an image depicts. Also use this
         before editing or enhancing an image to give yourself visual context —
         you cannot see the image directly. Pass an image filename or an URL.
+
+        The returned caption is always in English regardless of the image
+        content or the user's language.
         """
         if __request__ is None:
             log.error("generate_caption called without request context")
