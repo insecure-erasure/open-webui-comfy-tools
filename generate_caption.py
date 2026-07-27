@@ -193,13 +193,14 @@ def _extract_caption(outputs: dict, output_node_id: str) -> str:
 
 class Tools:
     """
-    Generate Caption - describe an image using Florence-2.
+    Generate a caption / description of an image.
 
-    Use when the user uploads or references an image and asks what it
-    depicts. Pass the image reference via the `image` parameter — either
-    a filename from a previous generation (e.g. "abc123.png") or a direct
-    URL to an external image (e.g. "https://..."). The tool auto-detects
-    which one it is.
+    Only call when the user asks what an image depicts. Also use this
+    before editing or enhancing an image to give yourself visual context —
+    you cannot see the image directly. Pass an image filename or an URL.
+
+    image: The filename previously generated from the smart_generate_image
+        response, or a direct URL to an external image.
     """
 
     def __init__(self):
@@ -216,11 +217,11 @@ class Tools:
         __id__: str = "",
     ):
         """
-        Generate a detailed caption for an image using Florence-2.
+        Generate a caption / description of an image.
 
-        image: Filename from a previous generation (e.g. "abc123.png")
-            or a direct URL to an external image ("https://...").
-            Auto-detects which mode to use.
+        Only call when the user asks what an image depicts. Also use this
+        before editing or enhancing an image to give yourself visual context —
+        you cannot see the image directly. Pass an image filename or an URL.
         """
         if __request__ is None:
             log.error("generate_caption called without request context")
