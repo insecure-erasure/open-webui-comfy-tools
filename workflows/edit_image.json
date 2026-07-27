@@ -1,34 +1,4 @@
 {
-  "202": {
-    "inputs": {
-      "rgthree_comparer": {
-        "images": [
-          {
-            "name": "A",
-            "selected": true,
-            "url": "/api/view?filename=rgthree.compare._temp_mynbi_00035_.png&type=temp&subfolder=&rand=0.6423053781652182"
-          },
-          {
-            "name": "B",
-            "selected": true,
-            "url": "/api/view?filename=rgthree.compare._temp_mynbi_00036_.png&type=temp&subfolder=&rand=0.1704987527286559"
-          }
-        ]
-      },
-      "image_a": [
-        "240",
-        0
-      ],
-      "image_b": [
-        "228",
-        0
-      ]
-    },
-    "class_type": "Image Comparer (rgthree)",
-    "_meta": {
-      "title": "Image Comparer (rgthree)"
-    }
-  },
   "217": {
     "inputs": {
       "images": [
