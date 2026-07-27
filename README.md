@@ -31,7 +31,7 @@ Model, steps, seed, and model family are configured via Valves.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | prompt | string | Image description. The LLM translates to English and enriches with visual details. |
-| size | string (optional) | Dimensions as WxH (e.g. 2000x3000). Falls back to Admin UI config if omitted. |
+| aspect_ratio | string (optional) | Aspect ratio as W:H (e.g. 16:9). Omit unless the user explicitly requests dimensions or aspect ratio. |
 
 **Response format:**
 
@@ -53,7 +53,7 @@ Upscales or enhances a previously generated image using SeedVR2. Only use when t
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| image_filename | string | The `image_filename` from the last Smart Generate Image response. Pass it as-is. |
+| image | string | Filename from a previous generation (e.g. "abc123.png") or a direct URL to an external image (e.g. "https://..."). Auto-detects which mode to use. |
 
 **Response format:**
 
@@ -66,25 +66,51 @@ Use image_md to display the enhanced image in your response.
 
 ---
 
+### Edit Image (`edit_image.py`)
+
+Edits a previously generated image using Flux 2 with steps and LoRA control. Only use when the user explicitly asks to edit, modify, or alter an image.
+
+**Parameters exposed to the LLM:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| image | string | Filename from a previous generation (e.g. "abc123.png") or a direct URL to an external image (e.g. "https://..."). Auto-detects which mode to use. |
+| edit_prompt | string | Description of the edit to apply. The LLM translates to English and enriches with details. |
+
+**Response format:**
+
+```
+image_md: ![Edited image](<url>)
+image_filename: <filename.png>
+
+Use image_md to display the edited image in your response.
+```
+
 ### Generate Video (`generate_video.py`)
 
-Generates a video through ComfyUI (text-to-video or image-to-video). Uses the same `comfyui_image_base_url` valve pattern as the other tools.
+Generates a video through ComfyUI (image-to-video). Supports Wan 2.1 (single-path) and Wan 2.2 (dual-path high/low) architectures.
 
 **Parameters exposed to the LLM:**
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | prompt | string | Video description in English, enriched with visual motion details. |
-| image_filename | string (optional) | The `image_filename` from a previous generation. Pass as-is to animate that image. |
+| image | string | Filename from a previous generation (e.g. "abc123.png") or a direct URL to an external image (e.g. "https://..."). Auto-detects which mode to use. |
 
 **Response format:**
 
 ```
-video_html: <full HTML block with video player>
-video_filename: <filename.mp4>
+<html>
+<style>...</style>
+<div>
+  <video controls autoplay muted loop playsinline>
+    <source src="<url>" type="video/mp4">
+  </video>
+</div>
+</html>
 
-Paste the video_html value inside a code block in your response
-(triple backticks) so the frontend renders it as a video player.
+Wrap the HTML block above in triple backticks and include it in your response
+so the frontend renders the video.
 ```
 
 The agent renders the video using an inline HTML block (`<video>` tag) instead of markdown, since markdown cannot display video.
@@ -102,7 +128,7 @@ Configurable by admins in **Workspace -> Tools -> Smart Generate Image -> Valves
 | model_family | dropdown | zit | Default model family: Z-Image Turbo or FLUX.2 Klein. Users can override. |
 | model_name | string | "" | Specific model filename. Overrides the model_family default. Leave empty to use the model_family default. |
 | max_steps | dropdown | 0 | Steps policy. **0** = user decides (no clamp). **-1** = force model default (ignore user). **1-15** = clamp user steps to ceiling. |
-| default_size | string | 768x1152 | Default image size when the LLM does not specify one. |
+| default_aspect_ratio | string | 2:3 | Default aspect ratio when the LLM does not specify one. Format W:H (e.g. 16:9). |
 | megapixel | string | 1.0 | Target megapixel value. Controls total resolution independent of aspect ratio. |
 | comfyui_image_base_url | string | "" | Public base URL for image links. Overrides COMFYUI_BASE_URL. Leave empty to use COMFYUI_BASE_URL. |
 | lora_config | JSON string | [] | JSON array of LoRAs. Applied positionally. User wins on name collision. |
@@ -125,8 +151,8 @@ Configurable by end users from the chat interface.
 | Valve (admin / user) | Type | Default | Description |
 |----------------------|------|---------|-------------|
 | comfyui_image_base_url | string | "" | Public base URL for edited image links. Leave empty to use COMFYUI_BASE_URL. |
-| steps | dropdown | 0 (System default) | Inference steps (1-15). 0 = use workflow default (6). |
-| lora_config | string | [] | JSON array of LoRAs. Applied positionally to lora_1..lora_4. User wins on name collision. |
+| steps | dropdown | 0 | Inference steps (1-15). 0 = use workflow default (6). |
+| lora_config | string | [] | JSON array of LoRAs. String=only name, object={"name", "strength"}. Applied positionally to lora_1..lora_4. Empty name or strength 0 disables it. User wins on name collision. |
 
 ### Valves (Enhance Image)
 
@@ -136,15 +162,38 @@ Configurable by end users from the chat interface.
 
 ### Valves (Generate Video)
 
-Same valves as Enhance Image — only `comfyui_image_base_url` (admin / user).
+#### Admin Valves
+
+| Valve | Type | Default | Description |
+|-------|------|---------|-------------|
+| model_version | dropdown | wan21 | Video model: Wan 2.1 (single-path) or Wan 2.2 (dual-path high/low). |
+| diffusion_model | string | "" | JSON with diffusion model(s). Single object for Wan 2.1: `{"model": "..."}`. Array for Wan 2.2: `[{"model": "...", "path": "high"}, ...]`. Empty = built-in defaults. |
+| lora_config | string | [] | JSON array of LoRAs. Each object: `{"model": "...", "strength": 1.0, "path": "high"|"low"}`. Omit "path" for all paths. |
+| length | dropdown | 81 | Maximum frames / video length. Acts as a ceiling for user values. -1 = no ceiling. Must be 4n+1. |
+| negative_prompt | string | "" | Negative prompt. Empty = use built-in default. |
+| comfyui_image_base_url | string | "" | Public base URL for video links. Overrides COMFYUI_BASE_URL. |
+
+#### User Valves
+
+| Valve | Type | Default | Description |
+|-------|------|---------|-------------|
+| model_version | dropdown | "" (System default) | Override the admin valve model version. |
+| diffusion_model | string | "" | JSON with diffusion model(s). Overrides the admin valve and built-in defaults. |
+| lora_config | string | [] | JSON array of LoRAs. Overrides the admin valve. |
+| length | dropdown | 0 | Number of frames. 0 = use admin value. Must be 4n+1. |
+| negative_prompt | string | "" | Preferred negative prompt. Empty = use admin or built-in default. |
+| seed | int | -1 | Seed. -1 = random, >=0 = fixed. |
+| comfyui_image_base_url | string | "" | Override the admin valve or COMFYUI_BASE_URL for video links. |
 
 ### Precedence
 
-**Model family resolution:** UserValves > AdminValves > `"zit"` (built-in default)
+**Model family resolution (images):** UserValves > AdminValves > `"zit"` (built-in default)
 
-**Model resolution:** UserValves `model_name` > AdminValves `model_name` > `MODEL_CONFIGS[family]["model"]`
+**Model resolution (images):** UserValves `model_name` > AdminValves `model_name` > `MODEL_CONFIGS[family]["model"]`
 
-**Steps resolution:**
+**Video model version resolution:** UserValves > AdminValves > `"wan21"` (built-in default)
+
+**Steps resolution (images):**
 - `max_steps=0` (default): user decides freely. User "Model default" → model family default.
 - `max_steps=-1`: force model family default, user steps are ignored.
 - `max_steps=1-15`: user steps clamped to this ceiling. Warning toast on clamp.
@@ -152,6 +201,8 @@ Same valves as Enhance Image — only `comfyui_image_base_url` (admin / user).
 **Seed resolution:** UserValve. -1 = random (auto-generated), >=0 = fixed.
 
 **Image base URL resolution:** UserValves > AdminValves > COMFYUI_BASE_URL
+
+**Video length resolution:** UserValves > AdminValves. If admin valve is set to a positive value (not -1), it acts as a ceiling — user values get clamped with a warning toast. If admin valve is -1, user decides freely. All lengths are snapped to the nearest valid 4n+1 frame count.
 
 ---
 
@@ -175,7 +226,8 @@ is embedded in the Python scripts.
 | `smart_generate_image.json` | Smart Generate Image | Z-Image Turbo / FLUX.2 Klein image generation |
 | `enhance_image.json` | Enhance Image | SeedVR2 standalone upscale |
 | `edit_image.json` | Edit Image | Flux 2 image editing |
-| `generate_video.json` | Generate Video | WAN2.1 image-to-video |
+| `generate_video.json` | Generate Video | Wan 2.1 image-to-video (single-path) |
+| `generate_video_wan22.json` | Generate Video | Wan 2.2 image-to-video (dual-path high/low) |
 
 All workflow JSONs are clean — no placeholders, no template variables. Values
 like prompt, seed, model, or LoRA are injected at runtime via Python after
@@ -189,8 +241,9 @@ parsing.
 2. Click **"+"** and paste the contents of `smart_generate_image.py`.
 3. Save as **"Smart Generate Image"**.
 4. Repeat for `enhance_image.py`, save as **"Enhance Image"**.
-5. Repeat for `generate_video.py`, save as **"Generate Video"**.
-6. Enable the tools in the chat tool selector.
+5. Repeat for `edit_image.py`, save as **"Edit Image"**.
+6. Repeat for `generate_video.py`, save as **"Generate Video"**.
+7. Enable the tools in the chat tool selector.
 
 ### Post-installation: deploy the workflow JSONs
 
