@@ -159,27 +159,34 @@ def _extract_caption(outputs: dict, output_node_id: str) -> str:
     """
     Extract the caption text from the workflow outputs.
 
-    The ShowText|pysssss node exposes the caption text under the "string" key.
-    Falls back to any available string/text field.
+    The ShowText|pysssss node exposes the caption text as a single-element
+    list under the "text" key: {"text": ["The caption..."]}.
 
     Returns the caption string.
     """
     node_output = outputs.get(output_node_id, {})
 
-    # ShowText|pysssss stores the text under "string"
-    caption = node_output.get("string")
-    if caption and isinstance(caption, str):
+    # ShowText|pysssss stores the text under "text" as ["caption"]
+    text_list = node_output.get("text")
+    if isinstance(text_list, list) and len(text_list) > 0 and isinstance(text_list[0], str):
+        return text_list[0].strip()
+
+    # Fallback: raw string under "text"
+    caption = node_output.get("text")
+    if isinstance(caption, str):
         return caption.strip()
 
-    # Fallback: try "text" key
-    caption = node_output.get("text")
-    if caption and isinstance(caption, str):
+    # Fallback: raw string under "string"
+    caption = node_output.get("string")
+    if isinstance(caption, str):
         return caption.strip()
 
     # Worst case: dump the first string value found
     for key, value in node_output.items():
         if isinstance(value, str) and len(value) > 10:
             return value.strip()
+        if isinstance(value, list) and len(value) > 0 and isinstance(value[0], str) and len(value[0]) > 10:
+            return value[0].strip()
 
     raise RuntimeError(
         f"Could not extract caption from output node {output_node_id}. "
