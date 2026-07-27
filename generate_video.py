@@ -33,12 +33,9 @@ _MIN_FRAMES = 81
 _MAX_FRAMES = 161
 _FRAMES_OPTIONS = [
     {"value": "0", "label": "System default"},
-    {"value": "81", "label": "81"},
-    {"value": "97", "label": "97"},
-    {"value": "113", "label": "113"},
-    {"value": "129", "label": "129"},
-    {"value": "145", "label": "145"},
-    {"value": "161", "label": "161"},
+] + [
+    {"value": str(n), "label": str(n)}
+    for n in range(81, 162, 4)
 ]
 
 
