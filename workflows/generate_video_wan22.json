@@ -90,7 +90,7 @@
     "inputs": {
       "frame_rate": 36,
       "loop_count": 0,
-      "filename_prefix": "WAN22_Remix/output",
+      "filename_prefix": "wan22_output",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 10,
