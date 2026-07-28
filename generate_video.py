@@ -677,6 +677,28 @@ class Tools:
                         }
                     )
 
+            # Warn if length is too high for the chosen steps
+            # Heuristic: 4 steps → 81 frames recommended. Each +1 step allows +12 frames.
+            _max_rec = 81 + (resolved_steps - 4) * 12
+            if resolved_length > _max_rec:
+                log.warning(
+                    "Steps (%d) may be insufficient for length %d (recommended max: %d)",
+                    resolved_steps, resolved_length, _max_rec,
+                )
+                if __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "warning",
+                                "content": (
+                                    f"\u26a0\ufe0f {resolved_steps} steps may be insufficient for {resolved_length} frames. "
+                                    f"Consider reducing length or increasing steps."
+                                ),
+                            },
+                        }
+                    )
+
             # Base URL: UserValves > AdminValves > COMFYUI_BASE_URL
             user_video_base_url = (
                 user_valves.comfyui_image_base_url
