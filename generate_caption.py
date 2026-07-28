@@ -60,7 +60,7 @@ _USER_TASK_OPTIONS = [
     {"value": "nsfw_detailed_caption", "label": "nsfw_detailed_caption"},
 ]
 
-_DEFAULT_TASK = "nsfw_detailed_caption"
+_DEFAULT_TASK = "detailed_caption"
 
 # =============================================================================
 # Token/beam configuration
