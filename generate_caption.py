@@ -1,8 +1,8 @@
 """
 title: Generate Caption
 author: A. Martin
-description: Generate a detailed caption for an image using Florence-2
-version: 1.0
+description: Generate a detailed caption for an image using Florence-2 via ComfyUI
+version: 2.0
 """
 
 import asyncio
@@ -22,6 +22,59 @@ log = logging.getLogger(__name__)
 # =============================================================================
 _COMFY_QUEUE_MAX_RETRIES = 120       # ~2 min at 1s intervals
 _COMFY_QUEUE_POLL_INTERVAL = 1.0     # seconds
+
+# =============================================================================
+# Model options
+# =============================================================================
+_MODEL_OPTIONS = [
+    {"value": "", "label": "System default"},
+    {"value": "Florence-2-base-ft", "label": "Florence-2-base-ft"},
+    {"value": "Florence-2-Flux-Large", "label": "Florence-2-Flux-Large"},
+    {"value": "Florence-2-large-interleaved", "label": "Florence-2-large-interleaved"},
+    {"value": "Florence-2-large-nsfw-pt", "label": "Florence-2-large-nsfw-pt"},
+]
+
+_DEFAULT_MODEL = "Florence-2-base-ft"
+
+_TASK_OPTIONS = [
+    {"value": "", "label": "System default"},
+    {"value": "caption", "label": "Caption"},
+    {"value": "detailed_caption", "label": "Detailed caption"},
+    {"value": "more_detailed_caption", "label": "More detailed caption"},
+    {"value": "nsfw_caption", "label": "NSFW caption"},
+    {"value": "nsfw_detailed_caption", "label": "NSFW detailed caption"},
+]
+
+_DEFAULT_TASK = "nsfw_detailed_caption"
+
+# =============================================================================
+# Token/beam configuration
+# =============================================================================
+_DEFAULT_MAX_NEW_TOKENS = 1024
+_DEFAULT_NUM_BEAMS = 4
+
+_MAX_BEAM_OPTIONS = [
+    {"value": "0", "label": "User decides"},
+    {"value": "-1", "label": "Model default (4)"},
+] + [
+    {"value": str(i), "label": str(i)}
+    for i in range(1, 9)
+]
+
+_USER_BEAM_OPTIONS = [
+    {"value": "0", "label": "System default"},
+] + [
+    {"value": str(i), "label": str(i)}
+    for i in range(1, 9)
+]
+
+_MAX_TOKENS_OPTIONS = [
+    {"value": "0", "label": "User decides"},
+    {"value": "-1", "label": "Model default (1024)"},
+] + [
+    {"value": str(i), "label": str(i)}
+    for i in [128, 256, 512, 768, 1024, 1536, 2048, 3072, 4096]
+]
 
 
 # =============================================================================
@@ -130,7 +183,6 @@ async def _comfyui_wait_for_output(
         if prompt_id in history and history[prompt_id].get("outputs"):
             return history[prompt_id]
 
-        # Key not in history yet or no outputs → still queued/processing
         await asyncio.sleep(_COMFY_QUEUE_POLL_INTERVAL)
 
     raise TimeoutError(
@@ -213,7 +265,90 @@ class Tools:
         response, or a direct URL to an external image.
     """
 
+    class Valves(BaseModel):
+        """Admin-level configuration."""
+
+        model: str = Field(
+            default=_DEFAULT_MODEL,
+            description=f"Default Florence-2 model. Users can override this from their valves. Default: {_DEFAULT_MODEL}.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": [o for o in _MODEL_OPTIONS if o["value"] != ""],
+                }
+            },
+        )
+        task: str = Field(
+            default=_DEFAULT_TASK,
+            description=f"Default caption task. Users can override this from their valves. Default: {_DEFAULT_TASK}.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": [o for o in _TASK_OPTIONS if o["value"] != ""],
+                }
+            },
+        )
+        max_new_tokens: str = Field(
+            default="0",
+            description="Max new tokens policy. 0 = user decides (no clamp). -1 = force model default (1024). 128-4096 = clamp user value to this ceiling.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _MAX_TOKENS_OPTIONS,
+                }
+            },
+        )
+        num_beams: str = Field(
+            default="0",
+            description="Num beams policy. 0 = user decides (no clamp). -1 = force model default (4). 1-8 = clamp user value to this ceiling.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _MAX_BEAM_OPTIONS,
+                }
+            },
+        )
+
+    class UserValves(BaseModel):
+        """User-level configuration (overrides admin valve)."""
+
+        model: str = Field(
+            default="",
+            description="Override the admin valve model family. Leave empty to use the admin valve default.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _MODEL_OPTIONS,
+                }
+            },
+        )
+        task: str = Field(
+            default="",
+            description="Override the admin valve task. Leave empty to use the admin valve default.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _TASK_OPTIONS,
+                }
+            },
+        )
+        max_new_tokens: int = Field(
+            default=0,
+            description="Max new tokens. 0 = use system default / admin policy. Subject to admin ceiling.",
+        )
+        num_beams: str = Field(
+            default="0",
+            description="Number of beams. 0 = use system default. 1-8 = explicit value (subject to admin ceiling).",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _USER_BEAM_OPTIONS,
+                }
+            },
+        )
+
     def __init__(self):
+        self.valves = self.Valves()
         self.citation = False
 
     async def generate_caption(
@@ -257,6 +392,103 @@ class Tools:
 
             image_config = await get_image_config()
 
+            user_valves = (__user__ or {}).get('valves', None)
+
+            # =================================================================
+            # Resolve model: UserValves > AdminValves > built-in default
+            # =================================================================
+            resolved_model = (
+                user_valves.model if user_valves and user_valves.model
+                else self.valves.model or _DEFAULT_MODEL
+            )
+
+            # =================================================================
+            # Resolve task: UserValves > AdminValves > built-in default
+            # =================================================================
+            resolved_task = (
+                user_valves.task if user_valves and user_valves.task
+                else self.valves.task or _DEFAULT_TASK
+            )
+
+            # =================================================================
+            # Resolve max_new_tokens with ceiling policy
+            # =================================================================
+            #   max_new_tokens = 0  → user decides (no clamp)
+            #   max_new_tokens = -1 → force model default (ignore user)
+            #   max_new_tokens > 0  → clamp user value to this ceiling
+            raw_admin_tokens = self.valves.max_new_tokens
+            if raw_admin_tokens == "-1":
+                admin_max_tokens = -1
+            elif raw_admin_tokens == "0" or not raw_admin_tokens:
+                admin_max_tokens = 0
+            else:
+                admin_max_tokens = int(raw_admin_tokens)
+
+            def _get_user_tokens():
+                if user_valves and user_valves.max_new_tokens and user_valves.max_new_tokens > 0:
+                    return user_valves.max_new_tokens
+                return 0
+
+            if admin_max_tokens == -1:
+                resolved_tokens = _DEFAULT_MAX_NEW_TOKENS
+            elif admin_max_tokens == 0:
+                user_tokens = _get_user_tokens()
+                resolved_tokens = user_tokens if user_tokens > 0 else _DEFAULT_MAX_NEW_TOKENS
+            else:
+                user_tokens = _get_user_tokens()
+                if user_tokens > 0:
+                    resolved_tokens = min(user_tokens, admin_max_tokens)
+                    if resolved_tokens < user_tokens and __event_emitter__:
+                        await __event_emitter__(
+                            {
+                                "type": "notification",
+                                "data": {
+                                    "type": "warning",
+                                    "content": f"\u26a0\ufe0f Max new tokens clamped to {admin_max_tokens} (system limit).",
+                                },
+                            }
+                        )
+                else:
+                    resolved_tokens = _DEFAULT_MAX_NEW_TOKENS
+
+            # =================================================================
+            # Resolve num_beams with ceiling policy
+            # =================================================================
+            raw_admin_beams = self.valves.num_beams
+            if raw_admin_beams == "-1":
+                admin_max_beams = -1
+            elif raw_admin_beams == "0" or not raw_admin_beams:
+                admin_max_beams = 0
+            else:
+                admin_max_beams = int(raw_admin_beams)
+
+            def _get_user_beams():
+                if user_valves and user_valves.num_beams and user_valves.num_beams != "0":
+                    return int(user_valves.num_beams)
+                return 0
+
+            if admin_max_beams == -1:
+                resolved_beams = _DEFAULT_NUM_BEAMS
+            elif admin_max_beams == 0:
+                user_beams = _get_user_beams()
+                resolved_beams = user_beams if user_beams > 0 else _DEFAULT_NUM_BEAMS
+            else:
+                user_beams = _get_user_beams()
+                if user_beams > 0:
+                    resolved_beams = min(user_beams, admin_max_beams)
+                    if resolved_beams < user_beams and __event_emitter__:
+                        await __event_emitter__(
+                            {
+                                "type": "notification",
+                                "data": {
+                                    "type": "warning",
+                                    "content": f"\u26a0\ufe0f Num beams clamped to {admin_max_beams} (system limit).",
+                                },
+                            }
+                        )
+                else:
+                    resolved_beams = _DEFAULT_NUM_BEAMS
+
             # =================================================================
             # Build the workflow: load from cache and parse
             # =================================================================
@@ -267,6 +499,8 @@ class Tools:
             # Resolve nodes
             # =================================================================
             _, load_image = _resolve_node(workflow, "Load Image (URL/Path)")
+            _, model_loader = _resolve_node(workflow, "Florence2ModelLoader")
+            _, run_node = _resolve_node(workflow, "Florence2Run")
             output_node_id, _ = _resolve_node(workflow, "Show Text \U0001f40d")
 
             # =================================================================
@@ -284,11 +518,24 @@ class Tools:
                 node_img["image"] = image
                 node_img["url"] = ""
 
+            # =================================================================
+            # Inject model and task
+            # =================================================================
+            model_loader["inputs"]["model"] = resolved_model
+            run_node["inputs"]["task"] = resolved_task
+            run_node["inputs"]["max_new_tokens"] = resolved_tokens
+            run_node["inputs"]["num_beams"] = resolved_beams
+            run_node["inputs"]["do_sample"] = False
+            run_node["inputs"]["seed"] = 1
+
             log.info(
-                "Dispatching caption workflow to ComfyUI (%s) - %s=%s",
+                "Dispatching caption workflow to ComfyUI (%s) - model=%s, task=%s, "
+                "max_new_tokens=%d, num_beams=%d",
                 image_config.COMFYUI_BASE_URL,
-                "url" if parsed.scheme and parsed.netloc else "file",
-                image,
+                resolved_model,
+                resolved_task,
+                resolved_tokens,
+                resolved_beams,
             )
 
             # =================================================================
