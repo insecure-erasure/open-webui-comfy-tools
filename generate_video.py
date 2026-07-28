@@ -38,6 +38,11 @@ _FRAMES_OPTIONS = [
     for n in range(81, 162, 4)
 ]
 
+_USER_FRAMES_OPTIONS = [
+    {"value": str(n), "label": str(n)}
+    for n in range(81, 162, 4)
+]
+
 
 def _snap_to_valid_frames(n: int) -> int:
     """Snap to nearest valid frame count (4n + 1, clamped to [_MIN_FRAMES, _MAX_FRAMES])."""
@@ -476,7 +481,7 @@ class Tools:
             json_schema_extra={
                 "input": {
                     "type": "select",
-                    "options": _FRAMES_OPTIONS,
+                    "options": _USER_FRAMES_OPTIONS,
                 }
             },
         )

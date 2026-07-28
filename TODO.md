@@ -184,3 +184,22 @@ is defined in `open_webui/main.py`.
   does **not** recreate the cache directory — it already exists.
 - Bootstrap on first run ensures zero-config deployment: paste the tool,
   use it, and the workflow JSON appears in the cache automatically.
+
+---
+
+## User valve dropdown cleanup
+
+User dropdowns should not include a "System default" / "Model default" option
+because `default=""` (or `default="0"`) in the Field already handles the
+"use admin value" case. Having it in the dropdown is redundant and confusing.
+
+### smart_generate_image.py
+- `UserValves.model_family`: remove `""` / `"System default"` from `_MODEL_FAMILY_OPTIONS`
+- `UserValves.steps`: remove `"0"` / `"Model default"` from `_STEPS_OPTIONS`
+
+### edit_image.py
+- `UserValves.steps`: remove `"0"` / `"0 (System default)"` from `_STEPS_OPTIONS`
+
+### Already fixed
+- `generate_caption.py` (branch `feat/generate-caption`)
+- `generate_video.py` (branch `feat/generate-caption` — `UserValves.length`)

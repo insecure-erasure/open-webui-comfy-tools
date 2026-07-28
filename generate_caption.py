@@ -34,10 +34,25 @@ _MODEL_OPTIONS = [
     {"value": "Florence-2-large-nsfw-pt", "label": "Florence-2-large-nsfw-pt"},
 ]
 
+_USER_MODEL_OPTIONS = [
+    {"value": "Florence-2-base-ft", "label": "Florence-2-base-ft"},
+    {"value": "Florence-2-Flux-Large", "label": "Florence-2-Flux-Large"},
+    {"value": "Florence-2-large-interleaved", "label": "Florence-2-large-interleaved"},
+    {"value": "Florence-2-large-nsfw-pt", "label": "Florence-2-large-nsfw-pt"},
+]
+
 _DEFAULT_MODEL = "Florence-2-base-ft"
 
 _TASK_OPTIONS = [
     {"value": "", "label": "System default"},
+    {"value": "caption", "label": "Caption"},
+    {"value": "detailed_caption", "label": "Detailed caption"},
+    {"value": "more_detailed_caption", "label": "More detailed caption"},
+    {"value": "nsfw_caption", "label": "NSFW caption"},
+    {"value": "nsfw_detailed_caption", "label": "NSFW detailed caption"},
+]
+
+_USER_TASK_OPTIONS = [
     {"value": "caption", "label": "Caption"},
     {"value": "detailed_caption", "label": "Detailed caption"},
     {"value": "more_detailed_caption", "label": "More detailed caption"},
@@ -314,21 +329,21 @@ class Tools:
 
         model: str = Field(
             default="",
-            description="Override the admin valve model family. Leave empty to use the admin valve default.",
+            description="Override the admin valve model. Leave unselected to use the admin valve default.",
             json_schema_extra={
                 "input": {
                     "type": "select",
-                    "options": _MODEL_OPTIONS,
+                    "options": _USER_MODEL_OPTIONS,
                 }
             },
         )
         task: str = Field(
             default="",
-            description="Override the admin valve task. Leave empty to use the admin valve default.",
+            description="Override the admin valve task. Leave unselected to use the admin valve default.",
             json_schema_extra={
                 "input": {
                     "type": "select",
-                    "options": _TASK_OPTIONS,
+                    "options": _USER_TASK_OPTIONS,
                 }
             },
         )
