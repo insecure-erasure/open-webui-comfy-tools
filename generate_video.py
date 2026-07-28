@@ -677,13 +677,33 @@ class Tools:
                         }
                     )
 
-            # Warn if length is too high for the chosen steps
-            # Heuristic: 4 steps → 81 frames recommended. Each +1 step allows +12 frames.
-            _max_rec = 81 + (resolved_steps - 4) * 12
-            if resolved_length > _max_rec:
+            # Warn if length falls outside the recommended range for the chosen steps
+            # Center: 81 + (steps - 4) * 12. Range: ±24 frames.
+            _center = 81 + (resolved_steps - 4) * 12
+            _low = max(81, _center - 24)
+            _high = min(161, _center + 24)
+            if resolved_length < _low:
+                log.warning(
+                    "Steps (%d) may be excessive for length %d (recommended min: %d)",
+                    resolved_steps, resolved_length, _low,
+                )
+                if __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "warning",
+                                "content": (
+                                    f"\u26a0\ufe0f {resolved_steps} steps may be excessive for {resolved_length} frames. "
+                                    f"Consider increasing length or reducing steps."
+                                ),
+                            },
+                        }
+                    )
+            elif resolved_length > _high:
                 log.warning(
                     "Steps (%d) may be insufficient for length %d (recommended max: %d)",
-                    resolved_steps, resolved_length, _max_rec,
+                    resolved_steps, resolved_length, _high,
                 )
                 if __event_emitter__:
                     await __event_emitter__(
