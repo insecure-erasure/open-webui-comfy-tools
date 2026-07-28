@@ -44,6 +44,12 @@ _USER_FRAMES_OPTIONS = [
 ]
 
 
+_STEPS_OPTIONS = [
+    {"value": str(i), "label": str(i)}
+    for i in range(4, 11)
+]
+
+
 def _snap_to_valid_frames(n: int) -> int:
     """Snap to nearest valid frame count (4n + 1, clamped to [_MIN_FRAMES, _MAX_FRAMES])."""
     n = max(_MIN_FRAMES, min(n, _MAX_FRAMES))
@@ -493,6 +499,16 @@ class Tools:
             default=-1,
             description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
         )
+        steps: str = Field(
+            default="4",
+            description="Inference steps (4-10). Wan 2.1: any value. Wan 2.2: odd values are rounded up to the nearest even.",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _STEPS_OPTIONS,
+                }
+            },
+        )
         comfyui_image_base_url: str = Field(
             default="",
             description="Override the admin valve or COMFYUI_BASE_URL for video links.",
@@ -645,6 +661,22 @@ class Tools:
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
             seed_arg = _random.randint(0, _COMFY_SEED_MAX) if user_seed == -1 else min(user_seed, _COMFY_SEED_MAX)
 
+            # Steps: UserValve dropdown (default 4)
+            # Wan 2.1: free; Wan 2.2: round up to even
+            resolved_steps = int(user_valves.steps) if user_valves and user_valves.steps else 4
+            if is_dual and resolved_steps % 2 != 0:
+                resolved_steps += 1
+                if __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "warning",
+                                "content": f"\u26a0\ufe0f Steps must be even for Wan 2.2. Rounded up to {resolved_steps}.",
+                            },
+                        }
+                    )
+
             # Base URL: UserValves > AdminValves > COMFYUI_BASE_URL
             user_video_base_url = (
                 user_valves.comfyui_image_base_url
@@ -784,6 +816,19 @@ class Tools:
                     nodes["ksampler"]["inputs"]["end_at_step"] = cfg["end_at_step"]
                     nodes["ksampler"]["inputs"]["add_noise"] = cfg["add_noise"]
                     nodes["ksampler"]["inputs"]["return_with_leftover_noise"] = cfg["return_with_leftover_noise"]
+
+                # Override steps from user valve (default 4)
+                nodes["ksampler"]["inputs"]["steps"] = resolved_steps
+
+                # For dual-path, recalculate start/end from resolved steps (always even)
+                if is_dual:
+                    half = resolved_steps // 2
+                    if path_name == "high":
+                        nodes["ksampler"]["inputs"]["start_at_step"] = 0
+                        nodes["ksampler"]["inputs"]["end_at_step"] = half
+                    else:
+                        nodes["ksampler"]["inputs"]["start_at_step"] = half
+                        nodes["ksampler"]["inputs"]["end_at_step"] = 10000
 
                 # ModelSamplingSD3
                 nodes["msampling"]["inputs"]["shift"] = cfg["model_sampling_shift"]
