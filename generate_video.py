@@ -678,10 +678,10 @@ class Tools:
                     )
 
             # Warn if length falls outside the recommended range for the chosen steps
-            # Center: 81 + (steps - 4) * 12. Range: ±24 frames.
+            # Center: 81 + (steps - 4) * 12. Range: ±9 frames, snapped to valid 4n+1.
             _center = 81 + (resolved_steps - 4) * 12
-            _low = max(81, _center - 24)
-            _high = min(161, _center + 24)
+            _low = _snap_to_valid_frames(_center - 9)
+            _high = _snap_to_valid_frames(_center + 9)
             if resolved_length < _low:
                 log.warning(
                     "Steps (%d) may be excessive for length %d (recommended min: %d)",
