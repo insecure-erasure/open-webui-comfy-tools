@@ -45,19 +45,19 @@ _DEFAULT_MODEL = "Florence-2-base-ft"
 
 _TASK_OPTIONS = [
     {"value": "", "label": "System default"},
-    {"value": "caption", "label": "Caption"},
-    {"value": "detailed_caption", "label": "Detailed caption"},
-    {"value": "more_detailed_caption", "label": "More detailed caption"},
-    {"value": "nsfw_caption", "label": "NSFW caption"},
-    {"value": "nsfw_detailed_caption", "label": "NSFW detailed caption"},
+    {"value": "caption", "label": "caption"},
+    {"value": "detailed_caption", "label": "detailed_caption"},
+    {"value": "more_detailed_caption", "label": "more_detailed_caption"},
+    {"value": "nsfw_caption", "label": "nsfw_caption"},
+    {"value": "nsfw_detailed_caption", "label": "nsfw_detailed_caption"},
 ]
 
 _USER_TASK_OPTIONS = [
-    {"value": "caption", "label": "Caption"},
-    {"value": "detailed_caption", "label": "Detailed caption"},
-    {"value": "more_detailed_caption", "label": "More detailed caption"},
-    {"value": "nsfw_caption", "label": "NSFW caption"},
-    {"value": "nsfw_detailed_caption", "label": "NSFW detailed caption"},
+    {"value": "caption", "label": "caption"},
+    {"value": "detailed_caption", "label": "detailed_caption"},
+    {"value": "more_detailed_caption", "label": "more_detailed_caption"},
+    {"value": "nsfw_caption", "label": "nsfw_caption"},
+    {"value": "nsfw_detailed_caption", "label": "nsfw_detailed_caption"},
 ]
 
 _DEFAULT_TASK = "nsfw_detailed_caption"
