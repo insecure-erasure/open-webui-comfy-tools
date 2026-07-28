@@ -8,6 +8,7 @@ version: 2.0
 import asyncio
 import json
 import logging
+import random as _random
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse
@@ -67,6 +68,7 @@ _DEFAULT_TASK = "detailed_caption"
 # =============================================================================
 _DEFAULT_MAX_NEW_TOKENS = 1024
 _DEFAULT_NUM_BEAMS = 4
+_COMFY_SEED_MAX: int = 1125899906842624
 
 _MAX_BEAM_OPTIONS = [
     {"value": "0", "label": "User decides"},
@@ -365,6 +367,10 @@ class Tools:
             default=False,
             description="Enable sampling (do_sample). False = greedy decoding, True = sampled decoding.",
         )
+        seed: int = Field(
+            default=-1,
+            description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
+        )
 
     def __init__(self):
         self.valves = self.Valves()
@@ -545,7 +551,10 @@ class Tools:
             run_node["inputs"]["max_new_tokens"] = resolved_tokens
             run_node["inputs"]["num_beams"] = resolved_beams
             run_node["inputs"]["do_sample"] = user_valves.do_sample if user_valves else False
-            run_node["inputs"]["seed"] = 1
+            # Seed: UserValve. -1 = random, >=0 = fixed
+            user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
+            seed_arg = _random.randint(0, _COMFY_SEED_MAX) if user_seed == -1 else min(user_seed, _COMFY_SEED_MAX)
+            run_node["inputs"]["seed"] = seed_arg
 
             log.info(
                 "Dispatching caption workflow to ComfyUI (%s) - model=%s, task=%s, "
