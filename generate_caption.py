@@ -361,6 +361,10 @@ class Tools:
                 }
             },
         )
+        do_sample: bool = Field(
+            default=False,
+            description="Enable sampling (do_sample). False = greedy decoding, True = sampled decoding.",
+        )
 
     def __init__(self):
         self.valves = self.Valves()
@@ -540,7 +544,7 @@ class Tools:
             run_node["inputs"]["task"] = resolved_task
             run_node["inputs"]["max_new_tokens"] = resolved_tokens
             run_node["inputs"]["num_beams"] = resolved_beams
-            run_node["inputs"]["do_sample"] = False
+            run_node["inputs"]["do_sample"] = user_valves.do_sample if user_valves else False
             run_node["inputs"]["seed"] = 1
 
             log.info(
