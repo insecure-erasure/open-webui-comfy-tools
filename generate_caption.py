@@ -1,6 +1,6 @@
 """
 title: Generate Caption
-author: A. Martin
+author: Insecure Erasure
 description: Generate a detailed caption for an image using Florence-2 via ComfyUI
 version: 2.0
 """

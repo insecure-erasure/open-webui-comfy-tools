@@ -1,6 +1,6 @@
 """
 title: Smart Generate Image
-author: A. Martin
+author: Insecure Erasure
 description: Generate images through ComfyUI with seed, model, size, and steps control
 version: 3.1
 """

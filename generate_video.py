@@ -1,6 +1,6 @@
 """
 title: Generate Video
-author: A. Martin
+author: Insecure Erasure
 description: Generate videos through ComfyUI (WAN2.1 / WAN2.2 image-to-video)
 version: 3.0
 """

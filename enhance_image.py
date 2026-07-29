@@ -1,6 +1,6 @@
 """
 title: Enhance Image
-author: A. Martin
+author: Insecure Erasure
 description: Enhance / upscale a previously generated image using SeedVR2
 version: 1.0
 """
