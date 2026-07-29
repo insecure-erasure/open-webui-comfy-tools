@@ -30,37 +30,6 @@ Generates videos from text or images using Wan 2.1 (single-path) or Wan 2.2 (dua
 
 ## Installation
 
-### 1. Add the tools in Open WebUI
-
-Navigate to Workspace > Tools, click "+", paste the script content, and save.
-
-| Script | Suggested name |
-|---|---|
-| smart_generate_image/tool.py | Smart Generate Image |
-| enhance_image/tool.py | Enhance Image |
-| edit_image/tool.py | Edit Image |
-| generate_caption/tool.py | Generate Caption |
-| generate_video/tool.py | Generate Video |
-
-### 2. Deploy the workflow JSONs
-
-Each tool requires its corresponding workflow JSON file. Copy it from the tool's directory to the tool's cache directory inside the Open WebUI container:
-
-```
-cp smart_generate_image/smart_generate_image.json /app/backend/data/cache/tools/smart_generate_image/smart_generate_image.json
-cp edit_image/edit_image.json                     /app/backend/data/cache/tools/edit_image/edit_image.json
-cp enhance_image/enhance_image.json               /app/backend/data/cache/tools/enhance_image/enhance_image.json
-cp generate_caption/generate_caption.json         /app/backend/data/cache/tools/generate_caption/generate_caption.json
-cp generate_video/generate_video.json             /app/backend/data/cache/tools/generate_video/generate_video.json
-cp generate_video/generate_video_wan22.json       /app/backend/data/cache/tools/generate_video/generate_video_wan22.json
-```
-
-The cache/tools/<name>/ directory is created automatically when you save the tool script.
-
-### 3. Enable the tools
-
-In any chat, open the tool selector and enable the ones you want to use.
-
 ### Requirements
 
 - Open WebUI (recent version with native Tools support)
@@ -83,4 +52,35 @@ The workflows also rely on custom nodes that are not part of core ComfyUI. Insta
 - https://github.com/chrisgoringe/ComfyUI-Custom-Scripts (ShowText node)
 - https://github.com/ltdrdata/ComfyUI-Impact-Pack (ImpactSwitch)
 - https://github.com/NVIDIA/ComfyUI-RTX-Video-SR (RTX video super resolution)
+
+### Add the tools in Open WebUI
+
+Navigate to Workspace > Tools, click "+", paste the script content, and save.
+
+| Script | Suggested name |
+|---|---|
+| smart_generate_image/tool.py | Smart Generate Image |
+| enhance_image/tool.py | Enhance Image |
+| edit_image/tool.py | Edit Image |
+| generate_caption/tool.py | Generate Caption |
+| generate_video/tool.py | Generate Video |
+
+### Deploy the workflow JSONs
+
+Each tool requires its corresponding workflow JSON file. Copy it from the tool's directory to the tool's cache directory inside the Open WebUI container:
+
+```
+cp smart_generate_image/smart_generate_image.json /app/backend/data/cache/tools/smart_generate_image/smart_generate_image.json
+cp edit_image/edit_image.json                     /app/backend/data/cache/tools/edit_image/edit_image.json
+cp enhance_image/enhance_image.json               /app/backend/data/cache/tools/enhance_image/enhance_image.json
+cp generate_caption/generate_caption.json         /app/backend/data/cache/tools/generate_caption/generate_caption.json
+cp generate_video/generate_video.json             /app/backend/data/cache/tools/generate_video/generate_video.json
+cp generate_video/generate_video_wan22.json       /app/backend/data/cache/tools/generate_video/generate_video_wan22.json
+```
+
+The cache/tools/<name>/ directory is created automatically when you save the tool script.
+
+### Enable the tools
+
+In any chat, open the tool selector and enable the ones you want to use.
 
