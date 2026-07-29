@@ -72,15 +72,15 @@ In any chat, open the tool selector and enable the ones you want to use.
 
 The workflows rely on custom nodes that are not part of core ComfyUI. Install the following repositories in your ComfyUI custom_nodes/ directory:
 
-- https://github.com/insecure-erasure/ComfyUI-LoadImageURL -- required by all tools
-- https://github.com/rgthree/rgthree-comfy -- Power Lora Loader
-- https://github.com/kijai/ComfyUI-Florence2 -- Florence-2 captioning
-- https://github.com/zkqiang/ComfyUI-SeedVR2 -- SeedVR2 upscaling
-- https://github.com/kijai/ComfyUI-WanVideoWrapper -- Wan 2.1 / 2.2 video generation
-- https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite -- video combine
-- https://github.com/Fannovel16/ComfyUI-Frame-Interpolation -- frame interpolation
-- https://github.com/kijai/ComfyUI-KJNodes -- PathchSageAttention
-- https://github.com/chrisgoringe/ComfyUI-Custom-Scripts -- ShowText node
-- https://github.com/ltdrdata/ComfyUI-Impact-Pack -- ImpactSwitch
-- https://github.com/NVIDIA/ComfyUI-RTX-Video-SR -- RTX video super resolution
+- https://github.com/insecure-erasure/ComfyUI-LoadImageURL (required by all tools)
+- https://github.com/rgthree/rgthree-comfy (Power Lora Loader)
+- https://github.com/kijai/ComfyUI-Florence2 (Florence-2 captioning)
+- https://github.com/zkqiang/ComfyUI-SeedVR2 (SeedVR2 upscaling)
+- https://github.com/kijai/ComfyUI-WanVideoWrapper (Wan 2.1 / 2.2 video generation)
+- https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite (video combine)
+- https://github.com/Fannovel16/ComfyUI-Frame-Interpolation (frame interpolation)
+- https://github.com/kijai/ComfyUI-KJNodes (PathchSageAttention)
+- https://github.com/chrisgoringe/ComfyUI-Custom-Scripts (ShowText node)
+- https://github.com/ltdrdata/ComfyUI-Impact-Pack (ImpactSwitch)
+- https://github.com/NVIDIA/ComfyUI-RTX-Video-SR (RTX video super resolution)
 
