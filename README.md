@@ -148,46 +148,19 @@ In any chat, open the tool selector and enable the ones you want to use.
 
 ## Dependencies
 
-The workflows use nodes from several ComfyUI custom node packs. Below is a complete list grouped by repository.
+The workflows rely on custom nodes that are not part of core ComfyUI. Install the following repositories in your ComfyUI custom_nodes/ directory:
 
-### Core ComfyUI (built-in)
-
-| Node | Used by |
-|---|---|
-| CLIPLoader, UNETLoader, VAELoader, VAEEncode, VAEDecode | smart_generate_image, edit_image, generate_video |
-| CLIPTextEncode, CLIPSetLastLayer | smart_generate_image, edit_image, generate_video |
-| CLIPVisionEncode, CLIPVisionLoader | generate_video |
-| CLIPLoaderGGUF | generate_video |
-| KSampler, KSamplerAdvanced | smart_generate_image, edit_image, generate_video |
-| EmptyLatentImage, SamplerCustomAdvanced, RandomNoise | smart_generate_image |
-| ImageScaleToTotalPixels, ImageUpscaleWithModel, UpscaleModelLoader | edit_image |
-| GetImageSize | edit_image |
-| BasicScheduler, CFGGuider (comfy_extras) | smart_generate_image |
-| ConditioningZeroOut, ConditioningConcat | smart_generate_image, edit_image, generate_video |
-| PreviewImage | smart_generate_image, edit_image, enhance_image |
-
-### External custom nodes
-
-| Node | Repository | Used by |
-|---|---|---|
-| LoadImageByUrlOrPath | [ComfyUI-LoadImageURL](https://github.com/insecure-erasure/ComfyUI-LoadImageURL) | All tools |
-| Power Lora Loader (rgthree) | [rgthree-comfy](https://github.com/rgthree/rgthree-comfy) | smart_generate_image, edit_image, generate_video |
-| ShowText\|pysssss | [ComfyUI-Custom-Scripts](https://github.com/chrisgoringe/ComfyUI-Custom-Scripts) | generate_caption |
-| Florence2ModelLoader, Florence2Run, DownloadAndLoadFlorence2Lora | [ComfyUI-Florence2](https://github.com/kijai/ComfyUI-Florence2) | generate_caption |
-| SeedVR2LoadDiTModel, SeedVR2LoadVAEModel, SeedVR2VideoUpscaler | [ComfyUI-SeedVR2](https://github.com/zkqiang/ComfyUI-SeedVR2) | enhance_image |
-| WanImageToVideo, WanVideoImageResizeToClosest, WanVideoNAG | [ComfyUI-WanVideoWrapper](https://github.com/kijai/ComfyUI-WanVideoWrapper) | generate_video |
-| VHS_VideoCombine | [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite) | generate_video |
-| FrameInterpolate, FrameInterpolationModelLoader | [ComfyUI-Frame-Interpolation](https://github.com/Fannovel16/ComfyUI-Frame-Interpolation) | generate_video |
-| PathchSageAttentionKJ | [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | generate_video |
-| FastUnsharpSharpen | [ComfyUI-vrgamedevgirl](https://github.com/nicolay256/ComfyUI-vrgamedevgirl) | generate_video |
-| RTXVideoSuperResolution | [ComfyUI-RTX-Video-SR](https://github.com/NVIDIA/ComfyUI-RTX-Video-SR) | generate_video |
-| ImpactSwitch | [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack) | smart_generate_image |
-| FluxResolutionNode, Flux2Scheduler | [ComfyUI-Flux](https://github.com/Comfy-Org/ComfyUI-Flux) | smart_generate_image |
-| StringConcatenate, PrimitiveStringMultiline | [ComfyUI-Efficiency-Nodes](https://github.com/LucianoCirino/efficiency-nodes-comfyui) | smart_generate_image, edit_image |
-| ReferenceLatent | [ComfyUI-Flux](https://github.com/Comfy-Org/ComfyUI-Flux) | edit_image |
-| ImageBlend | [ComfyUI-WAS-Node-Suite](https://github.com/WASasquatch/was-node-suite-comfyui) | enhance_image, generate_video |
-| easy seed, easy int | [ComfyUI-Easy-Use](https://github.com/yolain/ComfyUI-Easy-Use) | smart_generate_image, generate_video |
-| ModelSamplingSD3 | [ComfyUI-Flux](https://github.com/Comfy-Org/ComfyUI-Flux) | generate_video |
+- https://github.com/insecure-erasure/ComfyUI-LoadImageURL -- required by all tools
+- https://github.com/rgthree/rgthree-comfy -- Power Lora Loader
+- https://github.com/kijai/ComfyUI-Florence2 -- Florence-2 captioning
+- https://github.com/zkqiang/ComfyUI-SeedVR2 -- SeedVR2 upscaling
+- https://github.com/kijai/ComfyUI-WanVideoWrapper -- Wan 2.1 / 2.2 video generation
+- https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite -- video combine
+- https://github.com/Fannovel16/ComfyUI-Frame-Interpolation -- frame interpolation
+- https://github.com/kijai/ComfyUI-KJNodes -- PathchSageAttention
+- https://github.com/chrisgoringe/ComfyUI-Custom-Scripts -- ShowText node
+- https://github.com/ltdrdata/ComfyUI-Impact-Pack -- ImpactSwitch
+- https://github.com/NVIDIA/ComfyUI-RTX-Video-SR -- RTX video super resolution
 
 ## FAQ
 
