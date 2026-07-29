@@ -1,334 +1,214 @@
-# Smart Generate Image
+# Smart Generate Image — Image & Video Tools for Open WebUI
 
-Open WebUI tool for AI image generation through ComfyUI -- with size control, configurable model, steps and seed via Valves.
-
-> **Compatible with:** Open WebUI + ComfyUI
+A set of AI tools to generate, edit, enhance and caption images — and generate videos — directly in your Open WebUI chats, powered by ComfyUI.
 
 ---
 
-## Overview
+## 🧰 Tools
 
-Smart Generate Image is a tool that sends image generation requests to ComfyUI. The image appears in the chat rendered as markdown by the LLM. No local storage, no event emitter for files, no database persistence.
+### 🎨 Smart Generate Image
+Generates images from text with size control, model selection, and seed support.
 
-It is installed as a regular user tool in **Workspace -> Tools**. It does not require Image Generation to be enabled as a model capability or builtin tool. It uses the image generation settings from **Admin Panel -> Settings -> Images** when the engine is set to ComfyUI.
+**Example prompts:**
+> *"Generate an image of a cat wearing a spacesuit on Mars"*
+> *"Create a 1920x1080 landscape of a cyberpunk city at night"*
 
-Companion tools:
-- **Enhance Image** (`enhance_image.py`) — upscale previously generated images using SeedVR2.
-- **Edit Image** (`edit_image.py`) — edit previously generated images using Flux 2 with steps and LoRA control.
-- **Generate Video** (`generate_video.py`) — generate videos through ComfyUI (text-to-video or image-to-video).
+**Output:** the image renders inline in the chat.
 
----
-
-## Tools
-
-### Smart Generate Image (`smart_generate_image.py`)
-
-Generates images through ComfyUI with support for multiple model families (Z-Image Turbo and FLUX.2 Klein).
-Model, steps, seed, and model family are configured via Valves.
-
-**Parameters exposed to the LLM:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| prompt | string | Image description. The LLM translates to English and enriches with visual details. |
-| aspect_ratio | string (optional) | Aspect ratio as W:H (e.g. 16:9). Omit unless the user explicitly requests dimensions or aspect ratio. |
-
-**Response format:**
-
-```
-image_md: ![Generated image](<url>)
-image_filename: <filename.png>
-
-Use image_md to display the image in your response.
-```
-
-- `image_md`: Markdown to render the image in the conversation.
-- `image_filename`: Internal ComfyUI filename (not directly accessible from the filesystem). Used by Enhance Image.
-
-### Enhance Image (`enhance_image.py`)
-
-Upscales or enhances a previously generated image using SeedVR2. Only use when the user explicitly asks to improve, upscale, or enhance an image.
-
-**Parameters exposed to the LLM:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| image | string | Filename from a previous generation (e.g. "abc123.png") or a direct URL to an external image (e.g. "https://..."). Auto-detects which mode to use. |
-
-**Response format:**
-
-```
-image_md: ![Enhanced image](<url>)
-image_filename: <filename.png>
-
-Use image_md to display the enhanced image in your response.
-```
+**Available models:** Z-Image Turbo, FLUX.2 Klein, and Krea 2 Turbo.
 
 ---
 
-### Edit Image (`edit_image.py`)
+### ✏️ Edit Image
+Edits a previously generated image using Flux 2. Make targeted changes without regenerating from scratch.
 
-Edits a previously generated image using Flux 2 with steps and LoRA control. Only use when the user explicitly asks to edit, modify, or alter an image.
+**Example prompts:**
+> *"Edit that image — change the background to a beach at sunset"*
+> *"Add a dragon flying over the mountain in the last image"*
 
-**Parameters exposed to the LLM:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| image | string | Filename from a previous generation (e.g. "abc123.png") or a direct URL to an external image (e.g. "https://..."). Auto-detects which mode to use. |
-| edit_prompt | string | Description of the edit to apply. The LLM translates to English and enriches with details. |
-
-**Response format:**
-
-```
-image_md: ![Edited image](<url>)
-image_filename: <filename.png>
-
-Use image_md to display the edited image in your response.
-```
-
-### Generate Video (`generate_video.py`)
-
-Generates a video through ComfyUI (image-to-video). Supports Wan 2.1 (single-path) and Wan 2.2 (dual-path high/low) architectures.
-
-**Parameters exposed to the LLM:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| prompt | string | Video description in English, enriched with visual motion details. |
-| image | string | Filename from a previous generation (e.g. "abc123.png") or a direct URL to an external image (e.g. "https://..."). Auto-detects which mode to use. |
-
-**Response format:**
-
-```
-<html>
-<style>...</style>
-<div>
-  <video controls autoplay muted loop playsinline>
-    <source src="<url>" type="video/mp4">
-  </video>
-</div>
-</html>
-
-Wrap the HTML block above in triple backticks and include it in your response
-so the frontend renders the video.
-```
-
-The agent renders the video using an inline HTML block (`<video>` tag) instead of markdown, since markdown cannot display video.
+Accepts both tool-generated filenames and external URLs.
 
 ---
 
-## Valves
+### 🔍 Generate Caption
+Generates a detailed caption of an image using Florence-2. The LLM uses this automatically to "see" image content before editing it or answering questions about it.
 
-### Admin Valves (Smart Generate Image)
+**Example prompts (indirect):**
+> *"What's in this image?"* → the LLM calls the tool and replies in your language
+> *"Describe the last image in detail"*
 
-Configurable by admins in **Workspace -> Tools -> Smart Generate Image -> Valves**.
-
-| Valve | Type | Default | Description |
-|-------|------|---------|-------------|
-| model_family | dropdown | zit | Default model family: Z-Image Turbo or FLUX.2 Klein. Users can override. |
-| model_name | string | "" | Specific model filename. Overrides the model_family default. Leave empty to use the model_family default. |
-| max_steps | dropdown | 0 | Steps policy. **0** = user decides (no clamp). **-1** = force model default (ignore user). **1-15** = clamp user steps to ceiling. |
-| default_aspect_ratio | string | 2:3 | Default aspect ratio when the LLM does not specify one. Format W:H (e.g. 16:9). |
-| megapixel | string | 1.0 | Target megapixel value. Controls total resolution independent of aspect ratio. |
-| comfyui_image_base_url | string | "" | Public base URL for image links. Overrides COMFYUI_BASE_URL. Leave empty to use COMFYUI_BASE_URL. |
-| lora_config | JSON string | [] | JSON array of LoRAs. Applied positionally. User wins on name collision. |
-
-### User Valves (Smart Generate Image)
-
-Configurable by end users from the chat interface.
-
-| Valve | Type | Default | Description |
-|-------|------|---------|-------------|
-| model_family | dropdown | "" (System default) | Override the admin valve model family. Select Z-Image Turbo or FLUX.2 Klein explicitly. |
-| model_name | string | "" | Specific model filename. Overrides admin valve and model_family default. |
-| steps | dropdown | 0 (Model default) | Inference steps. 0 = use model family default. 1-15 = explicit value (subject to admin max_steps policy). |
-| comfyui_image_base_url | string | "" | Override the admin valve or COMFYUI_BASE_URL for image links. |
-| seed | int | -1 | Seed. -1 = random, >=0 = fixed seed for reproducibility. |
-| lora_config | JSON string | [] | JSON array of LoRAs. Applied positionally. Empty name or strength 0 disables it. Overrides admin on name collision. |
-
-### Valves (Edit Image)
-
-| Valve (admin / user) | Type | Default | Description |
-|----------------------|------|---------|-------------|
-| comfyui_image_base_url | string | "" | Public base URL for edited image links. Leave empty to use COMFYUI_BASE_URL. |
-| steps | dropdown | 0 | Inference steps (1-15). 0 = use workflow default (6). |
-| lora_config | string | [] | JSON array of LoRAs. String=only name, object={"name", "strength"}. Applied positionally to lora_1..lora_4. Empty name or strength 0 disables it. User wins on name collision. |
-
-### Valves (Enhance Image)
-
-| Valve (admin / user) | Type | Default | Description |
-|----------------------|------|---------|-------------|
-| comfyui_image_base_url | string | "" | Public base URL for enhanced image links. Leave empty to use COMFYUI_BASE_URL. |
-
-### Valves (Generate Video)
-
-#### Admin Valves
-
-| Valve | Type | Default | Description |
-|-------|------|---------|-------------|
-| model_version | dropdown | wan21 | Video model: Wan 2.1 (single-path) or Wan 2.2 (dual-path high/low). |
-| diffusion_model | string | "" | JSON with diffusion model(s). Single object for Wan 2.1: `{"model": "..."}`. Array for Wan 2.2: `[{"model": "...", "path": "high"}, ...]`. Empty = built-in defaults. |
-| lora_config | string | [] | JSON array of LoRAs. Each object: `{"model": "...", "strength": 1.0, "path": "high"|"low"}`. Omit "path" for all paths. |
-| length | dropdown | 81 | Maximum frames / video length. Acts as a ceiling for user values. -1 = no ceiling. Must be 4n+1. |
-| negative_prompt | string | "" | Negative prompt. Empty = use built-in default. |
-| comfyui_image_base_url | string | "" | Public base URL for video links. Overrides COMFYUI_BASE_URL. |
-
-#### User Valves
-
-| Valve | Type | Default | Description |
-|-------|------|---------|-------------|
-| model_version | dropdown | "" (System default) | Override the admin valve model version. |
-| diffusion_model | string | "" | JSON with diffusion model(s). Overrides the admin valve and built-in defaults. |
-| lora_config | string | [] | JSON array of LoRAs. Overrides the admin valve. |
-| length | dropdown | 0 | Number of frames. 0 = use admin value. Must be 4n+1. |
-| negative_prompt | string | "" | Preferred negative prompt. Empty = use admin or built-in default. |
-| seed | int | -1 | Seed. -1 = random, >=0 = fixed. |
-| comfyui_image_base_url | string | "" | Override the admin valve or COMFYUI_BASE_URL for video links. |
-
-### Precedence
-
-**Model family resolution (images):** UserValves > AdminValves > `"zit"` (built-in default)
-
-**Model resolution (images):** UserValves `model_name` > AdminValves `model_name` > `MODEL_CONFIGS[family]["model"]`
-
-**Video model version resolution:** UserValves > AdminValves > `"wan21"` (built-in default)
-
-**Steps resolution (images):**
-- `max_steps=0` (default): user decides freely. User "Model default" → model family default.
-- `max_steps=-1`: force model family default, user steps are ignored.
-- `max_steps=1-15`: user steps clamped to this ceiling. Warning toast on clamp.
-
-**Seed resolution:** UserValve. -1 = random (auto-generated), >=0 = fixed.
-
-**Image base URL resolution:** UserValves > AdminValves > COMFYUI_BASE_URL
-
-**Video length resolution:** UserValves > AdminValves. If admin valve is set to a positive value (not -1), it acts as a ceiling — user values get clamped with a warning toast. If admin valve is -1, user decides freely. All lengths are snapped to the nearest valid 4n+1 frame count.
+The caption is always generated in English for accuracy; the LLM translates it when replying.
 
 ---
 
-## Configuration
+### 🔬 Enhance Image
+Upscales or enhances an image using SeedVR2.
 
-Configure these in **Admin Panel -> Settings -> Images**:
-
-- Image Generation Engine: ComfyUI
-- ComfyUI Base URL: your ComfyUI server address
-- Image Size: default dimensions
-- Image Steps: default inference steps (acts as ceiling for Valves)
-
-### Workflows
-
-Pre-configured workflows are available in the `workflows/` directory. Each tool
-loads its workflow JSON from the tool's cache directory at runtime — no workflow
-is embedded in the Python scripts.
-
-| File | Used by | Description |
-|------|---------|-------------|
-| `smart_generate_image.json` | Smart Generate Image | Z-Image Turbo / FLUX.2 Klein image generation |
-| `enhance_image.json` | Enhance Image | SeedVR2 standalone upscale |
-| `edit_image.json` | Edit Image | Flux 2 image editing |
-| `generate_video.json` | Generate Video | Wan 2.1 image-to-video (single-path) |
-| `generate_video_wan22.json` | Generate Video | Wan 2.2 image-to-video (dual-path high/low) |
-
-All workflow JSONs are clean — no placeholders, no template variables. Values
-like prompt, seed, model, or LoRA are injected at runtime via Python after
-parsing.
+**Example prompts:**
+> *"Enhance that image"*
+> *"Upscale the last image to higher resolution"*
 
 ---
 
-## Installation
+### 🎬 Generate Video
+Generates videos from text or images using Wan 2.1 / 2.2.
 
-1. Go to **Workspace -> Tools** in Open WebUI.
-2. Click **"+"** and paste the contents of `smart_generate_image.py`.
-3. Save as **"Smart Generate Image"**.
-4. Repeat for `enhance_image.py`, save as **"Enhance Image"**.
-5. Repeat for `edit_image.py`, save as **"Edit Image"**.
-6. Repeat for `generate_video.py`, save as **"Generate Video"**.
-7. Enable the tools in the chat tool selector.
+**Example prompts:**
+> *"Generate a video of a cat walking on the moon"*
+> *"Animate the last image — make the waves move"*
 
-### Post-installation: deploy the workflow JSONs
+The result appears as an HTML video player in the chat (autoplay, muted, loop).
 
-Each tool reads its workflow from the cache directory
-`CACHE_DIR / 'tools' / <tool_id> / <filename>.json` at runtime.  On first
-invocation, if the file is not found, the tool will log an error with the
-expected path.
+---
 
-To deploy, copy the corresponding workflow JSON from `workflows/` into the
-tool's cache directory inside the Open WebUI container:
+## ⚙️ Configuration
+
+Each tool has configurable options accessible through the **Valves** panel in Open WebUI. There are two levels:
+
+- **Admin Valves** — set by the admin in Workspace → Tools (defaults and limits)
+- **User Valves** — set by each user from the chat (personal preferences)
+
+### Smart Generate Image
+
+| What you can tweak | How it works |
+|---|---|
+| **Model family** | Pick Z-Image Turbo, FLUX.2 Klein, or Krea 2 Turbo |
+| **Specific model** | A custom .safetensors filename within the family |
+| **Steps** | Inference steps. 0 = use model family default |
+| **Seed** | -1 = random, ≥0 = fixed for reproducibility |
+| **LoRAs** | JSON array of LoRAs for style tuning |
+
+### Edit Image
+
+| What you can tweak | How it works |
+|---|---|
+| **Steps** | 0 = use workflow default (6) |
+| **LoRAs** | JSON array of LoRAs, applied positionally to lora_1..lora_N |
+| **Base URL** | Override the image link base URL if needed |
+
+### Generate Caption
+
+| What you can tweak | How it works |
+|---|---|
+| **Model** | Florence-2 variant (base, large, nsfw, etc.) |
+| **Task** | Caption type: detailed, OCR, caption, etc. |
+| **Max new tokens** | Max caption length |
+| **Num beams** | Beam search width — more beams = better quality, slower |
+| **do_sample** | On = more creative; off = more deterministic (greedy) |
+| **Seed** | -1 = random, ≥0 = fixed for reproducibility |
+
+### Enhance Image
+
+| What you can tweak | How it works |
+|---|---|
+| **Base URL** | Only if you need to override the ComfyUI server URL |
+
+### Generate Video
+
+| What you can tweak | How it works |
+|---|---|
+| **Model version** | Wan 2.1 (single-path) or Wan 2.2 (dual-path high/low) |
+| **Diffusion model** | JSON specifying concrete model(s) |
+| **LoRAs** | LoRAs applied per path (high/low) |
+| **Frames (length)** | Video duration in frames. Must be 4n+1 |
+| **Negative prompt** | What you don't want to see in the video |
+| **Steps** | 4-10 inference steps |
+| **Seed** | -1 = random, ≥0 = fixed |
+
+---
+
+## 🚀 Installation
+
+### 1. Add the tools in Open WebUI
+
+Go to **Workspace → Tools**, click **"+"**, paste the script content, and save with the suggested name:
+
+| Script | Suggested name |
+|--------|----------------|
+| `smart_generate_image.py` | Smart Generate Image |
+| `enhance_image.py` | Enhance Image |
+| `edit_image.py` | Edit Image |
+| `generate_caption.py` | Generate Caption |
+| `generate_video.py` | Generate Video |
+
+### 2. Deploy the workflow JSONs
+
+Each tool needs its workflow JSON file. You'll find them in the `workflows/` directory. Copy them to the tool's cache directory inside the Open WebUI container:
 
 ```bash
-# Example: deploy the image generation workflow
-# Inside the Open WebUI container:
+# Example for Smart Generate Image
 cp workflows/smart_generate_image.json /app/backend/data/cache/tools/smart_generate_image/smart_generate_image.json
+
+# Repeat for each tool:
+cp workflows/edit_image.json       /app/backend/data/cache/tools/edit_image/edit_image.json
+cp workflows/enhance_image.json    /app/backend/data/cache/tools/enhance_image/enhance_image.json
+cp workflows/generate_caption.json /app/backend/data/cache/tools/generate_caption/generate_caption.json
+cp workflows/generate_video.json   /app/backend/data/cache/tools/generate_video/generate_video.json
+cp workflows/generate_video_wan22.json /app/backend/data/cache/tools/generate_video/generate_video_wan22.json
 ```
 
-The cache directory is created automatically when the tool is first saved.
-It persists container restarts (lives under `DATA_DIR`, typically a Docker
-volume).
+> The `cache/tools/<name>/` directory is created automatically when you save the tool.
 
----
+### 3. Enable the tools
 
-## Requirements
+In any chat, open the tool selector and enable the ones you want to use.
 
-- Open WebUI (any recent version with Tools support)
-- ComfyUI server running and accessible
+### Requirements
+
+- Open WebUI (recent version with Tools support)
+- A running ComfyUI server
 - Native Tool Calling enabled
-- Image Generation Engine set to ComfyUI
+- Image Generation Engine set to ComfyUI (Admin Panel → Settings → Images)
 - [ComfyUI-LoadImageURL](https://github.com/insecure-erasure/ComfyUI-LoadImageURL) custom node (required by Enhance Image)
 
 ---
 
-## Usage
+## ❓ FAQ
 
-Generate an image:
+**The image doesn't show up in the chat.**
+Check that the ComfyUI Base URL is accessible from your browser. Images are served directly from ComfyUI.
 
-> *"Generate an image of a cat wearing a spacesuit on Mars"*
->
-> *"Create a 1920x1080 landscape of a cyberpunk city at night"*
+**Seed doesn't seem to do anything.**
+Configure a "seed" node in Admin Panel → Settings → Images → ComfyUI Workflow Nodes.
 
-Enhance a generated image:
+**How do I change the model or steps?**
+Use the User Valves from the tool's configuration panel in the chat.
 
-> *"Enhance that image"*
->
-> *"Upscale the last image"*
+**What's the difference between model_family and model_name?**
+`model_family` selects a full configuration (model, VAE, scheduler, sampler, CFG). `model_name` only overrides the .safetensors file within that family. Usually you just need to change the family.
 
-Optional details the AI can handle:
+**I changed steps but nothing happened.**
+The admin may have `max_steps` set to `-1` (force model default). Ask them to set it to `0` or a specific value.
 
-- **Size**: "... at 2000x3000"
+**Enhance Image fails with an image loading error.**
+Make sure [ComfyUI-LoadImageURL](https://github.com/insecure-erasure/ComfyUI-LoadImageURL) is installed in ComfyUI's `custom_nodes/` directory.
 
-Model family, specific model, steps, and seed are controlled via Valves, not from the chat prompt.
+**The tool fails with "Workflow file not found".**
+The JSON file needs to be copied to the tool's cache directory. See the [installation section](#2-deploy-the-workflow-jsons).
+
+**How do I update a workflow without editing the tool?**
+Just replace the JSON file in `cache/tools/<id>/` and the tool will pick it up on the next run. No need to edit the script.
+
+**Generate Caption always returns English text — why?**
+For technical accuracy. The LLM receives the caption in English and translates it when replying to you.
 
 ---
 
-## FAQ
+## 📂 Project structure
 
-**Q: The image doesn't show up in the chat.**  
-A: Check that the ComfyUI Base URL (or comfyui_image_base_url valve) is accessible from your browser. Images are served directly from ComfyUI.
-
-**Q: Seed doesn't seem to do anything.**  
-A: Configure a "seed" node in Admin Panel -> Settings -> Images -> ComfyUI Workflow Nodes.
-
-**Q: How do I change the model or steps?**  
-A: Select the model family (Z-Image Turbo or FLUX.2 Klein) in your user valves. For a specific model filename within a family, use the `model_name` valve. Steps are controlled via the `steps` user valve, subject to the admin's `max_steps` policy.
-
-**Q: What's the difference between model_family and model_name?**  
-A: `model_family` selects a preset configuration (diffusion model, text encoder, VAE, scheduler, CFG, sampler — everything). `model_name` overrides only the diffusion model file within that family. Usually you only need to set `model_family`.
-
-**Q: I changed steps but nothing happened.**  
-A: The admin has `max_steps` set to `-1` (Model default), which forces the model family's default steps regardless of user settings. Ask your admin to set it to `0` (User decides) or a specific ceiling.
-
-**Q: Enhance Image fails with an image loading error.**  
-A: Ensure the [ComfyUI-LoadImageURL](https://github.com/insecure-erasure/ComfyUI-LoadImageURL) custom node is installed in ComfyUI's `custom_nodes/` directory.
-
-**Q: The tool fails with "Workflow file not found at ..."**  
-A: The workflow JSON needs to be copied into the tool's cache directory. See the
-[Post-installation](#post-installation-deploy-the-workflow-jsons) section.
-
-**Q: How do I update a workflow without editing the tool code?**  
-A: Replace the JSON file in the tool's cache directory
-(`/app/backend/data/cache/tools/<tool_id>/<filename>.json`) with your updated
-workflow. The tool reads it from disk on every invocation.
-
-**Q: How do I know which nodes the tool modifies by title?**  
-A: Each tool resolves nodes by `_meta.title`. Check the source code for
-`_resolve_node(workflow, "...")` calls to see which titles are expected.
-The error message lists all available titles if a match fails.
+```
+smart_generate_image/
+├── smart_generate_image.py   → Image generation
+├── enhance_image.py          → Image upscale/enhance
+├── edit_image.py             → Image editing (Flux 2)
+├── generate_caption.py       → Image captioning (Florence-2)
+├── generate_video.py         → Video generation (Wan)
+├── workflows/                → Workflow JSON files (copy to server)
+│   ├── smart_generate_image.json
+│   ├── enhance_image.json
+│   ├── edit_image.json
+│   ├── generate_caption.json
+│   ├── generate_video.json
+│   └── generate_video_wan22.json
+└── README.md
+```
