@@ -293,7 +293,7 @@ class Tools:
         )
         max_num_beams: str = Field(
             default="2",
-            description="Max beam ceiling. 0 = no ceiling. 1-10 = clamp user value to this ceiling.",
+            description="Max beam ceiling. 1-10 = clamp user value to this ceiling.",
             json_schema_extra={
                 "input": {
                     "type": "select",
@@ -330,8 +330,8 @@ class Tools:
             description="New tokens. 0 = use admin ceiling. 1-4096 = explicit value (subject to admin ceiling).",
         )
         num_beams: str = Field(
-            default="0",
-            description="Number of beams. 0 = use system default. 1-10 = explicit value (subject to admin ceiling).",
+            default="",
+            description="Number of beams. Leave empty to use the admin ceiling. 1-10 = explicit value (subject to admin ceiling).",
             json_schema_extra={
                 "input": {
                     "type": "select",
