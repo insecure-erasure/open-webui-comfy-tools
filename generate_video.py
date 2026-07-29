@@ -294,12 +294,15 @@ def _parse_lora_config(raw: str, label: str) -> tuple[list, str | None]:
     """
     Parse a lora_config JSON string.
 
-    Expected format: JSON array of objects. Each object has:
-      - model (str, required): LoRA filename
-      - strength (float, optional, default 1.0): LoRA strength
-      - path (str, optional): "high" / "low". Omit for all paths.
+    Expected format: JSON array of strings or objects.
+      - String: shorthand for {"model": <string>, "strength": 1.0}
+      - Object: {"model": "...", "strength": 1.0, "path": "high"|"low"}
+        - model (str, required): LoRA filename
+        - strength (float, optional, default 1.0): LoRA strength.
+          strength=0 disables the LoRA and frees the slot.
+        - path (str, optional): "high" / "low". Omit for all paths.
 
-    Returns (list, error_or_None).
+    Returns (list, error_or_None). Strings are expanded to objects.
     """
     if not raw or raw.strip() == "" or raw.strip() == "[]":
         return [], None
@@ -309,18 +312,24 @@ def _parse_lora_config(raw: str, label: str) -> tuple[list, str | None]:
         return [], f"Invalid JSON in {label} lora_config: {e}"
     if not isinstance(p, list):
         return [], f"{label} lora_config must be a JSON array, got {type(p).__name__}"
+    result = []
     for i, item in enumerate(p):
-        if not isinstance(item, dict):
-            return [], f"{label} lora_config[{i}] must be an object, got {type(item).__name__}"
-        if "model" not in item or not isinstance(item["model"], str):
-            return [], f"{label} lora_config[{i}] must have a 'model' string field"
-        strength = item.get("strength", None)
-        if strength is not None and not isinstance(strength, (int, float)):
-            return [], f"{label} lora_config[{i}] 'strength' must be a number, got {type(strength).__name__}"
-        path_val = item.get("path", None)
-        if path_val is not None and path_val not in ("high", "low"):
-            return [], f"{label} lora_config[{i}] 'path' must be 'high', 'low', or omitted"
-    return p, None
+        if isinstance(item, str):
+            # String shorthand → {"model": str, "strength": 1.0}
+            result.append({"model": item, "strength": 1.0})
+        elif isinstance(item, dict):
+            if "model" not in item or not isinstance(item["model"], str):
+                return [], f"{label} lora_config[{i}] must have a 'model' string field"
+            strength = item.get("strength", None)
+            if strength is not None and not isinstance(strength, (int, float)):
+                return [], f"{label} lora_config[{i}] 'strength' must be a number, got {type(strength).__name__}"
+            path_val = item.get("path", None)
+            if path_val is not None and path_val not in ("high", "low"):
+                return [], f"{label} lora_config[{i}] 'path' must be 'high', 'low', or omitted"
+            result.append(item)
+        else:
+            return [], f"{label} lora_config[{i}] must be a string or object, got {type(item).__name__}"
+    return result, None
 
 
 def _filter_loras_for_path(lora_list: list, path_name: str) -> list:
@@ -437,7 +446,7 @@ class Tools:
         )
         lora_config: str = Field(
             default="[]",
-            description='JSON array of LoRAs. Each object: {"model": "...", "strength": 1.0, "path": "high"|"low"}. Omit "path" for all ramas.',
+            description='JSON array of LoRAs. String=only name (strength 1.0), object={"model": "...", "strength": 1.0, "path": "high"|"low"}. strength=0 disables the LoRA and frees the slot. Omit "path" for all ramas.',
         )
         length: str = Field(
             default="81",
@@ -612,6 +621,9 @@ class Tools:
                         }
                     )
                 return f"Error: {err}"
+
+            # Filter out disabled LoRAs (strength == 0)
+            parsed_loras = [item for item in parsed_loras if float(item.get("strength", 1.0)) != 0]
 
             # Length: UserValves > AdminValves. Admin valve acts as ceiling.
             # Valves are dropdown strings — parse as int.
@@ -882,18 +894,29 @@ class Tools:
 
                 # LoRAs for this path
                 path_loras = _filter_loras_for_path(parsed_loras, path_name)
-                if path_loras:
-                    lora_slots = [k for k in nodes["lora"]["inputs"] if k.startswith("lora_")]
-                    for i, item in enumerate(path_loras[:len(lora_slots)]):
-                        slot = f"lora_{i + 1}"
-                        if slot not in nodes["lora"]["inputs"]:
-                            break
-                        name = item["model"]
-                        strength = float(item.get("strength", 1.0))
-                        if name:
-                            nodes["lora"]["inputs"][slot]["on"] = True
-                            nodes["lora"]["inputs"][slot]["lora"] = name
-                            nodes["lora"]["inputs"][slot]["strength"] = strength
+                lora_slots = [k for k in nodes["lora"]["inputs"] if k.startswith("lora_")]
+                # Fill used slots
+                for i, item in enumerate(path_loras[:len(lora_slots)]):
+                    slot = f"lora_{i + 1}"
+                    if slot not in nodes["lora"]["inputs"]:
+                        break
+                    name = item["model"]
+                    strength = float(item.get("strength", 1.0))
+                    if bool(name) and strength != 0:
+                        nodes["lora"]["inputs"][slot]["on"] = True
+                        nodes["lora"]["inputs"][slot]["lora"] = name
+                        nodes["lora"]["inputs"][slot]["strength"] = strength
+                    else:
+                        nodes["lora"]["inputs"][slot]["on"] = False
+                        nodes["lora"]["inputs"][slot]["lora"] = ""
+                        nodes["lora"]["inputs"][slot]["strength"] = 0
+                # Disable remaining unused slots
+                for j in range(len(path_loras), len(lora_slots)):
+                    slot = f"lora_{j + 1}"
+                    if slot in nodes["lora"]["inputs"]:
+                        nodes["lora"]["inputs"][slot]["on"] = False
+                        nodes["lora"]["inputs"][slot]["lora"] = ""
+                        nodes["lora"]["inputs"][slot]["strength"] = 0
 
                 # Build detail string for this path
                 path_lora_str = json.dumps(path_loras) if path_loras else "(none)"
