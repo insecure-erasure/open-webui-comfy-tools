@@ -355,7 +355,7 @@ class Tools:
     async def generate_caption(
         self,
         image: str,
-        detail_level: str = "detailed",
+        detail_level: str = "",
         __request__=None,
         __user__=None,
         __event_emitter__=None,
@@ -370,9 +370,9 @@ class Tools:
         filename or an URL.
 
         :param image: Filename or URL of the image to caption.
-        :param detail_level: How detailed the caption should be.
+        :param detail_level: Optional. Leave empty to use the configured task from valves.
             "simple" - brief one-line description (use for casual questions like "what's in this image?")
-            "detailed" - thorough description with multiple sentences (default, recommended)
+            "detailed" - thorough description with multiple sentences
             "verbose" - extremely detailed, exhaustive description (use when the user asks for great detail)
         """
         if __request__ is None:
@@ -527,7 +527,7 @@ class Tools:
                 "detailed": "detailed_caption",
                 "verbose": "more_detailed_caption",
             }
-            detail_task = _DETAIL_MAP.get(detail_level)
+            detail_task = _DETAIL_MAP.get(detail_level) if detail_level else None
             injected_task = detail_task if detail_task else resolved_task
             run_node["inputs"]["task"] = injected_task
             run_node["inputs"]["max_new_tokens"] = resolved_tokens
