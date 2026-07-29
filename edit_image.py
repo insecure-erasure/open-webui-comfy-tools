@@ -20,10 +20,9 @@ log = logging.getLogger(__name__)
 # ComfyUI seed max (consistent with smart_generate_image)
 _COMFY_SEED_MAX: int = 1125899906842624
 
-# Steps dropdown options (consistent with smart_generate_image)
+# Steps dropdown options (1-15). Value "0" = use workflow default (handled by Field(default="0")).
 _STEPS_OPTIONS = [
-    {"value": "0", "label": "0 (System default)"},
-    *[{"value": str(v), "label": str(v)} for v in range(1, 16)],
+    {"value": str(v), "label": str(v)} for v in range(1, 16)
 ]
 
 

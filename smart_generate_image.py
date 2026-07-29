@@ -18,12 +18,12 @@ from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
 
-# Shared dropdown options for the steps valve (15 down to 1, plus "Model default")
+# Shared dropdown options for the steps valve (15 down to 1).
+# Value "0" = use workflow default (handled by Field(default="0")).
 _STEPS_OPTIONS = [
     {"value": str(i), "label": str(i)}
     for i in range(15, 0, -1)
 ]
-_STEPS_OPTIONS.insert(0, {"value": "0", "label": "Model default"})
 
 # Separate options for max_steps admin valve (-1 = model default, 0 = user decides)
 _MAX_STEPS_OPTIONS = [
