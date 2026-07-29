@@ -126,7 +126,7 @@ def _load_workflow(tool_id: str, filename: str) -> str:
     if not workflow_path.exists():
         raise FileNotFoundError(
             f"Workflow file not found at {workflow_path}. "
-            f"Copy workflows/{filename} to that path."
+            f"Copy {filename} from the tool's directory to that path."
         )
 
     log.info("Loading workflow from %s", workflow_path)

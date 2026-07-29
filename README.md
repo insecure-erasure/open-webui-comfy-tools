@@ -110,23 +110,23 @@ Navigate to Workspace > Tools, click "+", paste the script content, and save.
 
 | Script | Suggested name |
 |---|---|
-| smart_generate_image.py | Smart Generate Image |
-| enhance_image.py | Enhance Image |
-| edit_image.py | Edit Image |
-| generate_caption.py | Generate Caption |
-| generate_video.py | Generate Video |
+| smart_generate_image/tool.py | Smart Generate Image |
+| enhance_image/tool.py | Enhance Image |
+| edit_image/tool.py | Edit Image |
+| generate_caption/tool.py | Generate Caption |
+| generate_video/tool.py | Generate Video |
 
 ### 2. Deploy the workflow JSONs
 
-Each tool requires its corresponding workflow JSON file from the workflows/ directory. Copy it to the tool's cache directory inside the Open WebUI container:
+Each tool requires its corresponding workflow JSON file. Copy it from the tool's directory to the tool's cache directory inside the Open WebUI container:
 
 ```
-cp workflows/smart_generate_image.json /app/backend/data/cache/tools/smart_generate_image/smart_generate_image.json
-cp workflows/edit_image.json       /app/backend/data/cache/tools/edit_image/edit_image.json
-cp workflows/enhance_image.json    /app/backend/data/cache/tools/enhance_image/enhance_image.json
-cp workflows/generate_caption.json /app/backend/data/cache/tools/generate_caption/generate_caption.json
-cp workflows/generate_video.json   /app/backend/data/cache/tools/generate_video/generate_video.json
-cp workflows/generate_video_wan22.json /app/backend/data/cache/tools/generate_video/generate_video_wan22.json
+cp smart_generate_image/smart_generate_image.json /app/backend/data/cache/tools/smart_generate_image/smart_generate_image.json
+cp edit_image/edit_image.json                     /app/backend/data/cache/tools/edit_image/edit_image.json
+cp enhance_image/enhance_image.json               /app/backend/data/cache/tools/enhance_image/enhance_image.json
+cp generate_caption/generate_caption.json         /app/backend/data/cache/tools/generate_caption/generate_caption.json
+cp generate_video/generate_video.json             /app/backend/data/cache/tools/generate_video/generate_video.json
+cp generate_video/generate_video_wan22.json       /app/backend/data/cache/tools/generate_video/generate_video_wan22.json
 ```
 
 The cache/tools/<name>/ directory is created automatically when you save the tool script.
@@ -164,17 +164,21 @@ In any chat, open the tool selector and enable the ones you want to use.
 ## Project structure
 
 ```
-smart_generate_image.py   -- Image generation
-enhance_image.py          -- Image upscale/enhance
-edit_image.py             -- Image editing (Flux 2)
-generate_caption.py       -- Image captioning (Florence-2)
-generate_video.py         -- Video generation (Wan 2.1 / 2.2)
-workflows/
-  smart_generate_image.json
-  enhance_image.json
-  edit_image.json
-  generate_caption.json
-  generate_video.json
-  generate_video_wan22.json
+smart_generate_image/
+  tool.py                    -- Image generation
+  smart_generate_image.json  -- ComfyUI workflow
+enhance_image/
+  tool.py                    -- Image upscale/enhance
+  enhance_image.json         -- ComfyUI workflow
+edit_image/
+  tool.py                    -- Image editing (Flux 2)
+  edit_image.json            -- ComfyUI workflow
+generate_caption/
+  tool.py                    -- Image captioning (Florence-2)
+  generate_caption.json      -- ComfyUI workflow
+generate_video/
+  tool.py                    -- Video generation (Wan 2.1 / 2.2)
+  generate_video.json        -- ComfyUI workflow (Wan 2.1)
+  generate_video_wan22.json  -- ComfyUI workflow (Wan 2.2)
 README.md
 ```
