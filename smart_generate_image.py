@@ -40,7 +40,6 @@ _DEFAULT_MEGAPIXEL = "1.0"
 _DEFAULT_MODEL_FAMILY = "zit"
 
 _MODEL_FAMILY_OPTIONS = [
-    {"value": "", "label": "System default"},
     {"value": "zit", "label": "Z-Image Turbo"},
     {"value": "krea2", "label": "Krea 2"},
     {"value": "flux.2", "label": "FLUX.2 Klein"},
