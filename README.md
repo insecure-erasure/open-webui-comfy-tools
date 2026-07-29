@@ -1,6 +1,10 @@
 # Open WebUI Comfy Tools
 
-A collection of Python tools that integrate ComfyUI workflows into Open WebUI chat sessions. Each tool loads its corresponding workflow JSON from a cache directory and communicates with a ComfyUI server via its REST API. Tools support configurable valves at both admin and user level.
+Open WebUI ships with a built-in image generation tool. It works, but its simplicity comes at a cost: no control over the model, no LoRA support, no seed for reproducibility, and no way to edit, caption, upscale, or generate video. For power users and admins running their own ComfyUI server, these limitations turn a capable backend into a black box.
+
+This project breaks that black box open. Each tool is a standalone Python script that loads a real ComfyUI workflow from a JSON file, injects user parameters into the right nodes, and returns the result inline in the chat. Every parameter is exposed through Open WebUI valves at both admin and user level.
+
+There is no wrapper library, no abstraction layer, and no handholding. Each tool talks directly to the ComfyUI REST API and gives you the same control you would have from the ComfyUI web interface.
 
 ## Tools
 
