@@ -315,7 +315,7 @@ class Tools:
                 }
             },
         )
-        num_beams: str = Field(
+        max_num_beams: str = Field(
             default="0",
             description="Num beams policy. 0 = user decides (no clamp). -1 = force model default (4). 1-8 = clamp user value to this ceiling.",
             json_schema_extra={
@@ -349,9 +349,9 @@ class Tools:
                 }
             },
         )
-        max_new_tokens: int = Field(
+        new_tokens: int = Field(
             default=0,
-            description="Max new tokens. 0 = use system default / admin policy. Subject to admin ceiling.",
+            description="New tokens. 0 = use system default / admin policy. Subject to admin ceiling.",
         )
         num_beams: str = Field(
             default="0",
@@ -388,21 +388,16 @@ class Tools:
         __id__: str = "",
     ):
         """
-        Generate a caption / description of an image (in English).
+        Generate a caption / description of an image.
 
-        Only call when the user asks what an image depicts. Also use this
-        before editing or enhancing an image to give yourself visual context —
-        you cannot see the image directly. Pass an image filename or an URL.
+        Only call when the user asks what an image depicts. Pass an image
+        filename or an URL.
 
-        The returned caption is always in English regardless of the image
-        content or the user's language.
-
-        Args:
-            image: Filename or URL of the image to caption.
-            detail_level: How detailed the caption should be.
-                "simple" — brief one-line description (use for casual questions like "what's in this image?")
-                "detailed" — thorough description with multiple sentences (default, recommended)
-                "verbose" — extremely detailed, exhaustive description (use when the user asks for great detail)
+        :param image: Filename or URL of the image to caption.
+        :param detail_level: How detailed the caption should be.
+            "simple" - brief one-line description (use for casual questions like "what's in this image?")
+            "detailed" - thorough description with multiple sentences (default, recommended)
+            "verbose" - extremely detailed, exhaustive description (use when the user asks for great detail)
         """
         if __request__ is None:
             log.error("generate_caption called without request context")
@@ -458,8 +453,8 @@ class Tools:
                 admin_max_tokens = int(raw_admin_tokens)
 
             def _get_user_tokens():
-                if user_valves and user_valves.max_new_tokens and user_valves.max_new_tokens > 0:
-                    return user_valves.max_new_tokens
+                if user_valves and user_valves.new_tokens and user_valves.new_tokens > 0:
+                    return user_valves.new_tokens
                 return 0
 
             if admin_max_tokens == -1:
@@ -487,7 +482,7 @@ class Tools:
             # =================================================================
             # Resolve num_beams with ceiling policy
             # =================================================================
-            raw_admin_beams = self.valves.num_beams
+            raw_admin_beams = self.valves.max_num_beams
             if raw_admin_beams == "-1":
                 admin_max_beams = -1
             elif raw_admin_beams == "0" or not raw_admin_beams:
