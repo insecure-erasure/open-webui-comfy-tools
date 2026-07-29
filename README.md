@@ -53,7 +53,7 @@ The workflows also rely on custom nodes that are not part of core ComfyUI. Insta
 - https://github.com/ltdrdata/ComfyUI-Impact-Pack (ImpactSwitch)
 - https://github.com/NVIDIA/ComfyUI-RTX-Video-SR (RTX video super resolution)
 
-### Add the tools in Open WebUI
+### 1. Add the tools in Open WebUI
 
 Navigate to Workspace > Tools, click "+", paste the script content, and save.
 
@@ -65,7 +65,7 @@ Navigate to Workspace > Tools, click "+", paste the script content, and save.
 | generate_caption/tool.py | Generate Caption |
 | generate_video/tool.py | Generate Video |
 
-### Deploy the workflow JSONs
+### 2. Deploy the workflow JSONs
 
 Each tool requires its corresponding workflow JSON file. Copy it from the tool's directory to the tool's cache directory inside the Open WebUI container:
 
@@ -80,7 +80,7 @@ cp generate_video/generate_video_wan22.json       /app/backend/data/cache/tools/
 
 The cache/tools/<name>/ directory is created automatically when you save the tool script.
 
-### Enable the tools
+### 3. Enable the tools
 
 In any chat, open the tool selector and enable the ones you want to use.
 
