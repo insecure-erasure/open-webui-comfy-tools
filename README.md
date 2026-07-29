@@ -68,6 +68,8 @@ In any chat, open the tool selector and enable the ones you want to use.
 - Native Tool Calling enabled
 - Image Generation Engine set to ComfyUI (Admin Panel > Settings > Images)
 
+Each workflow comes pre-configured with specific models. The models required for each tool are listed in its respective README.
+
 ## Dependencies
 
 The workflows rely on custom nodes that are not part of core ComfyUI. Install the following repositories in your ComfyUI custom_nodes/ directory:
