@@ -32,4 +32,4 @@ Place `enhance_image.json` in the tool's cache directory:
 /app/backend/data/cache/tools/enhance_image/enhance_image.json
 ```
 
-The workflow JSON can be edited freely. You can replace the SeedVR2 model or configuration with any compatible upscaling setup. The tool injects only the parameters configured through valves; everything else uses whatever the workflow defines.
+The workflow JSON can be edited freely. You can replace the SeedVR2 model or configuration with any compatible upscaling setup. The tool injects parameters from both the LLM call argument (image) and the valves. Everything else uses whatever the workflow defines.
