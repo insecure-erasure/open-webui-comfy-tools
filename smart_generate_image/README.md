@@ -8,7 +8,7 @@ Generates images from a text prompt through ComfyUI. Supports three model famili
 |---|---|---|---|---|---|---|
 | Z-Image Turbo | zImageTurbo-mxfp8.safetensors | Z-Image_half_natural_vae.safetensors | 1.0 | 10 | euler | simple |
 | Krea 2 | krea2_turbo_mixed_nvfp4.safetensors | qwen_image_vae.safetensors | 1.0 | 8 | euler | simple |
-| FLUX.2 Klein | flux-2-klein-9b-nvfp4.safetensors | flux2-vae-small-bf16.safetensors | 1.0 | 8 | euler | (none) |
+| FLUX.2 Klein | flux-2-klein-9b-nvfp4.safetensors | flux2-vae-small-bf16.safetensors | 1.0 | 8 | euler | (flux.2 guidance) |
 
 ## Valves
 
