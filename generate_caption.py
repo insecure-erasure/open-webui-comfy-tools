@@ -345,7 +345,7 @@ class Tools:
         )
         seed: int = Field(
             default=-1,
-            description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
+            description="Seed. -1 = random, >=1 = fixed seed for reproducibility.",
         )
 
     def __init__(self):
@@ -534,9 +534,9 @@ class Tools:
             run_node["inputs"]["max_new_tokens"] = resolved_tokens
             run_node["inputs"]["num_beams"] = resolved_beams
             run_node["inputs"]["do_sample"] = user_valves.do_sample if user_valves else False
-            # Seed: UserValve. -1 = random, >=0 = fixed
+            # Seed: UserValve. -1 = random, >=1 = fixed (Florence2Run minimum is 1)
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
-            seed_arg = _random.randint(1, _COMFY_SEED_MAX) if user_seed == -1 else min(user_seed, _COMFY_SEED_MAX)
+            seed_arg = _random.randint(1, _COMFY_SEED_MAX) if user_seed == -1 else min(max(user_seed, 1), _COMFY_SEED_MAX)
             run_node["inputs"]["seed"] = seed_arg
 
             log.info(
