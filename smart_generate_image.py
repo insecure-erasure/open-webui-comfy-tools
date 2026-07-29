@@ -355,6 +355,11 @@ class Tools:
             default="[]",
             description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Empty name or strength 0 disables it. Applied positionally to lora_1..lora_N. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
         )
+        override_system_loras: bool = Field(
+            default=True,
+            description="When enabled, user LoRAs override system (admin) LoRAs on name collision. "
+                        "Disable to use only system LoRAs regardless of user config.",
+        )
         steps: str = Field(
             default="0",
             description="Inference steps. 0 = use workflow default.",
@@ -539,7 +544,7 @@ class Tools:
                 return f"Error: {err}"
 
             user_loras = []
-            if user_valves and user_valves.lora_config:
+            if user_valves and user_valves.override_system_loras and user_valves.lora_config:
                 user_loras, err = _load_loras(user_valves.lora_config, "user")
                 if err:
                     if __event_emitter__:
