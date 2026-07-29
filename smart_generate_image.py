@@ -2,7 +2,7 @@
 title: Smart Generate Image
 author: A. Martin
 description: Generate images through ComfyUI with seed, model, size, and steps control
-version: 3.0
+version: 3.1
 """
 
 import asyncio
