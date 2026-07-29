@@ -75,11 +75,6 @@ _BEAM_OPTIONS = [
     for i in range(1, 11)
 ]
 
-_TOKENS_OPTIONS = [
-    {"value": str(i), "label": str(i)}
-    for i in [128, 256, 512, 768, 1024, 1536, 2048, 3072, 4096]
-]
-
 
 # =============================================================================
 # Workflow node resolver — finds nodes by _meta.title (must be unique)
@@ -292,19 +287,13 @@ class Tools:
                 }
             },
         )
-        max_new_tokens: str = Field(
-            default="0",
-            description="Max new tokens ceiling. 0 = no ceiling (use user value). 128-4096 = clamp user value to this ceiling.",
-            json_schema_extra={
-                "input": {
-                    "type": "select",
-                    "options": _TOKENS_OPTIONS,
-                }
-            },
+        max_new_tokens: int = Field(
+            default=1024,
+            description="Max new tokens ceiling. 0 = no ceiling. 1-4096 = clamp user value to this ceiling.",
         )
         max_num_beams: str = Field(
-            default="0",
-            description="Max beam ceiling. 0 = no ceiling (use user value). 1-10 = clamp user value to this ceiling.",
+            default="2",
+            description="Max beam ceiling. 0 = no ceiling. 1-10 = clamp user value to this ceiling.",
             json_schema_extra={
                 "input": {
                     "type": "select",
@@ -336,15 +325,9 @@ class Tools:
                 }
             },
         )
-        new_tokens: str = Field(
-            default="0",
-            description="New tokens. 0 = use system default. 128-4096 = explicit value (subject to admin ceiling).",
-            json_schema_extra={
-                "input": {
-                    "type": "select",
-                    "options": _TOKENS_OPTIONS,
-                }
-            },
+        new_tokens: int = Field(
+            default=0,
+            description="New tokens. 0 = use admin ceiling. 1-4096 = explicit value (subject to admin ceiling).",
         )
         num_beams: str = Field(
             default="0",
@@ -435,13 +418,13 @@ class Tools:
             # Resolve max_new_tokens with ceiling policy
             # =================================================================
             def _get_user_tokens():
-                if user_valves and user_valves.new_tokens and user_valves.new_tokens != "0":
-                    return int(user_valves.new_tokens)
+                if user_valves and user_valves.new_tokens and user_valves.new_tokens > 0:
+                    return user_valves.new_tokens
                 return 0
 
             def _get_admin_token_ceiling():
-                if self.valves.max_new_tokens and self.valves.max_new_tokens != "0":
-                    return int(self.valves.max_new_tokens)
+                if self.valves.max_new_tokens and self.valves.max_new_tokens > 0:
+                    return self.valves.max_new_tokens
                 return 0
 
             user_tokens = _get_user_tokens()
