@@ -375,7 +375,8 @@ class Tools:
             "detailed" - thorough description with multiple sentences
             "verbose" - extremely detailed, exhaustive description (use when the user asks for great detail)
 
-            If omitted, the default caption task will be used.
+            If omitted, the default caption task will be used. Only specify if the user
+            explicitly asks for a shorter or more detailed description.
         """
         if __request__ is None:
             log.error("generate_caption called without request context")
