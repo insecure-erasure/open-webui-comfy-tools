@@ -527,6 +527,7 @@ class Tools:
             _, model_loader = _resolve_node(workflow, "Florence2ModelLoader")
             _, run_node = _resolve_node(workflow, "Florence2Run")
             output_node_id, _ = _resolve_node(workflow, "Show Text \U0001f40d")
+            lora_node_id, _ = _resolve_node(workflow, "Florence2 Lora Loader")
 
             # =================================================================
             # Configure image source — auto-detect URL vs filename
@@ -549,7 +550,7 @@ class Tools:
             model_loader["inputs"]["model"] = resolved_model
             # PixelProse LoRA only works with Florence-2-base-ft — disable the node for other models
             if resolved_model != "Florence-2-base-ft":
-                workflow["44"]["disabled"] = True
+                workflow[lora_node_id]["disabled"] = True
             run_node["inputs"]["task"] = resolved_task
             run_node["inputs"]["max_new_tokens"] = resolved_tokens
             run_node["inputs"]["num_beams"] = resolved_beams
