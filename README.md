@@ -1,4 +1,4 @@
-# Smart Generate Image — Image & Video Tools for Open WebUI
+# Open WebUI Comfy Tools
 
 A set of AI tools to generate, edit, enhance and caption images — and generate videos — directly in your Open WebUI chats, powered by ComfyUI.
 
