@@ -547,9 +547,9 @@ class Tools:
             # Inject model and task
             # =================================================================
             model_loader["inputs"]["model"] = resolved_model
-            # PixelProse LoRA only works with Florence-2-base-ft — disconnect for other models
+            # PixelProse LoRA only works with Florence-2-base-ft — disable the node for other models
             if resolved_model != "Florence-2-base-ft":
-                model_loader["inputs"]["lora"] = None
+                workflow["44"]["disabled"] = True
             run_node["inputs"]["task"] = resolved_task
             run_node["inputs"]["max_new_tokens"] = resolved_tokens
             run_node["inputs"]["num_beams"] = resolved_beams
