@@ -54,3 +54,5 @@ Place `generate_caption.json` in the tool's cache directory:
 ```
 /app/backend/data/cache/tools/generate_caption/generate_caption.json
 ```
+
+The workflow JSON can be edited freely. You can replace the Florence-2 model with any compatible variant or add custom prompt engineering. The tool injects only the parameters configured through valves; everything else uses whatever the workflow defines.

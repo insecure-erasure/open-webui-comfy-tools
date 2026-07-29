@@ -32,3 +32,5 @@ Place `edit_image.json` in the tool's cache directory:
 ```
 /app/backend/data/cache/tools/edit_image/edit_image.json
 ```
+
+The workflow JSON can be edited freely. You can replace the default Flux 2 model with any compatible checkpoint. The tool injects only the parameters configured through valves; everything else uses whatever the workflow defines.

@@ -62,3 +62,5 @@ Place `smart_generate_image.json` in the tool's cache directory:
 ```
 /app/backend/data/cache/tools/smart_generate_image/smart_generate_image.json
 ```
+
+The workflow JSON can be edited freely. You can replace the default models with any compatible checkpoint, VAE, or text encoder. Model file names, sampler settings, scheduler configuration, and resolution parameters are all determined by what the workflow nodes reference. The tool injects only the parameters that are explicitly configured through valves; everything else uses whatever the workflow defines.

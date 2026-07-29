@@ -86,3 +86,5 @@ Place both workflow files in the tool's cache directory:
 /app/backend/data/cache/tools/generate_video/generate_video.json
 /app/backend/data/cache/tools/generate_video/generate_video_wan22.json
 ```
+
+The workflow JSONs can be edited freely. You can replace the diffusion models, samplers, schedulers, or any other node with whatever works for your setup. The tool injects only the parameters configured through valves; everything else uses whatever the workflow defines.
