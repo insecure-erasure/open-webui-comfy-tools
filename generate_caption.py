@@ -379,6 +379,7 @@ class Tools:
     async def generate_caption(
         self,
         image: str,
+        detail_level: str = "detailed",
         __request__=None,
         __user__=None,
         __event_emitter__=None,
@@ -395,6 +396,13 @@ class Tools:
 
         The returned caption is always in English regardless of the image
         content or the user's language.
+
+        Args:
+            image: Filename or URL of the image to caption.
+            detail_level: How detailed the caption should be.
+                "simple" — brief one-line description (use for casual questions like "what's in this image?")
+                "detailed" — thorough description with multiple sentences (default, recommended)
+                "verbose" — extremely detailed, exhaustive description (use when the user asks for great detail)
         """
         if __request__ is None:
             log.error("generate_caption called without request context")
@@ -551,7 +559,15 @@ class Tools:
             # PixelProse LoRA only works with Florence-2-base-ft — disable the node for other models
             if resolved_model != "Florence-2-base-ft":
                 workflow[lora_node_id]["disabled"] = True
-            run_node["inputs"]["task"] = resolved_task
+            # Map detail_level to Florence-2 task, overrides resolved_task
+            _DETAIL_MAP = {
+                "simple": "caption",
+                "detailed": "detailed_caption",
+                "verbose": "more_detailed_caption",
+            }
+            detail_task = _DETAIL_MAP.get(detail_level)
+            injected_task = detail_task if detail_task else resolved_task
+            run_node["inputs"]["task"] = injected_task
             run_node["inputs"]["max_new_tokens"] = resolved_tokens
             run_node["inputs"]["num_beams"] = resolved_beams
             run_node["inputs"]["do_sample"] = user_valves.do_sample if user_valves else False
@@ -562,12 +578,13 @@ class Tools:
 
             log.info(
                 "Dispatching caption workflow to ComfyUI (%s) - model=%s, task=%s, "
-                "max_new_tokens=%d, num_beams=%d",
+                "max_new_tokens=%d, num_beams=%d, detail_level=%s",
                 image_config.COMFYUI_BASE_URL,
                 resolved_model,
-                resolved_task,
+                injected_task,
                 resolved_tokens,
                 resolved_beams,
+                detail_level,
             )
 
             # =================================================================
