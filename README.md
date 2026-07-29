@@ -70,9 +70,7 @@ In any chat, open the tool selector and enable the ones you want to use.
 
 Each workflow comes pre-configured with specific models. The models required for each tool are listed in its respective README.
 
-## Dependencies
-
-The workflows rely on custom nodes that are not part of core ComfyUI. Install the following repositories in your ComfyUI custom_nodes/ directory:
+The workflows also rely on custom nodes that are not part of core ComfyUI. Install the following repositories in your ComfyUI custom_nodes/ directory:
 
 - https://github.com/insecure-erasure/ComfyUI-LoadImageURL (required by all tools)
 - https://github.com/rgthree/rgthree-comfy (Power Lora Loader)
