@@ -61,6 +61,8 @@ Dual-path pipeline with high and low resolution passes.
 
 ## Model sources
 
+The models listed below use mixed quantization formats (NVFP4, MXFP8) and are designed for NVIDIA Blackwell GPUs (RTX 50xx series). They require CUDA 13 and comfy-kitchen (or a compatible runtime) to load and run correctly.
+
 Diffusion models are available on HuggingFace at [InsecureErasure](https://huggingface.co/InsecureErasure):
 
 | File | Source |

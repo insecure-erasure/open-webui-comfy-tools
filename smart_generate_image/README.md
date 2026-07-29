@@ -12,6 +12,8 @@ Generates images from a text prompt through ComfyUI. Supports three model famili
 
 ## Model sources
 
+The models listed below use mixed quantization formats (NVFP4, MXFP8) and are designed for NVIDIA Blackwell GPUs (RTX 50xx series). They require CUDA 13 and comfy-kitchen (or a compatible runtime) to load and run correctly.
+
 Most models and text encoders are available on HuggingFace at [InsecureErasure](https://huggingface.co/InsecureErasure):
 
 | File | Source |
