@@ -126,9 +126,10 @@ class Tools:
             description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Empty name or strength 0 disables it. Applied positionally to lora_1..lora_N. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
         )
         override_system_loras: bool = Field(
-            default=True,
-            description="When enabled, user LoRAs override system (admin) LoRAs on name collision. "
-                        "Disable to use only system LoRAs regardless of user config.",
+            default=False,
+            description="When enabled, user LoRAs replace system (admin) LoRAs entirely. "
+                        "When disabled (default), system LoRAs take priority and user LoRAs "
+                        "are only added if they don't collide with system ones.",
         )
         comfyui_image_base_url: str = Field(
             default="",
@@ -255,7 +256,7 @@ class Tools:
                 return f"Error: {err}"
 
             user_loras = []
-            if user_valves and user_valves.override_system_loras and user_valves.lora_config:
+            if user_valves and user_valves.lora_config:
                 user_loras, err = _load_loras(user_valves.lora_config, "user")
                 if err:
                     if __event_emitter__:
@@ -271,26 +272,26 @@ class Tools:
                     return f"Error: {err}"
 
             user_active = []
-            blocked_names = set()
             for item in user_loras:
                 name = _lora_name(item)
                 if not name:
                     continue
-                disabled = False
                 if isinstance(item, dict):
                     s = float(item.get("strength", 1.0))
                     if s == 0:
-                        disabled = True
-                if disabled:
-                    blocked_names.add(name)
-                else:
-                    user_active.append(item)
-                    blocked_names.add(name)
+                        continue
+                user_active.append(item)
 
-            combined = list(user_active)
-            for item in admin_loras:
-                if _lora_name(item) not in blocked_names:
-                    combined.append(item)
+            if user_valves and user_valves.override_system_loras:
+                # User overrides system — only user LoRAs, admin ignored
+                combined = list(user_active)
+            else:
+                # System wins on collision, user adds non-colliding LoRAs
+                system_names = {_lora_name(item) for item in admin_loras}
+                combined = list(admin_loras)
+                for item in user_active:
+                    if _lora_name(item) not in system_names:
+                        combined.append(item)
 
             # Build LoRA lines for status
             lora_desc_lines = []
