@@ -61,7 +61,7 @@ The cache/tools/<name>/ directory is created automatically when you save the too
 
 In any chat, open the tool selector and enable the ones you want to use.
 
-### Requirements
+## Requirements
 
 - Open WebUI (recent version with native Tools support)
 - A running ComfyUI server
