@@ -75,10 +75,7 @@ _BEAM_OPTIONS = [
     for i in range(1, 11)
 ]
 
-_MAX_TOKENS_OPTIONS = [
-    {"value": "0", "label": "User decides"},
-    {"value": "-1", "label": "Model default (1024)"},
-] + [
+_TOKENS_OPTIONS = [
     {"value": str(i), "label": str(i)}
     for i in [128, 256, 512, 768, 1024, 1536, 2048, 3072, 4096]
 ]
@@ -297,11 +294,11 @@ class Tools:
         )
         max_new_tokens: str = Field(
             default="0",
-            description="Max new tokens policy. 0 = user decides (no clamp). -1 = force model default (1024). 128-4096 = clamp user value to this ceiling.",
+            description="Max new tokens ceiling. 0 = no ceiling (use user value). 128-4096 = clamp user value to this ceiling.",
             json_schema_extra={
                 "input": {
                     "type": "select",
-                    "options": _MAX_TOKENS_OPTIONS,
+                    "options": _TOKENS_OPTIONS,
                 }
             },
         )
@@ -339,9 +336,15 @@ class Tools:
                 }
             },
         )
-        new_tokens: int = Field(
-            default=0,
-            description="New tokens. 0 = use system default / admin policy. Subject to admin ceiling.",
+        new_tokens: str = Field(
+            default="0",
+            description="New tokens. 0 = use system default. 128-4096 = explicit value (subject to admin ceiling).",
+            json_schema_extra={
+                "input": {
+                    "type": "select",
+                    "options": _TOKENS_OPTIONS,
+                }
+            },
         )
         num_beams: str = Field(
             default="0",
@@ -431,45 +434,37 @@ class Tools:
             # =================================================================
             # Resolve max_new_tokens with ceiling policy
             # =================================================================
-            #   max_new_tokens = 0  → user decides (no clamp)
-            #   max_new_tokens = -1 → force model default (ignore user)
-            #   max_new_tokens > 0  → clamp user value to this ceiling
-            raw_admin_tokens = self.valves.max_new_tokens
-            if raw_admin_tokens == "-1":
-                admin_max_tokens = -1
-            elif raw_admin_tokens == "0" or not raw_admin_tokens:
-                admin_max_tokens = 0
-            else:
-                admin_max_tokens = int(raw_admin_tokens)
-
             def _get_user_tokens():
-                if user_valves and user_valves.new_tokens and user_valves.new_tokens > 0:
-                    return user_valves.new_tokens
+                if user_valves and user_valves.new_tokens and user_valves.new_tokens != "0":
+                    return int(user_valves.new_tokens)
                 return 0
 
-            if admin_max_tokens == -1:
-                resolved_tokens = _DEFAULT_MAX_NEW_TOKENS
-            elif admin_max_tokens == 0:
-                user_tokens = _get_user_tokens()
-                resolved_tokens = user_tokens if user_tokens > 0 else _DEFAULT_MAX_NEW_TOKENS
+            def _get_admin_token_ceiling():
+                if self.valves.max_new_tokens and self.valves.max_new_tokens != "0":
+                    return int(self.valves.max_new_tokens)
+                return 0
+
+            user_tokens = _get_user_tokens()
+            admin_token_ceiling = _get_admin_token_ceiling()
+
+            if user_tokens > 0 and admin_token_ceiling > 0:
+                resolved_tokens = min(user_tokens, admin_token_ceiling)
+                if resolved_tokens < user_tokens:
+                    log.warning("Max new tokens clamped to %d (admin ceiling)", admin_token_ceiling)
+                    if __event_emitter__:
+                        await __event_emitter__(
+                            {
+                                "type": "notification",
+                                "data": {
+                                    "type": "warning",
+                                    "content": f"\u26a0\ufe0f Max new tokens clamped to {admin_token_ceiling} (admin ceiling).",
+                                },
+                            }
+                        )
+            elif user_tokens > 0:
+                resolved_tokens = user_tokens
             else:
-                user_tokens = _get_user_tokens()
-                if user_tokens > 0:
-                    resolved_tokens = min(user_tokens, admin_max_tokens)
-                    if resolved_tokens < user_tokens:
-                        log.warning("Max new tokens clamped to %d (admin ceiling)", admin_max_tokens)
-                        if __event_emitter__:
-                            await __event_emitter__(
-                                {
-                                    "type": "notification",
-                                    "data": {
-                                        "type": "warning",
-                                        "content": f"\u26a0\ufe0f Max new tokens clamped to {admin_max_tokens} (admin ceiling).",
-                                    },
-                                }
-                            )
-                else:
-                    resolved_tokens = _DEFAULT_MAX_NEW_TOKENS
+                resolved_tokens = admin_token_ceiling if admin_token_ceiling > 0 else _DEFAULT_MAX_NEW_TOKENS
 
             # =================================================================
             # Resolve num_beams with ceiling policy
