@@ -3,11 +3,24 @@
     "inputs": {
       "model": "Florence-2-base-ft",
       "precision": "bf16",
+      "lora": [
+        "44",
+        0
+      ],
       "convert_to_safetensors": false
     },
     "class_type": "Florence2ModelLoader",
     "_meta": {
       "title": "Florence2ModelLoader"
+    }
+  },
+  "44": {
+    "inputs": {
+      "model": "NikshepShetty/Florence-2-pixelprose"
+    },
+    "class_type": "DownloadAndLoadFlorence2Lora",
+    "_meta": {
+      "title": "Florence2 Lora Loader"
     }
   },
   "9": {
