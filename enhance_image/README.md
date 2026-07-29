@@ -20,6 +20,13 @@ Upscales or enhances a previously generated image using SeedVR2. Loads images vi
 
 The LLM calls this tool when the user explicitly asks to enhance or upscale an image. Pass a filename from a previous generation or a direct URL to an external image.
 
+## Models
+
+The workflow uses two models that are downloaded automatically on first run:
+
+- DiT model: seedvr2_ema_7b-Q4_K_M.gguf (GGUF quantized, ~4 GB)
+- VAE model: ema_vae_fp16.safetensors
+
 ## Requirements
 
 - ComfyUI-LoadImageURL custom node installed in ComfyUI's custom_nodes/ directory.
