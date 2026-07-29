@@ -70,19 +70,9 @@ _DEFAULT_MAX_NEW_TOKENS = 1024
 _DEFAULT_NUM_BEAMS = 4
 _COMFY_SEED_MAX: int = 1125899906842624
 
-_MAX_BEAM_OPTIONS = [
-    {"value": "0", "label": "User decides"},
-    {"value": "-1", "label": "Model default (4)"},
-] + [
+_BEAM_OPTIONS = [
     {"value": str(i), "label": str(i)}
-    for i in range(1, 9)
-]
-
-_USER_BEAM_OPTIONS = [
-    {"value": "0", "label": "System default"},
-] + [
-    {"value": str(i), "label": str(i)}
-    for i in range(1, 9)
+    for i in range(1, 11)
 ]
 
 _MAX_TOKENS_OPTIONS = [
@@ -317,11 +307,11 @@ class Tools:
         )
         max_num_beams: str = Field(
             default="0",
-            description="Num beams policy. 0 = user decides (no clamp). -1 = force model default (4). 1-8 = clamp user value to this ceiling.",
+            description="Max beam ceiling. 0 = no ceiling (use user value). 1-10 = clamp user value to this ceiling.",
             json_schema_extra={
                 "input": {
                     "type": "select",
-                    "options": _MAX_BEAM_OPTIONS,
+                    "options": _BEAM_OPTIONS,
                 }
             },
         )
@@ -355,11 +345,11 @@ class Tools:
         )
         num_beams: str = Field(
             default="0",
-            description="Number of beams. 0 = use system default. 1-8 = explicit value (subject to admin ceiling).",
+            description="Number of beams. 0 = use system default. 1-10 = explicit value (subject to admin ceiling).",
             json_schema_extra={
                 "input": {
                     "type": "select",
-                    "options": _USER_BEAM_OPTIONS,
+                    "options": _BEAM_OPTIONS,
                 }
             },
         )
@@ -466,56 +456,55 @@ class Tools:
                 user_tokens = _get_user_tokens()
                 if user_tokens > 0:
                     resolved_tokens = min(user_tokens, admin_max_tokens)
-                    if resolved_tokens < user_tokens and __event_emitter__:
-                        await __event_emitter__(
-                            {
-                                "type": "notification",
-                                "data": {
-                                    "type": "warning",
-                                    "content": f"\u26a0\ufe0f Max new tokens clamped to {admin_max_tokens} (system limit).",
-                                },
-                            }
-                        )
+                    if resolved_tokens < user_tokens:
+                        log.warning("Max new tokens clamped to %d (admin ceiling)", admin_max_tokens)
+                        if __event_emitter__:
+                            await __event_emitter__(
+                                {
+                                    "type": "notification",
+                                    "data": {
+                                        "type": "warning",
+                                        "content": f"\u26a0\ufe0f Max new tokens clamped to {admin_max_tokens} (admin ceiling).",
+                                    },
+                                }
+                            )
                 else:
                     resolved_tokens = _DEFAULT_MAX_NEW_TOKENS
 
             # =================================================================
             # Resolve num_beams with ceiling policy
             # =================================================================
-            raw_admin_beams = self.valves.max_num_beams
-            if raw_admin_beams == "-1":
-                admin_max_beams = -1
-            elif raw_admin_beams == "0" or not raw_admin_beams:
-                admin_max_beams = 0
-            else:
-                admin_max_beams = int(raw_admin_beams)
-
             def _get_user_beams():
                 if user_valves and user_valves.num_beams and user_valves.num_beams != "0":
                     return int(user_valves.num_beams)
                 return 0
 
-            if admin_max_beams == -1:
-                resolved_beams = _DEFAULT_NUM_BEAMS
-            elif admin_max_beams == 0:
-                user_beams = _get_user_beams()
-                resolved_beams = user_beams if user_beams > 0 else _DEFAULT_NUM_BEAMS
-            else:
-                user_beams = _get_user_beams()
-                if user_beams > 0:
-                    resolved_beams = min(user_beams, admin_max_beams)
-                    if resolved_beams < user_beams and __event_emitter__:
+            def _get_admin_beam_ceiling():
+                if self.valves.max_num_beams and self.valves.max_num_beams != "0":
+                    return int(self.valves.max_num_beams)
+                return 0
+
+            user_beams = _get_user_beams()
+            admin_ceiling = _get_admin_beam_ceiling()
+
+            if user_beams > 0 and admin_ceiling > 0:
+                resolved_beams = min(user_beams, admin_ceiling)
+                if resolved_beams < user_beams:
+                    log.warning("Num beams clamped to %d (admin ceiling)", admin_ceiling)
+                    if __event_emitter__:
                         await __event_emitter__(
                             {
                                 "type": "notification",
                                 "data": {
                                     "type": "warning",
-                                    "content": f"\u26a0\ufe0f Num beams clamped to {admin_max_beams} (system limit).",
+                                    "content": f"\u26a0\ufe0f Num beams clamped to {admin_ceiling} (admin ceiling).",
                                 },
                             }
                         )
-                else:
-                    resolved_beams = _DEFAULT_NUM_BEAMS
+            elif user_beams > 0:
+                resolved_beams = user_beams
+            else:
+                resolved_beams = admin_ceiling if admin_ceiling > 0 else _DEFAULT_NUM_BEAMS
 
             # =================================================================
             # Build the workflow: load from cache and parse
