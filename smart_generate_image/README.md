@@ -10,6 +10,19 @@ Generates images from a text prompt through ComfyUI. Supports three model famili
 | Krea 2 | krea2_turbo_mixed_nvfp4.safetensors | qwen_image_vae.safetensors | 1.0 | 8 | euler | simple |
 | FLUX.2 Klein | flux-2-klein-9b-nvfp4.safetensors | flux2-vae-small-bf16.safetensors | 1.0 | 8 | euler | (flux.2 guidance) |
 
+## Model sources
+
+Most models and text encoders are available on HuggingFace at [InsecureErasure](https://huggingface.co/InsecureErasure):
+
+| File | Source |
+|---|---|
+| zImageTurbo-mxfp8.safetensors, Z-Image_half_natural_vae.safetensors | [InsecureErasure/Z-Image-Turbo-MXFP8](https://huggingface.co/InsecureErasure/Z-Image-Turbo-MXFP8) |
+| qwen3_4b_instruct_2507_mxfp8.safetensors | [InsecureErasure/Qwen3-4B-Instruct-NVFP4](https://huggingface.co/InsecureErasure/Qwen3-4B-Instruct-NVFP4) |
+| qwen3_vl_4b_instruct_mxfp8.safetensors | [InsecureErasure/Qwen3-VL-4B-Instruct-NVFP4](https://huggingface.co/InsecureErasure/Qwen3-VL-4B-Instruct-NVFP4) |
+| krea2_turbo_mixed_nvfp4.safetensors, qwen_image_vae.safetensors | [InsecureErasure/Krea2-Turbo-mixed-NVFP4](https://huggingface.co/InsecureErasure/Krea2-Turbo-mixed-NVFP4) |
+
+Models for FLUX.2 Klein (flux-2-klein-9b-nvfp4, flux2-vae-small-bf16, qwen_3_8b_nvfp4) are available from community sources on HuggingFace.
+
 ## Valves
 
 ### Admin

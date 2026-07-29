@@ -59,6 +59,17 @@ Dual-path pipeline with high and low resolution passes.
 | steps | 4-10. Wan 2.2 rounds odd values up to the nearest even. |
 | comfyui_image_base_url | Overrides admin valve and COMFYUI_BASE_URL. |
 
+## Model sources
+
+Diffusion models are available on HuggingFace at [InsecureErasure](https://huggingface.co/InsecureErasure):
+
+| File | Source |
+|---|---|
+| Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-nvfp4.safetensors | [InsecureErasure/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-NVFP4](https://huggingface.co/InsecureErasure/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-NVFP4) |
+| Wan2.2-I2V-A14B-Moe-Distill-Lightx2v-{high,low}-nvfp4.safetensors | [InsecureErasure/Wan2.2-I2V-A14B-Moe-Distill-Lightx2v-NVFP4](https://huggingface.co/InsecureErasure/Wan2.2-I2V-A14B-Moe-Distill-Lightx2v-NVFP4) |
+
+The Wan VAE (wan_2.1_vae.safetensors) is available from the original Wan repository.
+
 ## Usage
 
 The LLM calls this tool when the user asks to animate an image into a video. The prompt describes the desired motion in English. The image parameter accepts a filename from a previous generation or a direct URL.
