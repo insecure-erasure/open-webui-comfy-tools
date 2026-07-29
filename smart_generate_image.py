@@ -42,6 +42,7 @@ _DEFAULT_MODEL_FAMILY = "zit"
 _MODEL_FAMILY_OPTIONS = [
     {"value": "", "label": "System default"},
     {"value": "zit", "label": "Z-Image Turbo"},
+    {"value": "krea2", "label": "Krea 2"},
     {"value": "flux.2", "label": "FLUX.2 Klein"},
 ]
 
@@ -59,6 +60,18 @@ MODEL_CONFIGS = {
         "sampler": "euler",
         "scheduler": "simple",
         "clip_type": "lumina2",
+        "sigma_selector_index": 1,
+    },
+    "krea2": {
+        "model": "krea2_turbo_mixed_nvfp4.safetensors",
+        "text_encoder": "qwen3_vl_4b_instruct_mxfp8.safetensors",
+        "vae": "qwen_image_vae.safetensors",
+        "vae_scale_factor": 8,
+        "cfg": 1.0,
+        "steps": 8,
+        "sampler": "euler",
+        "scheduler": "simple",
+        "clip_type": "krea2",
         "sigma_selector_index": 1,
     },
     "flux.2": {
