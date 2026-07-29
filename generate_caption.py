@@ -536,7 +536,7 @@ class Tools:
             run_node["inputs"]["do_sample"] = user_valves.do_sample if user_valves else False
             # Seed: UserValve. -1 = random, >=0 = fixed
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
-            seed_arg = _random.randint(0, _COMFY_SEED_MAX) if user_seed == -1 else min(user_seed, _COMFY_SEED_MAX)
+            seed_arg = _random.randint(1, _COMFY_SEED_MAX) if user_seed == -1 else min(user_seed, _COMFY_SEED_MAX)
             run_node["inputs"]["seed"] = seed_arg
 
             log.info(
