@@ -10,101 +10,23 @@ There is no wrapper library, no abstraction layer, and no handholding. Each tool
 
 ### Smart Generate Image
 
-Generates images from a text prompt. Supports three model families: Z-Image Turbo, Krea 2, and FLUX.2 Klein. Each model family defines its own defaults for model file, VAE, scheduler, sampler, and CFG scale.
-
-**Admin valves.** Model family, specific model file override, default aspect ratio, megapixel target, max steps, seed, and LoRA configuration.
-
-**User valves.** Model family, model name, inference steps, seed, and LoRAs.
+Generates images from a text prompt. Supports three model families: Z-Image Turbo, Krea 2, and FLUX.2 Klein. Each model family defines its own defaults for model file, VAE, scheduler, sampler, and CFG scale. See its README for valve documentation.
 
 ### Edit Image
 
-Edits a previously generated image using Flux 2 inpainting. Accepts either a tool-generated filename or an external URL.
-
-**Admin valves.** Default steps and LoRA configuration.
-
-**User valves.** Steps and LoRAs.
+Edits a previously generated image using Flux 2 inpainting. Accepts either a tool-generated filename or an external URL. See its README for valve documentation.
 
 ### Generate Caption
 
-Generates a caption for an image using Florence-2 via ComfyUI. The LLM calls this tool automatically when it needs to interpret image content before editing or answering questions.
-
-**Admin valves.** Model, task type (detailed, caption, OCR, etc.), max new tokens, num beams, do_sample, and seed.
-
-**User valves.** Model, task, max new tokens, num beams, do_sample, and seed.
-
-The caption is always returned in English for accuracy. The LLM translates it when replying in the user's language.
+Generates a caption for an image using Florence-2 via ComfyUI. The LLM calls this tool automatically when it needs to interpret image content before editing or answering questions. The caption is always returned in English for accuracy; the LLM translates it when replying. See its README for valve documentation.
 
 ### Enhance Image
 
-Upscales or enhances an image using SeedVR2. Loads images via URL using the ComfyUI-LoadImageURL custom node.
-
-**Admin valves.** ComfyUI base URL override.
+Upscales or enhances an image using SeedVR2. Loads images via URL using the ComfyUI-LoadImageURL custom node. See its README for valve documentation.
 
 ### Generate Video
 
-Generates videos from text or images using Wan 2.1 (single-path) or Wan 2.2 (dual-path high/low resolution). Frames follow a 4n+1 constraint imposed by the WAN temporal VAE stride.
-
-**Admin valves.** Model version, diffusion model config, LoRAs, frame count, negative prompt, steps, seed.
-
-**User valves.** Model version, frame count, steps, negative prompt, seed.
-
-The result renders as an HTML video element in the chat with autoplay, muted, and loop attributes.
-
-## Configuration
-
-Each tool exposes valves in two tiers:
-
-- **Admin valves** - set in Workspace > Tools. Define defaults and limits for all users.
-- **User valves** - set per chat session. Override admin defaults without affecting other users.
-
-### Smart Generate Image
-
-| Valve | Level | Description |
-|---|---|---|
-| Model family | Admin, User | zit, krea2, or flux.2 |
-| Specific model | Admin, User | Override the .safetensors file within the family |
-| Steps | Admin, User | Inference steps. 0 = use model family default |
-| Seed | Admin, User | -1 = random, >=0 = fixed |
-| Aspect ratio | Admin | Width:height ratio (e.g., 2:3, 16:9) |
-| Megapixel | Admin | Resolution target (default 1.0) |
-| Max steps | Admin | Cap on user steps. -1 = force model default |
-| LoRAs | Admin, User | JSON array of LoRA configs |
-
-### Edit Image
-
-| Valve | Level | Description |
-|---|---|---|
-| Steps | Admin, User | 0 = use workflow default (6) |
-| LoRAs | Admin, User | JSON array, applied in order to lora_1..lora_N |
-
-### Generate Caption
-
-| Valve | Level | Description |
-|---|---|---|
-| Model | Admin, User | Florence-2 variant |
-| Task | Admin, User | caption, detailed_caption, ocr, etc. |
-| Max new tokens | Admin, User | Maximum caption length |
-| Num beams | Admin, User | Beam search width |
-| do_sample | Admin, User | Sampling vs. greedy decoding |
-| Seed | Admin, User | -1 = random, >=0 = fixed |
-
-### Enhance Image
-
-| Valve | Level | Description |
-|---|---|---|
-| Base URL | Admin | Override the ComfyUI server URL |
-
-### Generate Video
-
-| Valve | Level | Description |
-|---|---|---|
-| Model version | Admin, User | wan21 or wan22 |
-| Diffusion model | Admin | JSON specifying concrete model files |
-| LoRAs | Admin | Applied per path (high/low for Wan 2.2) |
-| Frames | Admin, User | Video length. Must be 4n+1 (81-161) |
-| Negative prompt | Admin, User | Content to exclude |
-| Steps | Admin, User | 4-10 |
-| Seed | Admin, User | -1 = random, >=0 = fixed |
+Generates videos from text or images using Wan 2.1 (single-path) or Wan 2.2 (dual-path high/low resolution). Frames follow a 4n+1 constraint imposed by the WAN temporal VAE stride. The result renders as an HTML video element with autoplay, muted, and loop. See its README for valve documentation.
 
 ## Installation
 
