@@ -6,9 +6,9 @@
         0
       ]
     },
-    "class_type": "PreviewImage",
+    "class_type": "RandomPreviewImage",
     "_meta": {
-      "title": "Preview Image"
+      "title": "Random Preview Image"
     }
   },
   "221": {

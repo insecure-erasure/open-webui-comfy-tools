@@ -9,8 +9,9 @@ import asyncio
 import json
 import logging
 import random as _random
+import uuid
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 
 import httpx
 from pydantic import BaseModel, Field
@@ -19,6 +20,7 @@ log = logging.getLogger(__name__)
 
 # ComfyUI seed max (consistent with smart_generate_image)
 _COMFY_SEED_MAX: int = 1125899906842624
+_COMFY_QUEUE_TIMEOUT = 60           # seconds
 
 # Steps dropdown options (1-15). Value "0" = use workflow default (handled by Field(default="0")).
 _STEPS_OPTIONS = [
@@ -81,6 +83,98 @@ def _load_workflow(tool_id: str, filename: str) -> str:
 
     log.info("Loading workflow from %s", workflow_path)
     return workflow_path.read_text(encoding='utf-8')
+
+
+async def _comfyui_queue_prompt(
+    client: httpx.AsyncClient, base_url: str, api_key: str, workflow: dict
+) -> str:
+    """Submit a workflow to ComfyUI and return the prompt_id."""
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    payload = {
+        "prompt": workflow,
+        "client_id": str(uuid.uuid4()),
+    }
+
+    resp = await client.post(
+        f"{base_url.rstrip('/')}/prompt",
+        json=payload,
+        headers=headers,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    prompt_id = data.get("prompt_id")
+    if not prompt_id:
+        raise RuntimeError(f"ComfyUI did not return a prompt_id: {data}")
+    return prompt_id
+
+
+async def _comfyui_wait_for_output(
+    client: httpx.AsyncClient, base_url: str, api_key: str, prompt_id: str
+) -> dict:
+    """Poll /history/{prompt_id} until the workflow completes. Returns the output dict."""
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    history_url = f"{base_url.rstrip('/')}/history/{prompt_id}"
+
+    for _ in range(_COMFY_QUEUE_TIMEOUT):
+        resp = await client.get(history_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        history = resp.json()
+
+        if prompt_id in history and history[prompt_id].get("outputs"):
+            return history[prompt_id]["outputs"]
+
+        await asyncio.sleep(1.0)
+
+    raise TimeoutError(
+        f"ComfyUI did not finish within {_COMFY_QUEUE_TIMEOUT}s "
+        f"(prompt_id={prompt_id})"
+    )
+
+
+async def _comfyui_interrupt(base_url: str, api_key: str) -> None:
+    """Interrupt the currently running ComfyUI generation."""
+    try:
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{base_url.rstrip('/')}/interrupt",
+                headers=headers,
+                timeout=5,
+            )
+    except Exception:
+        log.warning("Failed to interrupt ComfyUI", exc_info=True)
+
+
+def _extract_image_filename(outputs: dict, output_node_id: str) -> tuple[str, str]:
+    """
+    Extract the image filename and type from the workflow outputs.
+
+    Returns (filename, type). type is "output" or "temp" depending on
+    whether the node saved to disk or only kept the result in memory.
+    """
+    node_output = outputs.get(output_node_id, {})
+
+    for key in ("images",):
+        items = node_output.get(key, [])
+        if items and isinstance(items, list) and len(items) > 0:
+            filename = items[0].get("filename")
+            img_type = items[0].get("type", "output")
+            if filename:
+                return (filename, img_type)
+
+    raise RuntimeError(
+        f"Could not find an image filename in output node {output_node_id}. "
+        f"Available outputs: {json.dumps(node_output, indent=2)}"
+    )
 
 
 class Tools:
@@ -179,12 +273,6 @@ class Tools:
                 )
 
             from open_webui.routers.images import get_image_config
-            from open_webui.utils.images.comfyui import (
-                ComfyUICreateImageForm,
-                ComfyUIWorkflow,
-                comfyui_create_image,
-            )
-            import uuid
 
             image_config = await get_image_config()
 
@@ -429,6 +517,7 @@ class Tools:
             # 5. Inject LoRAs into the Power Lora Loader
             # =================================================================
             _, lora_node = _resolve_node(workflow, "Power Lora Loader (rgthree)")
+            preview_image_id, _ = _resolve_node(workflow, "Random Preview Image")
 
             max_slots = sum(1 for k in lora_node["inputs"] if k.startswith("lora_"))
             lora_config = combined[:max_slots]
@@ -470,64 +559,35 @@ class Tools:
                 json.dumps(lora_config) if lora_config else "(none)",
             )
 
-            cf_form = ComfyUICreateImageForm(
-                **{
-                    "prompt": "",
-                    "width": "1",
-                    "height": "1",
-                    "n": 1,
-                    "workflow": ComfyUIWorkflow(
-                        **{
-                            "workflow": json.dumps(workflow),
-                            "nodes": [],
-                        }
-                    ),
-                }
-            )
-
             # =================================================================
-            # Execute workflow
+            # Execute workflow via ComfyUI API
             # =================================================================
-            try:
-                res = await comfyui_create_image(
-                    None,
-                    cf_form,
-                    str(uuid.uuid4()),
-                    image_config.COMFYUI_BASE_URL,
-                    image_config.COMFYUI_API_KEY,
-                )
-            except asyncio.CancelledError:
-                log.info("Edit cancelled by user - interrupting ComfyUI")
-                try:
-                    interrupt_url = f"{image_config.COMFYUI_BASE_URL.rstrip('/')}/interrupt"
-                    headers = {}
-                    if image_config.COMFYUI_API_KEY:
-                        headers["Authorization"] = f"Bearer {image_config.COMFYUI_API_KEY}"
-                    async with httpx.AsyncClient() as client:
-                        await client.post(interrupt_url, headers=headers, timeout=5)
-                except Exception:
-                    log.warning("Failed to interrupt ComfyUI", exc_info=True)
-                raise
-
-            if res is None or not res.get("data"):
-                log.error("ComfyUI returned no image data")
-                raise RuntimeError("ComfyUI returned no image data")
-
-            # =================================================================
-            # Build output URLs (same logic as smart_generate_image)
-            # =================================================================
-            images = []
             comfy_base = image_config.COMFYUI_BASE_URL.rstrip("/")
-            for img in res["data"]:
-                raw_url = img["url"]
-                if raw_url.startswith("/"):
-                    base = resolved_image_base_url.rstrip("/")
-                    edit_url = f"{base}{raw_url}"
-                elif raw_url.startswith(comfy_base):
-                    edit_url = raw_url.replace(comfy_base, resolved_image_base_url.rstrip("/"), 1)
-                else:
-                    edit_url = raw_url
-                images.append({"url": edit_url})
+            api_key = image_config.COMFYUI_API_KEY or ""
+
+            async with httpx.AsyncClient() as client:
+                prompt_id = await _comfyui_queue_prompt(
+                    client, comfy_base, api_key, workflow
+                )
+
+                log.info("Edit workflow queued - prompt_id=%s", prompt_id)
+
+                try:
+                    outputs = await _comfyui_wait_for_output(
+                        client, comfy_base, api_key, prompt_id
+                    )
+                except asyncio.CancelledError:
+                    log.info("Edit cancelled by user - interrupting ComfyUI")
+                    await _comfyui_interrupt(comfy_base, api_key)
+                    raise
+
+            # =================================================================
+            # Extract image filename and build URL
+            # =================================================================
+            edit_filename, image_type = _extract_image_filename(outputs, preview_image_id)
+
+            base = resolved_image_base_url.rstrip("/")
+            edit_url = f"{base}/api/view?filename={edit_filename}&type={image_type}"
 
             if __event_emitter__:
                 await __event_emitter__(
@@ -540,13 +600,6 @@ class Tools:
                         },
                     }
                 )
-
-            edit_url = images[0]["url"] if images else None
-
-            # Extract filename from URL (same as smart_generate_image)
-            parsed = urlparse(edit_url)
-            params = parse_qs(parsed.query)
-            edit_filename = params.get("filename", ["unknown"])[0]
 
             return (
                 f"image_md: ![Edited image]({edit_url})\n"

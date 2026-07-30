@@ -694,7 +694,7 @@ class Tools:
             _, sigma_switch = _resolve_node(workflow, "Switch (SIGMAS)")
             _, random_noise = _resolve_node(workflow, "RandomNoise")
             _, lora_node = _resolve_node(workflow, "Power Lora Loader (rgthree)")
-            preview_image_id, _ = _resolve_node(workflow, "Preview Image")
+            preview_image_id, _ = _resolve_node(workflow, "Random Preview Image")
 
             # =================================================================
             # Inject model config values into workflow nodes
