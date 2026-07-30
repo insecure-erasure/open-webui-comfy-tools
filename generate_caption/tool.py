@@ -515,9 +515,10 @@ class Tools:
             # Inject model and task
             # =================================================================
             model_loader["inputs"]["model"] = resolved_model
-            # PixelProse LoRA only works with Florence-2-base-ft — disable the node for other models
+            # PixelProse LoRA only works with Florence-2-base-ft — disconnect lora input and remove the node
             if resolved_model != "Florence-2-base-ft":
-                workflow[lora_node_id]["disabled"] = True
+                model_loader["inputs"]["lora"] = None
+                workflow.pop(lora_node_id, None)
             # Map detail_level to Florence-2 task, overrides resolved_task
             _DETAIL_MAP = {
                 "brief": "caption",
