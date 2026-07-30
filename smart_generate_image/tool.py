@@ -617,16 +617,19 @@ class Tools:
                 image_config.COMFYUI_BASE_URL,
                 image_config.COMFYUI_API_KEY or "",
             )
-            if missing and __event_emitter__:
-                await __event_emitter__(
-                    {
-                        "type": "notification",
-                        "data": {
-                            "type": "warning",
-                            "content": f"LoRA(s) not found on server: {', '.join(missing)}",
-                        },
-                    }
-                )
+            if missing:
+                msg = f"LoRA(s) not found on server: {', '.join(missing)}"
+                if __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "error",
+                                "content": msg,
+                            },
+                        }
+                    )
+                return f"Error: {msg}"
 
             # Build LoRA lines for status
             lora_desc_lines = []
