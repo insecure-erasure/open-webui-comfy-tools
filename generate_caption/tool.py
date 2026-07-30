@@ -430,14 +430,14 @@ class Tools:
             if user_tokens > 0 and admin_token_ceiling > 0:
                 resolved_tokens = min(user_tokens, admin_token_ceiling)
                 if resolved_tokens < user_tokens:
-                    log.warning("Max new tokens clamped to %d (admin ceiling)", admin_token_ceiling)
+                    log.warning("Max new tokens clamped to %d (system limit)", admin_token_ceiling)
                     if __event_emitter__:
                         await __event_emitter__(
                             {
                                 "type": "notification",
                                 "data": {
                                     "type": "warning",
-                                    "content": f"\u26a0\ufe0f Max new tokens clamped to {admin_token_ceiling} (admin ceiling).",
+                                    "content": f"\u26a0\ufe0f Max new tokens clamped to {admin_token_ceiling} (system limit).",
                                 },
                             }
                         )
@@ -465,14 +465,14 @@ class Tools:
             if user_beams > 0 and admin_ceiling > 0:
                 resolved_beams = min(user_beams, admin_ceiling)
                 if resolved_beams < user_beams:
-                    log.warning("Num beams clamped to %d (admin ceiling)", admin_ceiling)
+                    log.warning("Num beams clamped to %d (system limit)", admin_ceiling)
                     if __event_emitter__:
                         await __event_emitter__(
                             {
                                 "type": "notification",
                                 "data": {
                                     "type": "warning",
-                                    "content": f"\u26a0\ufe0f Num beams clamped to {admin_ceiling} (admin ceiling).",
+                                    "content": f"\u26a0\ufe0f Num beams clamped to {admin_ceiling} (system limit).",
                                 },
                             }
                         )

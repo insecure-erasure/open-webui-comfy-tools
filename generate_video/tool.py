@@ -710,7 +710,7 @@ class Tools:
                                     "type": "notification",
                                     "data": {
                                         "type": "warning",
-                                        "content": f"\u26a0\ufe0f Video length clamped to {admin_raw} frames (admin ceiling).",
+                                        "content": f"\u26a0\ufe0f Video length clamped to {admin_raw} frames (system limit).",
                                     },
                                 }
                             )
