@@ -2,7 +2,7 @@
 title: Edit Image
 author: Insecure Erasure
 description: Edit a previously generated image using Flux 2 inpainting/editing
-version: 1.0
+version: 1.1
 """
 
 import asyncio

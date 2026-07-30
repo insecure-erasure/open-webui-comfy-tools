@@ -2,7 +2,7 @@
 title: Smart Generate Image
 author: Insecure Erasure
 description: Generate images through ComfyUI with seed, model, size, and steps control
-version: 3.1
+version: 3.2
 """
 
 import asyncio
