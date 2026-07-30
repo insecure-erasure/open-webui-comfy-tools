@@ -332,6 +332,51 @@ def _parse_lora_config(raw: str, label: str) -> tuple[list, str | None]:
     return result, None
 
 
+async def _validate_loras_on_server(
+    lora_list: list,
+    comfy_base_url: str,
+    api_key: str = "",
+) -> list[str]:
+    """
+    Check that LoRA filenames exist on the ComfyUI server.
+
+    Returns a list of missing filenames. An empty list means all were found
+    or the server couldn't be reached.
+    """
+    if not lora_list:
+        return []
+
+    names_to_check = set()
+    for item in lora_list:
+        if isinstance(item, str):
+            names_to_check.add(item.replace("\\", "/").rsplit("/", 1)[-1])
+        elif isinstance(item, dict):
+            name = item.get("model", "")
+            if name:
+                names_to_check.add(name.replace("\\", "/").rsplit("/", 1)[-1])
+    if not names_to_check:
+        return []
+
+    try:
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{comfy_base_url.rstrip('/')}/models/loras",
+                headers=headers,
+                timeout=10,
+            )
+            resp.raise_for_status()
+            server_loras = resp.json()
+            server_basenames = {
+                p.replace("\\", "/").rsplit("/", 1)[-1] for p in server_loras
+            }
+            return [n for n in names_to_check if n not in server_basenames]
+    except Exception:
+        return []
+
+
 def _filter_loras_for_path(lora_list: list, path_name: str) -> list:
     """
     Filter LoRAs applicable to a specific path/ram.
@@ -622,6 +667,23 @@ class Tools:
 
             # Filter out disabled LoRAs (strength == 0)
             parsed_loras = [item for item in parsed_loras if float(item.get("strength", 1.0)) != 0]
+
+            # Validate LoRAs exist on the ComfyUI server
+            missing = await _validate_loras_on_server(
+                parsed_loras,
+                image_config.COMFYUI_BASE_URL,
+                image_config.COMFYUI_API_KEY or "",
+            )
+            if missing and __event_emitter__:
+                await __event_emitter__(
+                    {
+                        "type": "notification",
+                        "data": {
+                            "type": "warning",
+                            "content": f"LoRA(s) not found on server: {', '.join(missing)}",
+                        },
+                    }
+                )
 
             # Length: UserValves > AdminValves. Admin valve acts as ceiling.
             # Valves are dropdown strings — parse as int.

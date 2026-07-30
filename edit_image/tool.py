@@ -237,6 +237,39 @@ class Tools:
                         return [], f"{label} lora_config[{i}] must be a string or object, got {type(item).__name__}"
                 return p, None
 
+            async def _check_loras_exist(lora_list, comfy_base_url, api_key=""):
+                """Check that LoRA filenames exist on the ComfyUI server. Returns list of missing names."""
+                if not lora_list:
+                    return []
+                names_to_check = set()
+                for item in lora_list:
+                    if isinstance(item, str):
+                        names_to_check.add(item.replace("\\", "/").rsplit("/", 1)[-1])
+                    elif isinstance(item, dict):
+                        name = item.get("name", item.get("model", ""))
+                        if name:
+                            names_to_check.add(name.replace("\\", "/").rsplit("/", 1)[-1])
+                if not names_to_check:
+                    return []
+                try:
+                    headers = {}
+                    if api_key:
+                        headers["Authorization"] = f"Bearer {api_key}"
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.get(
+                            f"{comfy_base_url.rstrip('/')}/models/loras",
+                            headers=headers,
+                            timeout=10,
+                        )
+                        resp.raise_for_status()
+                        server_loras = resp.json()
+                        server_basenames = {
+                            p.replace("\\", "/").rsplit("/", 1)[-1] for p in server_loras
+                        }
+                        return [n for n in names_to_check if n not in server_basenames]
+                except Exception:
+                    return []
+
             admin_loras, err = _load_loras(self.valves.lora_config, "admin")
             if err:
                 if __event_emitter__:
@@ -288,6 +321,23 @@ class Tools:
                 for item in user_active:
                     if _lora_name(item) not in system_names:
                         combined.append(item)
+
+            # Validate LoRAs exist on the ComfyUI server
+            missing = await _check_loras_exist(
+                combined,
+                image_config.COMFYUI_BASE_URL,
+                image_config.COMFYUI_API_KEY or "",
+            )
+            if missing and __event_emitter__:
+                await __event_emitter__(
+                    {
+                        "type": "notification",
+                        "data": {
+                            "type": "warning",
+                            "content": f"LoRA(s) not found on server: {', '.join(missing)}",
+                        },
+                    }
+                )
 
             # Build LoRA lines for status
             lora_desc_lines = []
