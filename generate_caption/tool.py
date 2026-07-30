@@ -370,7 +370,7 @@ class Tools:
         filename or an URL.
 
         :param image: Filename or URL of the image to caption.
-        :param detail_level: Only use when the user explicitly asks. "simple"=brief one-liner, "detailed"=thorough (default), "verbose"=exhaustive.
+        :param detail_level: Only use when the user explicitly asks. "brief"=short one-liner, "normal"=standard description (default), "detailed"=exhaustive description.
         """
         if __request__ is None:
             log.error("generate_caption called without request context")
@@ -520,9 +520,9 @@ class Tools:
                 workflow[lora_node_id]["disabled"] = True
             # Map detail_level to Florence-2 task, overrides resolved_task
             _DETAIL_MAP = {
-                "simple": "caption",
-                "detailed": "detailed_caption",
-                "verbose": "more_detailed_caption",
+                "brief": "caption",
+                "normal": "detailed_caption",
+                "detailed": "more_detailed_caption",
             }
             detail_task = _DETAIL_MAP.get(detail_level) if detail_level else None
             injected_task = detail_task if detail_task else resolved_task
