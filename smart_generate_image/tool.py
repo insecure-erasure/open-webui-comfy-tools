@@ -394,12 +394,8 @@ class Tools:
         """
         Generate one image with optional control over aspect ratio.
 
-        prompt: Image generation prompt. Translate the user's request into English internally,
-            then enrich with visual details without changing the subject or scene. Do not add
-            superfluous details. Write the final prompt in English.
-        aspect_ratio (optional): ALWAYS omit this parameter unless the user's request
-            specifically mentions dimensions or aspect ratio (e.g., "16:9", "square",
-            "portrait", "landscape"). Format W:H (e.g., 16:9).
+        :param prompt: Image generation prompt. Translate the user's request into English internally, then enrich with visual details without changing the subject or scene. Do not add superfluous details. Write the final prompt in English.
+        :param aspect_ratio: ALWAYS omit this parameter unless the user's request specifically mentions dimensions or aspect ratio (e.g., "16:9", "square", "portrait", "landscape"). Format W:H (e.g., 16:9).
         """
         if __request__ is None:
             log.error("smart_generate_image called without request context")

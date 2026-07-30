@@ -370,11 +370,7 @@ class Tools:
         filename or an URL.
 
         :param image: Filename or URL of the image to caption.
-        :param detail_level: Only specify if the user explicitly asks for a shorter
-            or more detailed description.
-            "simple" - brief one-line description (use for casual questions like "what's in this image?")
-            "detailed" - thorough description with multiple sentences
-            "verbose" - extremely detailed, exhaustive description (use when the user asks for great detail)
+        :param detail_level: Only use when the user explicitly asks. "simple"=brief one-liner, "detailed"=thorough (default), "verbose"=exhaustive.
         """
         if __request__ is None:
             log.error("generate_caption called without request context")

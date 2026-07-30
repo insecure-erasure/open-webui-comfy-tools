@@ -157,12 +157,8 @@ class Tools:
         Only call when the user explicitly asks to edit or modify an
         existing image. Pass an image filename or a direct URL.
 
-        image: The filename previously generated from smart_generate_image
-            or enhance_image, or a direct URL to an external image.
-
-        edit_prompt: Natural language description of the edit to apply
-            (e.g., "Change the cat's fur to orange", "Add a sunset
-            background"). Be specific and descriptive.
+        :param image: The filename previously generated from smart_generate_image or enhance_image, or a direct URL to an external image.
+        :param edit_prompt: Natural language description of the edit to apply (e.g., "Change the cat's fur to orange", "Add a sunset background"). Be specific and descriptive.
         """
         if __request__ is None:
             log.error("edit_image called without request context")

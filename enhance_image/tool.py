@@ -121,8 +121,7 @@ class Tools:
         Only call when the user explicitly asks to enhance or upscale
         an image. Pass an image filename or an URL.
 
-        image: The filename previously generated from the smart_generate_image
-            response, or a direct URL to an external image.
+        :param image: The filename previously generated from the smart_generate_image response, or a direct URL to an external image.
         """
         if __request__ is None:
             log.error("enhance_image called without request context")
