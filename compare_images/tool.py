@@ -75,14 +75,10 @@ class Tools:
         """
         Compare two images with an interactive before/after slider.
 
-        Only call when the user asks to compare two images (e.g. before/after
-        editing or enhancement, or two generated variants). Pass the URLs of
-        the two images to compare.
+        Only call when the user asks to compare two images.
 
-        :param image_a: URL of the first image. Base layer, fully visible; appears
-            on the right of the divider.
-        :param image_b: URL of the second image. Top layer, revealed by the slider
-            from the left of the divider.
+        :param image_a: URL of the first image.
+        :param image_b: URL of the second image.
         """
         if __event_emitter__:
             await __event_emitter__(
