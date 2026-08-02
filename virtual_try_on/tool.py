@@ -231,10 +231,9 @@ class Tools:
     """
     Virtual try-on: dress a person photo with an upper and a lower garment.
 
-    Call only when the user asks to try on clothes on a person. Requires 3
-    images in this exact order: 1) model, 2) upper garment, 3) lower garment.
-    Map them unreordered: model_image=1st, upper_image=2nd, lower_image=3rd.
-    Returns the result image (image_md) and the prompt.
+    Call only when the user asks to try on clothes on a person. Requires the
+    model photo. Both garments are optional — a missing garment falls back to
+    its configured default. Returns the result image (image_md) and the prompt.
     """
 
     class Valves(BaseModel):
@@ -264,6 +263,14 @@ class Tools:
             default="",
             description="Optional text appended at the end of the generated prompt (after the workflow's default try-on instruction). Leave empty to skip.",
         )
+        default_upper_image: str = Field(
+            default="",
+            description="Fallback upper garment used when upper_image is not provided. Accepts a filename from Open WebUI's static/images/vton/ (e.g. 'default_upper.png'), a full URL, or a ComfyUI input file prefixed with 'input:'. Leave empty to require the user to provide the upper garment.",
+        )
+        default_lower_image: str = Field(
+            default="",
+            description="Fallback lower garment used when lower_image is not provided. Accepts a filename from Open WebUI's static/images/vton/ (e.g. 'default_lower.png'), a full URL, or a ComfyUI input file prefixed with 'input:'. Leave empty to require the user to provide the lower garment.",
+        )
 
     def __init__(self):
         self.valves = self.Valves()
@@ -272,8 +279,8 @@ class Tools:
     async def virtual_try_on(
         self,
         model_image: str,
-        upper_image: str,
-        lower_image: str,
+        upper_image: str = "",
+        lower_image: str = "",
         __request__=None,
         __user__=None,
         __event_emitter__=None,
@@ -284,12 +291,12 @@ class Tools:
         """
         Try on an upper and a lower garment on a person photo.
 
-        Requires 3 images in this exact order: 1) model, 2) upper, 3) lower.
-        Pass them unreordered.
+        Requires the model photo. Both garments are optional: omit whichever
+        the user did not provide.
 
-        :param model_image: Photo of the person to dress — FIRST image.
-        :param upper_image: Upper garment (top/jacket/shirt) — SECOND image.
-        :param lower_image: Lower garment (trousers/skirt/shorts) — THIRD image.
+        :param model_image: Photo of the person to dress.
+        :param upper_image: Upper garment. Optional.
+        :param lower_image: Lower garment. Optional.
         """
         if __request__ is None:
             log.error("virtual_try_on called without request context")
@@ -302,9 +309,96 @@ class Tools:
             user_valves = (__user__ or {}).get("valves", None)
 
             # =================================================================
+            # Garment resolution & fallbacks
+            #   Both garments are optional. A missing upper/lower garment falls
+            #   back to its configured default (default_upper_image /
+            #   default_lower_image). When a default is used a notification is
+            #   emitted so the user knows.
+            # =================================================================
+            default_upper = (
+                user_valves.default_upper_image
+                if user_valves and user_valves.default_upper_image
+                else ""
+            )
+            default_lower = (
+                user_valves.default_lower_image
+                if user_valves and user_valves.default_lower_image
+                else ""
+            )
+
+            # =================================================================
+            # Default garments live in Open WebUI's static/images/vton/ and are
+            # referenced by filename. Build the full URL from the Open WebUI
+            # base URL, resolved the same way Open WebUI itself does for its
+            # own links (OAuth redirects, share URLs): global config
+            # 'webui.url' first, falling back to the request's base URL.
+            # =================================================================
+            from open_webui.models.config import Config
+
+            webui_url = await Config.get('webui.url')
+            owui_base = (str(webui_url or __request__.base_url)).rstrip('/')
+
+            def _resolve_default_image(value: str) -> str:
+                """Resolve a default garment reference to something the
+                LoadImageByUrlOrPath node understands.
+
+                - 'input:foo.png'  -> passed through (ComfyUI input/)
+                - full URL         -> passed through
+                - 'foo.png'        -> Open WebUI static URL:
+                                     <owui_base>/static/images/vton/foo.png
+                """
+                if not value:
+                    return ""
+                parsed = urlparse(value)
+                if parsed.scheme and parsed.netloc:
+                    return value
+                if value.startswith("input:"):
+                    return value
+                return f"{owui_base}/static/images/vton/{value.lstrip('/')}"
+
+            resolved_upper = upper_image or _resolve_default_image(default_upper)
+            resolved_lower = lower_image or _resolve_default_image(default_lower)
+
+            if not resolved_upper:
+                return (
+                    "Error: No upper garment image provided and no "
+                    "default_upper_image configured. Provide an upper garment "
+                    "or set default_upper_image."
+                )
+            if not resolved_lower:
+                return (
+                    "Error: No lower garment image provided and no "
+                    "default_lower_image configured. Provide a lower garment "
+                    "or set default_lower_image."
+                )
+
+            # =================================================================
+            # Notify when a default garment is used
+            # =================================================================
+            missing_garments = []
+            if not upper_image:
+                missing_garments.append("upper")
+            if not lower_image:
+                missing_garments.append("lower")
+
+            if __event_emitter__ and missing_garments:
+                if len(missing_garments) == 2:
+                    content = (
+                        "No garments provided — using default upper and lower garments."
+                    )
+                else:
+                    g = missing_garments[0]
+                    content = f"No {g} garment provided — using default {g} garment."
+                await __event_emitter__(
+                    {
+                        "type": "notification",
+                        "data": {"type": "info", "content": content},
+                    }
+                )
+
+            # =================================================================
             # Build the workflow: load from cache and parse
             # =================================================================
-            raw_workflow = _load_workflow(__id__, "virtual_try_on.json")
             workflow = json.loads(raw_workflow)
 
             # =================================================================
@@ -468,14 +562,20 @@ class Tools:
                     node_inputs["url"] = image
                     node_inputs.pop("image", None)
                     node_inputs.pop("Choose file to upload", None)
+                elif image.startswith("input:"):
+                    # Static file in ComfyUI's input/ directory
+                    node_inputs["source"] = "input"
+                    node_inputs["image"] = image[len("input:"):]
+                    node_inputs["url"] = ""
+                    node_inputs.pop("Choose file to upload", None)
                 else:
                     node_inputs["source"] = "temp"
                     node_inputs["image"] = image
                     node_inputs["url"] = ""
 
             _set_image_source(model_node["inputs"], model_image)
-            _set_image_source(upper_node["inputs"], upper_image)
-            _set_image_source(lower_node["inputs"], lower_image)
+            _set_image_source(upper_node["inputs"], resolved_upper)
+            _set_image_source(lower_node["inputs"], resolved_lower)
 
             # =================================================================
             # Prompt suffix: user text appended to the generated prompt
@@ -504,8 +604,8 @@ class Tools:
                 "model=%s, upper=%s, lower=%s, seed=%d, loras=%s, prompt_suffix=%s",
                 image_config.COMFYUI_BASE_URL,
                 model_image,
-                upper_image,
-                lower_image,
+                resolved_upper,
+                resolved_lower,
                 seed_arg,
                 json.dumps(combined) if combined else "(none)",
                 user_prompt_suffix or "(none)",
