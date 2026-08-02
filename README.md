@@ -24,6 +24,10 @@ Generates a caption for an image using Florence-2 via ComfyUI. The LLM calls thi
 
 Upscales or enhances an image using SeedVR2. Loads images via URL using the ComfyUI-LoadImageURL custom node. See its README for valve documentation.
 
+### Virtual Try-On
+
+Dresses a person photo with an upper and a lower garment using the Flux.2 Klein try-on LoRA. Accepts three input images (model, top, bottom) via URL or filename and returns both the try-on result and the prompt generated internally by the workflow. See its README for valve documentation.
+
 ### Generate Video
 
 Generates videos from text or images using Wan 2.1 (single-path) or Wan 2.2 (dual-path high/low resolution). Frames follow a 4n+1 constraint imposed by the WAN temporal VAE stride. The result renders as an HTML video element with autoplay, muted, and loop. See its README for valve documentation.
@@ -61,6 +65,7 @@ Navigate to Workspace > Tools, click "+", paste the script content, and save.
 |---|---|
 | smart_generate_image/tool.py | Smart Generate Image |
 | enhance_image/tool.py | Enhance Image |
+| virtual_try_on/tool.py | Virtual Try-On |
 | edit_image/tool.py | Edit Image |
 | generate_caption/tool.py | Generate Caption |
 | generate_video/tool.py | Generate Video |
@@ -73,6 +78,7 @@ Each tool requires its corresponding workflow JSON file. Copy it from the tool's
 cp smart_generate_image/smart_generate_image.json /app/backend/data/cache/tools/smart_generate_image/smart_generate_image.json
 cp edit_image/edit_image.json                     /app/backend/data/cache/tools/edit_image/edit_image.json
 cp enhance_image/enhance_image.json               /app/backend/data/cache/tools/enhance_image/enhance_image.json
+cp virtual_try_on/virtual_try_on.json             /app/backend/data/cache/tools/virtual_try_on/virtual_try_on.json
 cp generate_caption/generate_caption.json         /app/backend/data/cache/tools/generate_caption/generate_caption.json
 cp generate_video/generate_video.json             /app/backend/data/cache/tools/generate_video/generate_video.json
 cp generate_video/generate_video_wan22.json       /app/backend/data/cache/tools/generate_video/generate_video_wan22.json

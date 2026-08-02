@@ -1,0 +1,616 @@
+{
+  "14": {
+    "inputs": {
+      "conditioning": [
+        "426",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "Conditioning Zero Out"
+    }
+  },
+  "19": {
+    "inputs": {
+      "text": [
+        "462:460",
+        0
+      ],
+      "clip": [
+        "408",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "311": {
+    "inputs": {
+      "noise_seed": 839254528835361
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "313": {
+    "inputs": {
+      "cfg": 1.2,
+      "model": [
+        "391",
+        0
+      ],
+      "positive": [
+        "403:382",
+        0
+      ],
+      "negative": [
+        "403:380",
+        0
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFG Guider"
+    }
+  },
+  "316": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "318": {
+    "inputs": {
+      "steps": 6,
+      "width": [
+        "403:375",
+        4
+      ],
+      "height": [
+        "403:375",
+        5
+      ]
+    },
+    "class_type": "Flux2Scheduler",
+    "_meta": {
+      "title": "Flux2Scheduler"
+    }
+  },
+  "319": {
+    "inputs": {
+      "samples": [
+        "419",
+        0
+      ],
+      "vae": [
+        "392",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "371": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1,
+      "image": [
+        "424",
+        0
+      ]
+    },
+    "class_type": "ImageScaleToTotalPixels",
+    "_meta": {
+      "title": "Scale Image to Total Pixels"
+    }
+  },
+  "372": {
+    "inputs": {
+      "image": [
+        "376",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Image Size"
+    }
+  },
+  "373": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1,
+      "image": [
+        "425",
+        0
+      ]
+    },
+    "class_type": "ImageScaleToTotalPixels",
+    "_meta": {
+      "title": "Scale Image to Total Pixels"
+    }
+  },
+  "374": {
+    "inputs": {
+      "width": [
+        "372",
+        0
+      ],
+      "height": [
+        "372",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyFlux2LatentImage",
+    "_meta": {
+      "title": "Empty Flux 2 Latent"
+    }
+  },
+  "376": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1,
+      "image": [
+        "423",
+        0
+      ]
+    },
+    "class_type": "ImageScaleToTotalPixels",
+    "_meta": {
+      "title": "Scale Image to Total Pixels"
+    }
+  },
+  "389": {
+    "inputs": {
+      "unet_name": "flux-2-klein-9b-nvfp4.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "391": {
+    "inputs": {
+      "lora_name": "flux2\\flux-klein-tryon-comfy.safetensors",
+      "strength_model": 1,
+      "model": [
+        "389",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "392": {
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "408": {
+    "inputs": {
+      "clip_name": "qwen_3_8b_nvfp4.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "419": {
+    "inputs": {
+      "noise": [
+        "311",
+        0
+      ],
+      "guider": [
+        "313",
+        0
+      ],
+      "sampler": [
+        "316",
+        0
+      ],
+      "sigmas": [
+        "318",
+        0
+      ],
+      "latent_image": [
+        "374",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "423": {
+    "inputs": {
+      "source": "input",
+      "url": "",
+      "image": "girl.jpg",
+      "Choose file to upload": null
+    },
+    "class_type": "LoadImageByUrlOrPath",
+    "_meta": {
+      "title": "Model"
+    }
+  },
+  "424": {
+    "inputs": {
+      "source": "input",
+      "url": "",
+      "image": "top.jpeg",
+      "Choose file to upload": null
+    },
+    "class_type": "LoadImageByUrlOrPath",
+    "_meta": {
+      "title": "Upper garments"
+    }
+  },
+  "425": {
+    "inputs": {
+      "source": "input",
+      "url": "https://cdn.grupoelcorteingles.es/statics-front/front-msh3-manager-cloud/contents/images/uploads/2026/03/rkxGegNNY-l.jpeg",
+      "image": "bottom.jpeg",
+      "Choose file to upload": null
+    },
+    "class_type": "LoadImageByUrlOrPath",
+    "_meta": {
+      "title": "Lower garments"
+    }
+  },
+  "426": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "408",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "441": {
+    "inputs": {
+      "text_0": "TRYON A woman. Replace the outfit with the upper and the lower pieces of garment as shown in the reference images. The final image keeps its original framing.",
+      "text": [
+        "462:460",
+        0
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Prompt preview"
+    }
+  },
+  "466": {
+    "inputs": {
+      "images": [
+        "319",
+        0
+      ]
+    },
+    "class_type": "RandomPreviewImage",
+    "_meta": {
+      "title": "Random Preview Image"
+    }
+  },
+  "447:440": {
+    "inputs": {
+      "model": "Florence-2-base-ft",
+      "precision": "bf16",
+      "convert_to_safetensors": false
+    },
+    "class_type": "Florence2ModelLoader",
+    "_meta": {
+      "title": "Florence2ModelLoader"
+    }
+  },
+  "447:439": {
+    "inputs": {
+      "text_input": "",
+      "task": "caption",
+      "fill_mask": false,
+      "keep_model_loaded": false,
+      "max_new_tokens": 16,
+      "num_beams": 1,
+      "do_sample": false,
+      "output_mask_select": "",
+      "seed": 1,
+      "image": [
+        "423",
+        0
+      ],
+      "florence2_model": [
+        "447:440",
+        0
+      ]
+    },
+    "class_type": "Florence2Run",
+    "_meta": {
+      "title": "Subject captioner"
+    }
+  },
+  "462:458": {
+    "inputs": {
+      "string_a": [
+        "462:459",
+        0
+      ],
+      "string_b": "as shown in the reference images. The final image keeps its original framing.",
+      "delimiter": " "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate Text"
+    }
+  },
+  "462:460": {
+    "inputs": {
+      "string_a": [
+        "462:457",
+        0
+      ],
+      "string_b": [
+        "462:458",
+        0
+      ],
+      "delimiter": " "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate Text"
+    }
+  },
+  "462:457": {
+    "inputs": {
+      "string_a": [
+        "462:456",
+        0
+      ],
+      "string_b": [
+        "462:461",
+        0
+      ],
+      "delimiter": " "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate Text"
+    }
+  },
+  "462:459": {
+    "inputs": {
+      "string_a": "and",
+      "string_b": "the lower pieces of garment",
+      "delimiter": " "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate Text"
+    }
+  },
+  "462:461": {
+    "inputs": {
+      "string_a": "Replace the outfit with",
+      "string_b": "the upper",
+      "delimiter": " "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate Text"
+    }
+  },
+  "462:456": {
+    "inputs": {
+      "string_a": "TRYON",
+      "string_b": [
+        "462:463",
+        0
+      ],
+      "delimiter": " "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate Text"
+    }
+  },
+  "462:463": {
+    "inputs": {
+      "string": [
+        "447:439",
+        2
+      ],
+      "regex_pattern": "^(An? (young|old)?(man|woman|girl|boy)).*",
+      "replace": "\\1.",
+      "case_insensitive": true,
+      "multiline": false,
+      "dotall": true,
+      "count": 0
+    },
+    "class_type": "RegexReplace",
+    "_meta": {
+      "title": "Replace Text (Regex)"
+    }
+  },
+  "403:381": {
+    "inputs": {
+      "pixels": [
+        "373",
+        0
+      ],
+      "vae": [
+        "392",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "403:387": {
+    "inputs": {
+      "pixels": [
+        "376",
+        0
+      ],
+      "vae": [
+        "392",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "403:384": {
+    "inputs": {
+      "pixels": [
+        "371",
+        0
+      ],
+      "vae": [
+        "392",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "403:385": {
+    "inputs": {
+      "conditioning": [
+        "403:388",
+        0
+      ],
+      "latent": [
+        "403:384",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "UpperLatent (positive)"
+    }
+  },
+  "403:382": {
+    "inputs": {
+      "conditioning": [
+        "403:385",
+        0
+      ],
+      "latent": [
+        "403:381",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent (positive)"
+    }
+  },
+  "403:383": {
+    "inputs": {
+      "conditioning": [
+        "403:386",
+        0
+      ],
+      "latent": [
+        "403:384",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "UpperLatent (negative)"
+    }
+  },
+  "403:375": {
+    "inputs": {
+      "latent": [
+        "374",
+        0
+      ]
+    },
+    "class_type": "GetLatentSizeAndCount",
+    "_meta": {
+      "title": "Get Latent Size & Count"
+    }
+  },
+  "403:388": {
+    "inputs": {
+      "conditioning": [
+        "19",
+        0
+      ],
+      "latent": [
+        "403:387",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent (positive)"
+    }
+  },
+  "403:386": {
+    "inputs": {
+      "conditioning": [
+        "14",
+        0
+      ],
+      "latent": [
+        "403:387",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent (negative)"
+    }
+  },
+  "403:380": {
+    "inputs": {
+      "conditioning": [
+        "403:383",
+        0
+      ],
+      "latent": [
+        "403:381",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "LowerLatent (negative)"
+    }
+  }
+}

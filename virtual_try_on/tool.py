@@ -1,0 +1,459 @@
+"""
+title: Virtual Try-On
+author: Insecure Erasure
+description: Try on a pair of garments (upper + lower) on a person photo using the Flux.2 Klein try-on LoRA via ComfyUI
+version: 1.0
+"""
+
+import asyncio
+import json
+import logging
+import random as _random
+import uuid
+from urllib.parse import urlparse
+
+import httpx
+from pydantic import BaseModel, Field
+
+log = logging.getLogger(__name__)
+
+# =============================================================================
+# ComfyUI constants
+# =============================================================================
+_COMFY_QUEUE_MAX_RETRIES = 600       # ~10 min at 1s intervals (Florence-2 + Flux.2 Klein 9B is slow)
+_COMFY_QUEUE_POLL_INTERVAL = 1.0     # seconds
+_COMFY_SEED_MAX: int = 1125899906842624
+
+
+# =============================================================================
+# Workflow node resolver — finds nodes by _meta.title (must be unique)
+# =============================================================================
+
+def _resolve_node(workflow: dict, title: str) -> tuple[str, dict]:
+    """
+    Find a workflow node by its _meta.title.
+
+    Returns (node_id, node_dict). Titles must be unique in the workflow.
+    """
+    for node_id, node in workflow.items():
+        if node.get("_meta", {}).get("title") == title:
+            return (node_id, node)
+    raise KeyError(
+        f"Node with title {title!r} not found in workflow. "
+        "Available titles: "
+        + ", ".join(
+            n.get("_meta", {}).get("title", "(no title)")
+            for n in workflow.values()
+        )
+    )
+
+
+# =============================================================================
+# Workflow loader — cache/tools/<tool_id>/filename.json
+# =============================================================================
+
+def _load_workflow(tool_id: str, filename: str) -> str:
+    """
+    Load the workflow JSON from the tool's cache directory.
+
+    Resolves CACHE_DIR / 'tools' / <tool_id> / <filename>.
+    Returns the raw JSON string, ready for json.loads() followed by
+    _resolve_node().
+
+    Raises RuntimeError if the tool_id is empty or the file is not found.
+    """
+    if not tool_id:
+        raise RuntimeError(
+            "No tool_id provided. The tool must run inside Open WebUI "
+            "to resolve the workflow from cache."
+        )
+
+    from open_webui.config import CACHE_DIR
+
+    workflow_path = CACHE_DIR / 'tools' / tool_id / filename
+
+    if not workflow_path.exists():
+        raise FileNotFoundError(
+            f"Workflow file not found at {workflow_path}. "
+            f"Copy {filename} from the tool's directory to that path."
+        )
+
+    log.info("Loading workflow from %s", workflow_path)
+    return workflow_path.read_text(encoding='utf-8')
+
+
+# =============================================================================
+# ComfyUI API helpers (direct REST calls, no Open WebUI dependency)
+# =============================================================================
+
+async def _comfyui_queue_prompt(
+    client: httpx.AsyncClient, base_url: str, api_key: str, workflow: dict
+) -> str:
+    """Submit a workflow to ComfyUI and return the prompt_id."""
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    payload = {
+        "prompt": workflow,
+        "client_id": str(uuid.uuid4()),
+    }
+
+    resp = await client.post(
+        f"{base_url.rstrip('/')}/prompt",
+        json=payload,
+        headers=headers,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    prompt_id = data.get("prompt_id")
+    if not prompt_id:
+        raise RuntimeError(f"ComfyUI did not return a prompt_id: {data}")
+    return prompt_id
+
+
+async def _comfyui_wait_for_output(
+    client: httpx.AsyncClient, base_url: str, api_key: str, prompt_id: str
+) -> dict:
+    """Poll /history/{prompt_id} until the workflow completes. Returns the output dict."""
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    history_url = f"{base_url.rstrip('/')}/history/{prompt_id}"
+
+    for attempt in range(_COMFY_QUEUE_MAX_RETRIES):
+        resp = await client.get(history_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        history = resp.json()
+
+        if prompt_id in history and history[prompt_id].get("outputs"):
+            return history[prompt_id]["outputs"]
+
+        # Check if still in queue — the key might exist but have no outputs yet
+        if prompt_id in history and history[prompt_id].get("status", {}).get("completed") is False:
+            await asyncio.sleep(_COMFY_QUEUE_POLL_INTERVAL)
+            continue
+
+        # Key not in history yet → still queued/processing
+        await asyncio.sleep(_COMFY_QUEUE_POLL_INTERVAL)
+
+    raise TimeoutError(
+        f"ComfyUI did not finish within {_COMFY_QUEUE_MAX_RETRIES} seconds "
+        f"(prompt_id={prompt_id})"
+    )
+
+
+async def _comfyui_interrupt(base_url: str, api_key: str) -> None:
+    """Interrupt the currently running ComfyUI generation."""
+    try:
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{base_url.rstrip('/')}/interrupt",
+                headers=headers,
+                timeout=5,
+            )
+    except Exception:
+        log.warning("Failed to interrupt ComfyUI", exc_info=True)
+
+
+def _extract_image_filename(outputs: dict, output_node_id: str) -> tuple[str, str]:
+    """
+    Extract the image filename and type from the workflow outputs.
+
+    Returns (filename, type). type is "output" or "temp" depending on
+    whether the node saved to disk or only kept the result in memory.
+    """
+    node_output = outputs.get(output_node_id, {})
+
+    for key in ("images",):
+        items = node_output.get(key, [])
+        if items and isinstance(items, list) and len(items) > 0:
+            filename = items[0].get("filename")
+            img_type = items[0].get("type", "output")
+            if filename:
+                return (filename, img_type)
+
+    raise RuntimeError(
+        f"Could not find an image filename in output node {output_node_id}. "
+        f"Available outputs: {json.dumps(node_output, indent=2)}"
+    )
+
+
+def _extract_text(outputs: dict, output_node_id: str) -> str:
+    """
+    Extract the text from a ShowText|pysssss output node in the workflow history.
+
+    The node exposes the text as a single-element list under the "text" key:
+    {"text": ["TRYON A woman. ..."]}.
+
+    Returns the trimmed text string.
+    """
+    node_output = outputs.get(output_node_id, {})
+
+    # ShowText|pysssss stores the text under "text" as ["prompt"]
+    text_list = node_output.get("text")
+    if isinstance(text_list, list) and len(text_list) > 0 and isinstance(text_list[0], str):
+        return text_list[0].strip()
+
+    # Fallback: raw string under "text"
+    text = node_output.get("text")
+    if isinstance(text, str):
+        return text.strip()
+
+    # Fallback: raw string under "string"
+    text = node_output.get("string")
+    if isinstance(text, str):
+        return text.strip()
+
+    # Worst case: dump the first string value found
+    for key, value in node_output.items():
+        if isinstance(value, str) and len(value) > 10:
+            return value.strip()
+        if isinstance(value, list) and len(value) > 0 and isinstance(value[0], str) and len(value[0]) > 10:
+            return value[0].strip()
+
+    raise RuntimeError(
+        f"Could not extract text from output node {output_node_id}. "
+        f"Available outputs: {json.dumps(node_output, indent=2)}"
+    )
+
+
+# =============================================================================
+# TOOL
+# =============================================================================
+
+class Tools:
+    """
+    Virtual try-on: dress a person photo with an upper and a lower garment.
+
+    Call only when the user asks to try on clothes on a person. Requires 3
+    images in this exact order: 1) model, 2) upper garment, 3) lower garment.
+    Map them unreordered: model_image=1st, upper_image=2nd, lower_image=3rd.
+    Returns the result image (image_md) plus the generated prompt.
+    """
+
+    class Valves(BaseModel):
+        """Admin-level configuration."""
+
+        comfyui_image_base_url: str = Field(
+            default="",
+            description="Public base URL for image links (overrides COMFYUI_BASE_URL). Leave empty to use COMFYUI_BASE_URL.",
+        )
+
+    class UserValves(BaseModel):
+        """User-level configuration (overrides admin valve)."""
+
+        comfyui_image_base_url: str = Field(
+            default="",
+            description="Public base URL for image links. Overrides the admin valve and COMFYUI_BASE_URL.",
+        )
+        seed: int = Field(
+            default=-1,
+            description="Seed. -1 = random, >=1 = fixed seed for reproducible results.",
+        )
+
+    def __init__(self):
+        self.valves = self.Valves()
+        self.citation = False
+
+    async def virtual_try_on(
+        self,
+        model_image: str,
+        upper_image: str,
+        lower_image: str,
+        __request__=None,
+        __user__=None,
+        __event_emitter__=None,
+        __chat_id__=None,
+        __message_id__=None,
+        __id__: str = "",
+    ):
+        """
+        Try on an upper and a lower garment on a person photo.
+
+        Requires 3 images in this exact order: 1) model, 2) upper, 3) lower.
+        Pass them unreordered.
+
+        :param model_image: Photo of the person to dress — FIRST image.
+        :param upper_image: Upper garment (top/jacket/shirt) — SECOND image.
+        :param lower_image: Lower garment (trousers/skirt/shorts) — THIRD image.
+        """
+        if __request__ is None:
+            log.error("virtual_try_on called without request context")
+            return "Error: The tool could not be initialized."
+
+        try:
+            if __event_emitter__:
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {
+                            "description": "\U0001f455 Running virtual try-on...",
+                            "done": False,
+                            "hidden": False,
+                        },
+                    }
+                )
+
+            from open_webui.routers.images import get_image_config
+
+            image_config = await get_image_config()
+
+            # =================================================================
+            # Resolve image base URL for the output link
+            #   UserValves > AdminValves > COMFYUI_BASE_URL
+            # =================================================================
+            user_valves = (__user__ or {}).get("valves", None)
+            user_image_base_url = (
+                user_valves.comfyui_image_base_url
+                if user_valves and user_valves.comfyui_image_base_url
+                else ""
+            )
+            resolved_image_base_url = (
+                user_image_base_url
+                or self.valves.comfyui_image_base_url
+                or image_config.COMFYUI_BASE_URL
+            )
+
+            # =================================================================
+            # Build the workflow: load from cache and parse
+            # =================================================================
+            raw_workflow = _load_workflow(__id__, "virtual_try_on.json")
+            workflow = json.loads(raw_workflow)
+
+            # =================================================================
+            # Resolve nodes by _meta.title
+            # =================================================================
+            _, model_node = _resolve_node(workflow, "Model")
+            _, upper_node = _resolve_node(workflow, "Upper garments")
+            _, lower_node = _resolve_node(workflow, "Lower garments")
+            _, random_noise = _resolve_node(workflow, "RandomNoise")
+            preview_image_id, _ = _resolve_node(workflow, "Random Preview Image")
+            prompt_node_id, _ = _resolve_node(workflow, "Prompt preview")
+
+            # =================================================================
+            # Configure image sources — auto-detect URL vs filename for each
+            # =================================================================
+            def _set_image_source(node_inputs: dict, image: str) -> None:
+                parsed = urlparse(image)
+                if parsed.scheme and parsed.netloc:
+                    node_inputs["source"] = "url"
+                    node_inputs["url"] = image
+                    node_inputs.pop("image", None)
+                    node_inputs.pop("Choose file to upload", None)
+                else:
+                    node_inputs["source"] = "temp"
+                    node_inputs["image"] = image
+                    node_inputs["url"] = ""
+
+            _set_image_source(model_node["inputs"], model_image)
+            _set_image_source(upper_node["inputs"], upper_image)
+            _set_image_source(lower_node["inputs"], lower_image)
+
+            # =================================================================
+            # Seed: UserValve. -1 = random, >=1 = fixed
+            # =================================================================
+            user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
+            seed_arg = (
+                _random.randint(1, _COMFY_SEED_MAX)
+                if user_seed == -1
+                else min(max(user_seed, 1), _COMFY_SEED_MAX)
+            )
+            random_noise["inputs"]["noise_seed"] = seed_arg
+
+            log.info(
+                "Dispatching virtual try-on workflow to ComfyUI (%s) - "
+                "model=%s, upper=%s, lower=%s, seed=%d",
+                image_config.COMFYUI_BASE_URL,
+                model_image,
+                upper_image,
+                lower_image,
+                seed_arg,
+            )
+
+            # =================================================================
+            # Execute workflow via ComfyUI API
+            # =================================================================
+            comfy_base = image_config.COMFYUI_BASE_URL.rstrip("/")
+            api_key = image_config.COMFYUI_API_KEY or ""
+
+            async with httpx.AsyncClient() as client:
+                prompt_id = await _comfyui_queue_prompt(
+                    client, comfy_base, api_key, workflow
+                )
+
+                log.info("Virtual try-on workflow queued - prompt_id=%s", prompt_id)
+
+                try:
+                    outputs = await _comfyui_wait_for_output(
+                        client, comfy_base, api_key, prompt_id
+                    )
+                except asyncio.CancelledError:
+                    log.info("Virtual try-on cancelled by user - interrupting ComfyUI")
+                    await _comfyui_interrupt(comfy_base, api_key)
+                    raise
+
+            # =================================================================
+            # Extract output image filename and build URL
+            # =================================================================
+            image_filename, image_type = _extract_image_filename(outputs, preview_image_id)
+
+            base = resolved_image_base_url.rstrip("/")
+            image_url = f"{base}/api/view?filename={image_filename}&type={image_type}"
+
+            # =================================================================
+            # Extract the prompt generated by the workflow
+            # =================================================================
+            generated_prompt = _extract_text(outputs, prompt_node_id)
+
+            log.info(
+                "Virtual try-on complete - prompt_id=%s, image=%s, prompt_len=%d",
+                prompt_id,
+                image_filename,
+                len(generated_prompt),
+            )
+
+            if __event_emitter__:
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {
+                            "description": "\u2705 Virtual try-on complete.",
+                            "done": True,
+                            "hidden": False,
+                        },
+                    }
+                )
+
+            return (
+                f"image_md: ![Virtual try-on result]({image_url})\n"
+                f"image_filename: {image_filename}\n\n"
+                f"Generated prompt: {generated_prompt}\n\n"
+                "Use image_md to display the try-on result in your response."
+            )
+
+        except asyncio.CancelledError:
+            log.info("virtual_try_on cancelled by user")
+            if __event_emitter__:
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {
+                            "description": "\u2753 Virtual try-on cancelled.",
+                            "done": True,
+                            "hidden": False,
+                        },
+                    }
+                )
+            return (
+                "The virtual try-on was cancelled by the user. "
+                "Do not retry. Acknowledge the cancellation and wait for their next request."
+            )
+        except Exception as e:
+            log.exception("virtual_try_on failed: %s", e)
+            return f"Error running virtual try-on: {e}"
