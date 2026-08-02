@@ -373,33 +373,16 @@ class Tools:
                     "Create it or provide a lower garment image."
                 )
 
-            # =================================================================
-            # Notify when a default garment is used
-            # =================================================================
             missing_garments = []
             if not upper_image:
                 missing_garments.append("upper")
             if not lower_image:
                 missing_garments.append("lower")
 
-            if __event_emitter__ and missing_garments:
-                if len(missing_garments) == 2:
-                    content = (
-                        "No garments provided — using default upper and lower garments."
-                    )
-                else:
-                    g = missing_garments[0]
-                    content = f"No {g} garment provided — using default {g} garment."
-                await __event_emitter__(
-                    {
-                        "type": "notification",
-                        "data": {"type": "info", "content": content},
-                    }
-                )
-
             # =================================================================
             # Build the workflow: load from cache and parse
             # =================================================================
+            raw_workflow = _load_workflow(__id__, "virtual_try_on.json")
             workflow = json.loads(raw_workflow)
 
             # =================================================================
@@ -534,7 +517,8 @@ class Tools:
 
             # Single-line status (event emitter doesn't support multi-line).
             # "with extra LoRAs" only when the user added LoRAs beyond the
-            # workflow's fixed try-on LoRA.
+            # workflow's fixed try-on LoRA. Default-garment usage is appended
+            # as a status message (event emitter), not a toast.
             has_extra_loras = len(combined) > 1
 
             if __event_emitter__:
@@ -542,6 +526,12 @@ class Tools:
                 if has_extra_loras:
                     status_desc += " with extra LoRAs"
                 status_desc += "..."
+                if missing_garments:
+                    if len(missing_garments) == 2:
+                        status_desc += " Using default upper and lower garments."
+                    else:
+                        g = missing_garments[0]
+                        status_desc += f" Using default {g} garment."
                 await __event_emitter__(
                     {
                         "type": "status",
