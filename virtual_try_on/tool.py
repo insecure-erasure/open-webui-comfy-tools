@@ -256,6 +256,10 @@ class Tools:
             default=-1,
             description="Seed. -1 = random, >=1 = fixed seed for reproducible results.",
         )
+        lora_config: str = Field(
+            default="[]",
+            description='JSON array of extra LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. The workflow try-on LoRA always stays first at strength 1; these are appended after it. Empty name or strength 0 skips the entry. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
+        )
 
     def __init__(self):
         self.valves = self.Valves()
@@ -288,37 +292,10 @@ class Tools:
             return "Error: The tool could not be initialized."
 
         try:
-            if __event_emitter__:
-                await __event_emitter__(
-                    {
-                        "type": "status",
-                        "data": {
-                            "description": "\U0001f455 Running virtual try-on...",
-                            "done": False,
-                            "hidden": False,
-                        },
-                    }
-                )
-
             from open_webui.routers.images import get_image_config
 
             image_config = await get_image_config()
-
-            # =================================================================
-            # Resolve image base URL for the output link
-            #   UserValves > AdminValves > COMFYUI_BASE_URL
-            # =================================================================
             user_valves = (__user__ or {}).get("valves", None)
-            user_image_base_url = (
-                user_valves.comfyui_image_base_url
-                if user_valves and user_valves.comfyui_image_base_url
-                else ""
-            )
-            resolved_image_base_url = (
-                user_image_base_url
-                or self.valves.comfyui_image_base_url
-                or image_config.COMFYUI_BASE_URL
-            )
 
             # =================================================================
             # Build the workflow: load from cache and parse
@@ -333,8 +310,148 @@ class Tools:
             _, upper_node = _resolve_node(workflow, "Upper garments")
             _, lower_node = _resolve_node(workflow, "Lower garments")
             _, random_noise = _resolve_node(workflow, "RandomNoise")
+            _, lora_node = _resolve_node(workflow, "Power Lora Loader (rgthree)")
             preview_image_id, _ = _resolve_node(workflow, "Random Preview Image")
             prompt_node_id, _ = _resolve_node(workflow, "Prompt preview")
+
+            # =================================================================
+            # Resolve image base URL for the output link
+            #   UserValves > AdminValves > COMFYUI_BASE_URL
+            # =================================================================
+            user_image_base_url = (
+                user_valves.comfyui_image_base_url
+                if user_valves and user_valves.comfyui_image_base_url
+                else ""
+            )
+            resolved_image_base_url = (
+                user_image_base_url
+                or self.valves.comfyui_image_base_url
+                or image_config.COMFYUI_BASE_URL
+            )
+
+            # =================================================================
+            # LoRAs — same JSON format as Smart Generate Image, but with no
+            # admin valve. The workflow's try-on LoRA is ALWAYS slot 1 at
+            # strength 1; the user's extra LoRAs are appended after it.
+            # Entries with an empty name, strength 0, or a name matching the
+            # try-on LoRA are skipped (avoids duplicates).
+            # =================================================================
+            tryon_slot = lora_node["inputs"].get("lora_1")
+            tryon_name = tryon_slot.get("lora", "") if isinstance(tryon_slot, dict) else ""
+
+            user_loras = []
+            raw_lora_config = (
+                user_valves.lora_config if user_valves and user_valves.lora_config else ""
+            )
+            if raw_lora_config and raw_lora_config.strip():
+                try:
+                    parsed_config = json.loads(raw_lora_config)
+                except json.JSONDecodeError as e:
+                    return f"Error: Invalid JSON in lora_config: {e}"
+                if not isinstance(parsed_config, list):
+                    return (
+                        f"Error: lora_config must be a JSON array, got "
+                        f"{type(parsed_config).__name__}. Ex: [\"lora.sft\"]"
+                    )
+                for i, item in enumerate(parsed_config):
+                    if isinstance(item, str):
+                        user_loras.append(item)
+                    elif isinstance(item, dict):
+                        name = item.get("name", item.get("model", None))
+                        if name is not None and not isinstance(name, str):
+                            return (
+                                f"Error: lora_config[{i}] 'name'/'model' must be a "
+                                f"string, got {type(name).__name__}"
+                            )
+                        strength = item.get("strength", None)
+                        if strength is not None and not isinstance(strength, (int, float)):
+                            return (
+                                f"Error: lora_config[{i}] 'strength' must be a "
+                                f"number, got {type(strength).__name__}"
+                            )
+                        if name:
+                            user_loras.append(item)
+                    else:
+                        return (
+                            f"Error: lora_config[{i}] must be a string or object, "
+                            f"got {type(item).__name__}"
+                        )
+
+            def _lora_name(item):
+                if isinstance(item, str):
+                    return item
+                if isinstance(item, dict):
+                    return item.get("name", item.get("model", ""))
+                return ""
+
+            # Normalize every LoRA to (name, strength) and filter skips
+            combined = []
+            if tryon_name:
+                combined.append((tryon_name, 1.0))
+            for item in user_loras:
+                name = _lora_name(item)
+                if not name:
+                    continue
+                if name == tryon_name:
+                    continue  # already fixed in slot 1
+                strength = (
+                    float(item.get("strength", 1.0)) if isinstance(item, dict) else 1.0
+                )
+                if strength == 0:
+                    continue
+                combined.append((name, strength))
+
+            max_slots = sum(1 for k in lora_node["inputs"] if k.startswith("lora_"))
+            combined = combined[:max_slots]
+
+            log.info(
+                "LoRA injection: tryon=%s user_raw=%s combined=%s",
+                tryon_name,
+                raw_lora_config,
+                json.dumps(combined),
+            )
+
+            for i, (name, strength) in enumerate(combined, start=1):
+                slot = f"lora_{i}"
+                if slot not in lora_node["inputs"]:
+                    break
+                if bool(name) and strength != 0:
+                    lora_node["inputs"][slot]["on"] = True
+                    lora_node["inputs"][slot]["lora"] = name
+                    lora_node["inputs"][slot]["strength"] = strength
+                else:
+                    lora_node["inputs"][slot]["on"] = False
+                    lora_node["inputs"][slot]["lora"] = ""
+                    lora_node["inputs"][slot]["strength"] = 0
+
+            # Turn off any slots left over after the combined list
+            for i in range(len(combined) + 1, max_slots + 1):
+                slot = f"lora_{i}"
+                if slot in lora_node["inputs"]:
+                    lora_node["inputs"][slot]["on"] = False
+                    lora_node["inputs"][slot]["lora"] = ""
+                    lora_node["inputs"][slot]["strength"] = 0
+
+            # Single-line status (event emitter doesn't support multi-line).
+            # "with extra LoRAs" only when the user added LoRAs beyond the
+            # workflow's fixed try-on LoRA.
+            has_extra_loras = len(combined) > 1
+
+            if __event_emitter__:
+                status_desc = "\U0001f455 Running virtual try-on"
+                if has_extra_loras:
+                    status_desc += " with extra LoRAs"
+                status_desc += "..."
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {
+                            "description": status_desc,
+                            "done": False,
+                            "hidden": False,
+                        },
+                    }
+                )
 
             # =================================================================
             # Configure image sources — auto-detect URL vs filename for each
@@ -368,12 +485,13 @@ class Tools:
 
             log.info(
                 "Dispatching virtual try-on workflow to ComfyUI (%s) - "
-                "model=%s, upper=%s, lower=%s, seed=%d",
+                "model=%s, upper=%s, lower=%s, seed=%d, loras=%s",
                 image_config.COMFYUI_BASE_URL,
                 model_image,
                 upper_image,
                 lower_image,
                 seed_arg,
+                json.dumps(combined) if combined else "(none)",
             )
 
             # =================================================================

@@ -185,16 +185,38 @@
   },
   "391": {
     "inputs": {
-      "lora_name": "flux2\\flux-klein-tryon-comfy.safetensors",
-      "strength_model": 1,
+      "PowerLoraLoaderHeaderWidget": {
+        "type": "PowerLoraLoaderHeaderWidget"
+      },
+      "lora_1": {
+        "on": true,
+        "lora": "flux2\\flux-klein-tryon-comfy.safetensors",
+        "strength": 1
+      },
+      "lora_2": {
+        "on": false,
+        "lora": "",
+        "strength": 0
+      },
+      "lora_3": {
+        "on": false,
+        "lora": "",
+        "strength": 0
+      },
+      "lora_4": {
+        "on": false,
+        "lora": "",
+        "strength": 0
+      },
+      "➕ Add Lora": "",
       "model": [
         "389",
         0
       ]
     },
-    "class_type": "LoraLoaderModelOnly",
+    "class_type": "Power Lora Loader (rgthree)",
     "_meta": {
-      "title": "Load LoRA"
+      "title": "Power Lora Loader (rgthree)"
     }
   },
   "392": {

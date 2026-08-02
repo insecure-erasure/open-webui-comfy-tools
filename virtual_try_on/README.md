@@ -16,6 +16,7 @@ Dresses a person photo with a specific upper garment and lower garment using the
 |---|---|
 | comfyui_image_base_url | Overrides admin valve and COMFYUI_BASE_URL. |
 | seed | -1 = random (default), >=1 = fixed seed for reproducible results. |
+| lora_config | JSON array of extra LoRAs to stack on top of the try-on LoRA. String = only name (strength 1.0), object = {"name"\|"model", "strength"}. The workflow try-on LoRA always stays in slot 1 at strength 1; your LoRAs are appended after it. Empty name, strength 0, or a name matching the try-on LoRA are skipped. Ex: `["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]` |
 
 ## Usage
 
@@ -49,6 +50,7 @@ Generation settings: CFG 1.2, 6 steps, euler sampler, Flux2Scheduler. The latent
 ## Requirements
 
 - ComfyUI-LoadImageURL custom node installed in ComfyUI's custom_nodes/ directory.
+- rgthree-comfy (Power Lora Loader) — loads the try-on LoRA.
 - ComfyUI-Custom-Scripts (ShowText node) — required to emit the generated prompt.
 - ComfyUI-KJNodes (Random Preview Image node).
 - ComfyUI-Florence2 (Florence-2 subject captioning).
