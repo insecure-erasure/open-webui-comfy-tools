@@ -260,6 +260,10 @@ class Tools:
             default="[]",
             description='JSON array of extra LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. The workflow try-on LoRA always stays first at strength 1; these are appended after it. Empty name or strength 0 skips the entry. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
         )
+        prompt_suffix: str = Field(
+            default="",
+            description="Optional text appended at the end of the generated prompt (after the workflow's default try-on instruction). Leave empty to skip.",
+        )
 
     def __init__(self):
         self.valves = self.Valves()
@@ -311,6 +315,7 @@ class Tools:
             _, lower_node = _resolve_node(workflow, "Lower garments")
             _, random_noise = _resolve_node(workflow, "RandomNoise")
             _, lora_node = _resolve_node(workflow, "Power Lora Loader (rgthree)")
+            _, suffix_node = _resolve_node(workflow, "Prompt suffix")
             preview_image_id, _ = _resolve_node(workflow, "Random Preview Image")
             prompt_node_id, _ = _resolve_node(workflow, "Prompt preview")
 
@@ -473,6 +478,17 @@ class Tools:
             _set_image_source(lower_node["inputs"], lower_image)
 
             # =================================================================
+            # Prompt suffix: user text appended to the generated prompt
+            # (string_b of the "Prompt suffix" concat node)
+            # =================================================================
+            user_prompt_suffix = (
+                user_valves.prompt_suffix
+                if user_valves and user_valves.prompt_suffix
+                else ""
+            )
+            suffix_node["inputs"]["string_b"] = user_prompt_suffix
+
+            # =================================================================
             # Seed: UserValve. -1 = random, >=1 = fixed
             # =================================================================
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
@@ -485,13 +501,14 @@ class Tools:
 
             log.info(
                 "Dispatching virtual try-on workflow to ComfyUI (%s) - "
-                "model=%s, upper=%s, lower=%s, seed=%d, loras=%s",
+                "model=%s, upper=%s, lower=%s, seed=%d, loras=%s, prompt_suffix=%s",
                 image_config.COMFYUI_BASE_URL,
                 model_image,
                 upper_image,
                 lower_image,
                 seed_arg,
                 json.dumps(combined) if combined else "(none)",
+                user_prompt_suffix or "(none)",
             )
 
             # =================================================================

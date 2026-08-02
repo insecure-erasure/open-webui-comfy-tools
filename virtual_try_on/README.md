@@ -17,6 +17,7 @@ Dresses a person photo with a specific upper garment and lower garment using the
 | comfyui_image_base_url | Overrides admin valve and COMFYUI_BASE_URL. |
 | seed | -1 = random (default), >=1 = fixed seed for reproducible results. |
 | lora_config | JSON array of extra LoRAs to stack on top of the try-on LoRA. String = only name (strength 1.0), object = {"name"\|"model", "strength"}. The workflow try-on LoRA always stays in slot 1 at strength 1; your LoRAs are appended after it. Empty name, strength 0, or a name matching the try-on LoRA are skipped. Ex: `["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]` |
+| prompt_suffix | Optional text appended to the end of the generated prompt, after the workflow's default try-on instruction. Leave empty to skip. |
 
 ## Usage
 

@@ -14,7 +14,7 @@
   "19": {
     "inputs": {
       "text": [
-        "462:460",
+        "470",
         0
       ],
       "clip": [
@@ -320,7 +320,7 @@
     "inputs": {
       "text_0": "TRYON A woman. Replace the outfit with the upper and the lower pieces of garment as shown in the reference images. The final image keeps its original framing.",
       "text": [
-        "462:460",
+        "470",
         0
       ]
     },
@@ -633,6 +633,20 @@
     "class_type": "ReferenceLatent",
     "_meta": {
       "title": "LowerLatent (negative)"
+    }
+  },
+  "470": {
+    "inputs": {
+      "string_a": [
+        "462:460",
+        0
+      ],
+      "string_b": "",
+      "delimiter": " "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Prompt suffix"
     }
   }
 }
