@@ -24,6 +24,12 @@ _COMFY_QUEUE_MAX_RETRIES = 600       # ~10 min at 1s intervals (Florence-2 + Flu
 _COMFY_QUEUE_POLL_INTERVAL = 1.0     # seconds
 _COMFY_SEED_MAX: int = 1125899906842624
 
+# Default garments served from Open WebUI's static/images/vton/.
+# Fixed names, transparent to the user: when a garment is omitted the tool
+# falls back to these images.
+_DEFAULT_UPPER_FILENAME = "default_upper.png"
+_DEFAULT_LOWER_FILENAME = "default_lower.png"
+
 
 # =============================================================================
 # Workflow node resolver — finds nodes by _meta.title (must be unique)
@@ -263,14 +269,6 @@ class Tools:
             default="",
             description="Optional text appended at the end of the generated prompt (after the workflow's default try-on instruction). Leave empty to skip.",
         )
-        default_upper_image: str = Field(
-            default="",
-            description="Fallback upper garment used when upper_image is not provided. Accepts a filename from Open WebUI's static/images/vton/ (e.g. 'default_upper.png'), a full URL, or a ComfyUI input file prefixed with 'input:'. Leave empty to require the user to provide the upper garment.",
-        )
-        default_lower_image: str = Field(
-            default="",
-            description="Fallback lower garment used when lower_image is not provided. Accepts a filename from Open WebUI's static/images/vton/ (e.g. 'default_lower.png'), a full URL, or a ComfyUI input file prefixed with 'input:'. Leave empty to require the user to provide the lower garment.",
-        )
 
     def __init__(self):
         self.valves = self.Valves()
@@ -311,20 +309,12 @@ class Tools:
             # =================================================================
             # Garment resolution & fallbacks
             #   Both garments are optional. A missing upper/lower garment falls
-            #   back to its configured default (default_upper_image /
-            #   default_lower_image). When a default is used a notification is
-            #   emitted so the user knows.
+            #   back to the fixed default images in static/images/vton/
+            #   (default_upper.png / default_lower.png). When a default is used
+            #   a notification is emitted so the user knows.
             # =================================================================
-            default_upper = (
-                user_valves.default_upper_image
-                if user_valves and user_valves.default_upper_image
-                else ""
-            )
-            default_lower = (
-                user_valves.default_lower_image
-                if user_valves and user_valves.default_lower_image
-                else ""
-            )
+            default_upper = _DEFAULT_UPPER_FILENAME
+            default_lower = _DEFAULT_LOWER_FILENAME
 
             # =================================================================
             # Default garments live in Open WebUI's static/images/vton/ and are
@@ -359,17 +349,28 @@ class Tools:
             resolved_upper = upper_image or _resolve_default_image(default_upper)
             resolved_lower = lower_image or _resolve_default_image(default_lower)
 
-            if not resolved_upper:
+            # =================================================================
+            # Salvaguard: check the default garment files exist on disk before
+            # dispatching. Only checked when the default is actually going to
+            # be used (i.e. the user did not provide that garment). Otherwise
+            # ComfyUI would fail later with an obscure image-load error.
+            # =================================================================
+            from open_webui.env import STATIC_DIR
+
+            def _default_file_exists(filename: str) -> bool:
+                return (STATIC_DIR / "images" / "vton" / filename).is_file()
+
+            if not upper_image and not _default_file_exists(default_upper):
                 return (
-                    "Error: No upper garment image provided and no "
-                    "default_upper_image configured. Provide an upper garment "
-                    "or set default_upper_image."
+                    "Error: Default upper garment file not found: "
+                    f"{STATIC_DIR / 'images' / 'vton' / default_upper}. "
+                    "Create it or provide an upper garment image."
                 )
-            if not resolved_lower:
+            if not lower_image and not _default_file_exists(default_lower):
                 return (
-                    "Error: No lower garment image provided and no "
-                    "default_lower_image configured. Provide a lower garment "
-                    "or set default_lower_image."
+                    "Error: Default lower garment file not found: "
+                    f"{STATIC_DIR / 'images' / 'vton' / default_lower}. "
+                    "Create it or provide a lower garment image."
                 )
 
             # =================================================================

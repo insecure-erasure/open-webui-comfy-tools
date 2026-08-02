@@ -18,10 +18,8 @@ Dresses a person photo with a specific upper garment and lower garment using the
 | seed | -1 = random (default), >=1 = fixed seed for reproducible results. |
 | lora_config | JSON array of extra LoRAs to stack on top of the try-on LoRA. String = only name (strength 1.0), object = {"name"\|"model", "strength"}. The workflow try-on LoRA always stays in slot 1 at strength 1; your LoRAs are appended after it. Empty name, strength 0, or a name matching the try-on LoRA are skipped. Ex: `["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]` |
 | prompt_suffix | Optional text appended to the end of the generated prompt, after the workflow's default try-on instruction. Leave empty to skip. |
-| default_upper_image | Fallback upper garment used when `upper_image` is not provided. A filename from Open WebUI's `static/images/vton/` (URL built from the Open WebUI base URL), a full URL, or a ComfyUI input file (`input:filename.png`). Leave empty to require the user to provide the upper garment. |
-| default_lower_image | Fallback lower garment used when `lower_image` is not provided. A filename from Open WebUI's `static/images/vton/` (URL built from the Open WebUI base URL), a full URL, or a ComfyUI input file (`input:filename.png`). Leave empty to require the user to provide the lower garment. |
 
-At least **one** garment is required: the LLM passes both `upper_image` and `lower_image` when available, or the missing one as an empty string (falling back to `default_upper_image` / `default_lower_image`). With no garment at all the tool fails.
+Both garments are **optional**. When the user omits one, the tool falls back to the fixed default images `default_upper.png` / `default_lower.png` in `static/images/vton/` and shows an info notification.
 
 Default garment images live in `static/images/vton/` (e.g. `/app/backend/open_webui/static/images/vton/default_upper.png`). The tool builds their URL from the Open WebUI base URL — the global `webui.url` config (Admin > Settings), falling back to the request's base URL — so ComfyUI can fetch them at `<open-webui-base>/static/images/vton/<filename>`. Note that `/app/backend/open_webui/static` is not inside the `data/` volume; mount a bind volume there (e.g. `-v ./static-images:/app/backend/open_webui/static/images`) so the images survive container recreation.
 
