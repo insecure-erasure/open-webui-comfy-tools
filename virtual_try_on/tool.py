@@ -525,13 +525,13 @@ class Tools:
                 status_desc = "\U0001f455 Running virtual try-on"
                 if has_extra_loras:
                     status_desc += " with extra LoRAs"
-                status_desc += "..."
                 if missing_garments:
                     if len(missing_garments) == 2:
-                        status_desc += " Using default upper and lower garments."
+                        status_desc += " using default upper and lower garments"
                     else:
                         g = missing_garments[0]
-                        status_desc += f" Using default {g} garment."
+                        status_desc += f" using default {g} garment"
+                status_desc += "..."
                 await __event_emitter__(
                     {
                         "type": "status",
