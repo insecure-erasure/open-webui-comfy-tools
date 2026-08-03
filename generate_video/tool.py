@@ -587,7 +587,7 @@ class Tools:
         Animate an image into a video (image-to-video).
 
         :param prompt: Video description in English, enriched with motion details.
-        :param image: Filename from a previous generation (e.g. "abc123.png") or a direct URL to an external image ("https://..."). Auto-detects which mode to use.
+        :param image: Filename from a previous generation (e.g. "abc123.png") or a direct URL to an external image ("https://...").
         """
         if __request__ is None:
             log.error("generate_video called without request context")
