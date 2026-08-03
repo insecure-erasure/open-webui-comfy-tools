@@ -1,7 +1,7 @@
 """
 title: Virtual Try-On
 author: Insecure Erasure
-description: Try on an upper and a lower garment on a person photo
+description: Try on an upper and a lower garment on a person photo. Each image argument accepts a filename from a previous generation or a direct external image URL. model_image is required; upper_image and lower_image are optional.
 version: 1.0
 """
 
@@ -235,11 +235,18 @@ def _extract_text(outputs: dict, output_node_id: str) -> str:
 
 class Tools:
     """
-    Virtual try-on: dress a person photo with an upper and a lower garment.
+    Try on an upper and a lower garment on a person photo.
 
-    Call only when the user asks to try on clothes on a person. Requires the
-    model photo. Both garments are optional — a missing garment falls back to
-    its configured default. Returns the result image (image_md) and the prompt.
+    Call only when the user asks to try on clothes on a person (virtual
+    try-on). Requires a photo of the person to dress. Each image argument
+    accepts either a filename from a previous generation or a direct external
+    image URL. model_image is required; upper_image and lower_image are
+    optional — omit whichever the user did not provide (a missing garment
+    falls back to its configured default image). Returns the result image
+    (image_md) and the prompt.
+
+    Example: model_image='abc123.png', upper_image='https://.../top.jpg',
+    lower_image='https://.../skirt.jpg'
     """
 
     class Valves(BaseModel):
@@ -289,12 +296,15 @@ class Tools:
         """
         Try on an upper and a lower garment on a person photo.
 
-        Requires the model photo. Both garments are optional: omit whichever
-        the user did not provide.
+        Call only when the user explicitly asks to try on clothes on a person.
+        model_image is required; upper_image and lower_image are optional —
+        omit whichever the user did not provide. Each image argument is a
+        string accepting either a filename from a previous generation (e.g.
+        'abc123.png') or a direct external image URL (e.g. 'https://...').
 
-        :param model_image: Photo of the person to dress.
-        :param upper_image: Upper garment. Optional.
-        :param lower_image: Lower garment. Optional.
+        :param model_image: Filename or URL of the person photo to dress. Required.
+        :param upper_image: Filename or URL of the upper garment photo (top, jacket, shirt...). Optional.
+        :param lower_image: Filename or URL of the lower garment photo (trousers, skirt, shorts...). Optional.
         """
         if __request__ is None:
             log.error("virtual_try_on called without request context")
