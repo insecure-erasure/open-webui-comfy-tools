@@ -25,7 +25,7 @@ The slider uses the skeleton from the request with three adjustments:
 - The divider starts at 50% instead of 0% so both images are visible on load. Change the two `var(--p,50%)` fallbacks back to `0%` if you prefer the original behavior.
 - A `reportHeight()` postMessage keeps the embed height in sync with the slider size (recommended by Open WebUI for sandboxed embeds).
 
-The interaction is mouse-driven (`mousemove` on the container); touch is not handled.
+The interaction uses **Pointer Events**, which unify mouse and touch: drag anywhere on the slider (or tap to move the divider) works on desktop and mobile. A small narrow **handle** with arrows is shown in the center of the divider as a visual affordance that the slider can be moved. `touch-action: none` on the container keeps the browser from hijacking the drag for scrolling.
 
 ### Robust image-load handling
 
