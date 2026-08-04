@@ -13,8 +13,11 @@ import random as _random
 import uuid
 
 import httpx
-from pathlib import Path
 from pydantic import BaseModel, Field
+
+from fastapi.responses import HTMLResponse
+
+from embeds import build_image_viewer
 
 log = logging.getLogger(__name__)
 
@@ -393,6 +396,12 @@ class Tools:
     ):
         """
         Generate one image with optional control over aspect ratio.
+
+        The image is displayed in the chat as a Rich UI embed (image viewer
+        with zoom and download). The tool returns the image URL as context
+        ({'image': <url>}); use it for chained tool calls (edit_image,
+        enhance_image, virtual_try_on, generate_video) or to refer to the
+        generated image.
 
         :param prompt: Image generation prompt. Translate the user's request into English internally, then enrich with visual details without changing the subject or scene. Do not add superfluous details. Write the final prompt in English.
         :param aspect_ratio: ALWAYS omit this parameter unless the user's request specifically mentions dimensions or aspect ratio (e.g., "16:9", "square", "portrait", "landscape"). Format W:H (e.g., 16:9).
@@ -831,11 +840,16 @@ class Tools:
                     }
                 )
 
-            return (
-                f"image_md: ![Generated image]({image_url})\n"
-                f"image_filename: {image_filename}\n\n"
-                "Use image_md to display the image in your response."
-            )
+            # Rich UI embed (see DESIGN.md): the LLM receives only the
+            # actionable context ({'image': url}) and never sees the HTML.
+            # The aspect ratio is known a priori (reduced_w:reduced_h), so the
+            # viewer reserves it to avoid the load "jump". The URL (not the
+            # filename) is emitted so downstream tools (edit/enhance/virtual
+            # try-on/video) and compare_images can use it directly.
+            viewer = build_image_viewer(image_url, aspect_ratio=(reduced_w, reduced_h))
+            return HTMLResponse(
+                content=viewer, headers={"Content-Disposition": "inline"}
+            ), {{"image": image_url}}
 
         except asyncio.CancelledError:
             log.info("smart_generate_image cancelled by user")
