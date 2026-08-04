@@ -105,6 +105,11 @@ function fit(){{
   // starts at ~150px and its own vh is useless, so derive from the container
   // width and the image aspect ratio, cap the height at 70% of the available
   // screen height (screen.availHeight), and report the resulting height.
+  // While the lightbox is in browser fullscreen the iframe viewport is the
+  // full screen and resizing/reporting would blow up the embed and shift the
+  // chat scroll — so skip sizing during fullscreen entirely (the overlay
+  // covers everything anyway) and re-fit when fullscreen ends.
+  if(document.fullscreenElement||document.webkitFullscreenElement)return;
   let r=0;
   if(RESERVED_R)r=Number(RESERVED_R);
   if(!(r>0)&&thumb.naturalWidth>0&&thumb.naturalHeight>0)r=thumb.naturalWidth/thumb.naturalHeight;
@@ -134,15 +139,24 @@ function openLightbox(){{
   try{{el.webkitRequestFullscreen&&el.webkitRequestFullscreen();}}catch(e){{}}
 }}
 function closeLightbox(){{
-  overlay.classList.remove('open');
-  document.body.style.overflow='';
-  try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{}}
-  try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{}}
+  // If in fullscreen, exit it; the overlay is removed and the size re-fit in
+  // the fullscreenchange handler (avoids a flash of the bare viewer fullscreen).
+  if(document.fullscreenElement||document.webkitFullscreenElement){{
+    try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{}}
+    try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{}}
+  }}else{{
+    overlay.classList.remove('open');
+    document.body.style.overflow='';
+    restoreScroll();
+  }}
 }}
 // Restore the parent scroll position after fullscreen: exiting fullscreen
 // scrolls the iframe's document back to the top, and since the iframe height
 // changes when the overlay opens, the chat scroll jumps up. Save the parent
-// scroll position before opening and restore it after closing.
+// scroll position before opening and restore it after closing. NOTE: in the
+// cross-origin sandbox parent.scrollTo is blocked, so the real fix is not
+// resizing the embed during fullscreen (see fit()); this is a best-effort
+// fallback for the embed-area lightbox (no fullscreen).
 let savedScroll=0;
 function saveScroll(){{try{{savedScroll=(parent.scrollY||0)||(document.documentElement.scrollTop||0);}}catch(e){{savedScroll=0;}}}}
 function restoreScroll(){{requestAnimationFrame(()=>{{try{{parent.scrollTo(0,savedScroll);}}catch(e){{}}document.documentElement.scrollTop=savedScroll;document.body.scrollTop=savedScroll;}});}}
@@ -151,7 +165,7 @@ closeBtn.addEventListener('pointerup',()=>{{closeLightbox();restoreScroll();}});
 overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeLightbox();restoreScroll();}}}});
 big.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;e.stopPropagation();}});
 document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{closeLightbox();restoreScroll();}}}});
-document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');restoreScroll();}}}});
+document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');document.body.style.overflow='';restoreScroll();fit();}}}});
 async function download(){{try{{const r=await fetch(big.src);if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}}catch(err){{const w=window.open(big.src,'_blank');if(w)w.focus();}}}}
 dlBtn.addEventListener('pointerup',download);
 </script>

@@ -20,6 +20,7 @@
   - Width: fit to the chat container.
   - Height: **capped at 70vh** maximum, centered (flexbox), `object-fit: contain` (no distortion).
   - **Implementation note (learned in Phase 2)**: `vh` units inside the sandboxed iframe refer to the iframe box (~150px initial), not the browser viewport — so the 70vh cap is implemented as **70% of `screen.availHeight`** (approximation), and the height is derived from the container width + image aspect ratio, with `reportHeight()` keeping the iframe at the real height. `reportHeight()` reports the **viewer's own height** (`viewer.offsetHeight`), not the document's, so the iframe hugs the image and no empty "frame" appears around it when the height cap makes the viewer narrower than the container (desktop wide screens).
+  - **Scroll stability (learned in Phase 2)**: entering browser fullscreen expands the iframe's viewport to the full screen, which would re-trigger sizing and blow up the embed (shifting the chat scroll). `fit()` therefore **skips sizing while in fullscreen** (the overlay covers everything anyway) and re-fits when fullscreen ends. Exiting fullscreen also removes the overlay only via the `fullscreenchange` event (no flash), and re-fits + reports so the chat scroll stays put.
   - The backend **does not measure** the image; the aspect ratio is known a priori (`reduced_w:reduced_h`), useful for aspect reservation and avoiding the "jump" on load.
 - **Modal viewer (lightbox) replicated inside the iframe**:
   - Open: a click on the thumbnail.
