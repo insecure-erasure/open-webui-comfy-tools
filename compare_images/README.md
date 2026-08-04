@@ -27,6 +27,15 @@ The slider uses the skeleton from the request with three adjustments:
 
 The interaction is mouse-driven (`mousemove` on the container); touch is not handled.
 
+## Sizing strategy (adaptive)
+
+The slider uses an adaptive sizing strategy depending on the device orientation:
+
+- **Vertical (portrait) devices**: the slider fills the full width of the chat container with **no height cap** (height follows the image aspect ratio).
+- **Horizontal (landscape) devices**: the height is **capped at 80% of the available vertical space**; the width is scaled proportionally and the slider is centered.
+
+Because the embed is a sandboxed cross-origin iframe, it cannot read the parent page's viewport. The available height is therefore approximated with the device screen (`screen.availHeight`, which is readable inside the sandbox).
+
 ## Requirements
 
 - A recent Open WebUI version with Rich UI embedding support (renders the tool's `HTMLResponse` as an interactive iframe).

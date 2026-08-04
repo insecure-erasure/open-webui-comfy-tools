@@ -48,6 +48,7 @@
   - Height: resulting from the aspect ratio, via `reportHeight()`.
   - No thumbnail centering: it fills the width (unlike the image viewer).
 - **Requires two valid URLs** (validated with `urlparse`). This is the reason the image tools emit a **URL** (and not a filename) in their `context`.
+- **Adaptive sizing** (maintainer decision, 2026-08-04): on **vertical/portrait** devices the slider fills the full width with **no height cap**; on **horizontal/landscape** devices the height is **capped at 80% of the available vertical space**, width scaled proportionally and centered. The available height is approximated with the device screen (`screen.availHeight`) because the sandboxed iframe cannot read the parent viewport (cross-origin, `allowSameOrigin` OFF).
 - **Repo status**: the code in master **still uses the hack** (HTML block + instruction to the agent), but the README **already documents the Rich UI version** — there is an inconsistency. The migration would align the code with the README.
 - **Does not require** ComfyUI or a workflow (it receives two URLs).
 - **Chains**: no.

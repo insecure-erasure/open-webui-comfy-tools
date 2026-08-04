@@ -2,7 +2,7 @@
 title: Compare Images
 author: Insecure Erasure
 description: Compare two images side by side with an interactive before/after slider
-version: 2.0
+version: 2.1
 """
 
 import html
@@ -22,11 +22,22 @@ def _build_slider_html(image_a: str, image_b: str) -> str:
     so query strings (e.g. &filename=...&type=...) cannot break the markup.
 
     The slider fills the full width of the chat container and its height
-    follows the aspect ratio of the base image (image_a). A reportHeight()
-    postMessage keeps the sandboxed iframe height in sync with the slider
-    (required by Open WebUI: without it the iframe stays at ~150px and the
-    content is cut off). The divider starts at 50% so both images are visible
-    on load.
+    follows the aspect ratio of the base image (image_a), with an adaptive
+    sizing strategy:
+
+    - Vertical (portrait) devices: full width, no height cap.
+    - Horizontal (landscape) devices: height capped at 80%% of the available
+      vertical space; the width is scaled proportionally and the slider is
+      centered.
+
+    The sandboxed iframe cannot read the parent viewport (cross-origin,
+    allowSameOrigin OFF), so the available height is approximated with the
+    device screen (screen.availHeight), which is readable inside the sandbox.
+
+    A reportHeight() postMessage keeps the sandboxed iframe height in sync
+    with the slider (required by Open WebUI: without it the iframe stays at
+    ~150px and the content is cut off). The divider starts at 50%% so both
+    images are visible on load.
     """
     a = html.escape(image_a, quote=True)
     b = html.escape(image_b, quote=True)
@@ -38,7 +49,7 @@ def _build_slider_html(image_a: str, image_b: str) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 body{{margin:0;background:#222}}
-#c{{position:relative;width:100%;overflow:hidden;cursor:crosshair}}
+#c{{position:relative;width:100%;margin:0 auto;overflow:hidden;cursor:crosshair}}
 #c img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}}
 #top{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
 #d{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:#fff;transform:translateX(-50%)}}
@@ -55,14 +66,25 @@ const c=document.getElementById('c'),im=document.querySelector('#c img');
 function reportHeight(){{parent.postMessage({{type:'iframe:height',height:document.documentElement.scrollHeight}},'*')}}
 function fit(){{
   const r=(im.naturalWidth||16)/(im.naturalHeight||9);
-  c.style.height=(c.clientWidth/r)+'px';
+  // Adaptive sizing: portrait devices use the full width with no height cap;
+  // landscape devices cap the height at 80% of the available vertical space
+  // and scale the width proportionally (centered). The sandboxed iframe
+  // cannot read the parent viewport, so the available height is approximated
+  // with the device screen (availHeight) — acceptable for internal services.
+  const landscape=(screen.width||0)>(screen.height||0);
+  const vh=screen.availHeight||screen.height||0;
+  const maxH=landscape?vh*0.8:0;
+  let w=document.documentElement.clientWidth;
+  if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
+  c.style.width=w+'px';
+  c.style.height=(w/r)+'px';
   reportHeight();
 }}
 addEventListener('resize',fit);
 im.addEventListener('load',fit);
 document.getElementById('top').addEventListener('load',fit);
 new ResizeObserver(fit).observe(document.body);
-c.addEventListener('mousemove',e=>{{const r=c.getBoundingClientRect(),p=Math.min(100,Math.max(0,(e.clientX-r.left)/r.width*100));c.style.setProperty('--p',p+'%')}});
+c.addEventListener('mousemove',e=>{{const rect=c.getBoundingClientRect(),p=Math.min(100,Math.max(0,(e.clientX-rect.left)/rect.width*100));c.style.setProperty('--p',p+'%')}});
 fit();
 </script>
 </body>
