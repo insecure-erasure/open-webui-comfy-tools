@@ -6,6 +6,7 @@ version: 3.1
 """
 
 import asyncio
+import html
 import json
 import logging
 import random as _random
@@ -15,6 +16,8 @@ from urllib.parse import urlparse, parse_qs
 
 import httpx
 from pydantic import BaseModel, Field
+
+from fastapi.responses import HTMLResponse
 
 log = logging.getLogger(__name__)
 
@@ -465,6 +468,12 @@ class Tools:
     previous generation (e.g. "abc123.png") or a direct URL to an external
     image (e.g. "https://..."). The tool auto-detects which one it is.
 
+    The generated video is displayed in the chat as a Rich UI embed (video
+    player with native controls, autoplay muted loop). The result is
+    terminal: no context is returned (bare HTMLResponse), so the LLM
+    receives the middleware's generic message and should simply acknowledge
+    that the video was generated and shown.
+
     prompt: Video description. Translate the user's request into English
         internally, then enrich with visual motion details without changing
         the subject or scene.
@@ -572,6 +581,90 @@ class Tools:
         self.valves = self.Valves()
         self.citation = False
 
+    def _build_video_player(self, video_url: str) -> str:
+        """
+        Build the self-contained video player embed for a single video URL.
+
+        The URL is HTML-escaped so query strings (e.g. &filename=...&type=...)
+        cannot break the markup.
+
+        Layout: the player fits the chat container width and its height is capped
+        at 80% of the available screen height (screen.availHeight) — the sizing
+        decision recorded in DESIGN.md §6 (2026-08-04): 80vh. `vh` units inside
+        the sandboxed iframe are useless (they refer to the iframe box, ~150px),
+        so the cap is expressed via the device screen, exactly like the image
+        viewer. The video's aspect ratio is NOT known a priori (unlike
+        smart_generate_image, which reserves reduced_w:reduced_h), so the embed
+        waits for the `loadedmetadata` event (videoWidth/videoHeight) before
+        sizing — never a made-up fallback ratio (DESIGN.md §10.4) — and reports
+        the player's own height via reportHeight() so the iframe hugs the video
+        (no empty frame on wide desktop screens).
+
+        The player uses the native controls (play/seek/volume/fullscreen); there
+        is no lightbox and no download button (maintainer decision, 2026-08-04).
+        `muted` is kept so autoplay works (browsers block autoplay with sound).
+        The native fullscreen of the <video> (via its controls) does NOT cause
+        the chat scroll jump, so no saveScroll/restoreScroll is needed here
+        (unlike the image lightbox, DESIGN.md §10.8).
+        """
+        src = html.escape(video_url, quote=True)
+        return (
+f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{{
+  color-scheme:light dark;
+}}
+*{{margin:0;padding:0;box-sizing:border-box}}
+html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
+body{{display:flex;align-items:center;justify-content:center;background:transparent}}
+.player{{max-width:100%;overflow:hidden;border-radius:12px;background:#000}}
+.player video{{display:block;width:100%;height:100%;object-fit:contain;border-radius:12px}}
+</style>
+</head>
+<body>
+<div class="player" id="player">
+  <video id="video" src="{src}" autoplay muted loop playsinline controls preload="metadata"></video>
+</div>
+<script>
+const player=document.getElementById('player'),video=document.getElementById('video');
+function reportHeight(){{parent.postMessage({{type:'iframe:height',height:player.offsetHeight||document.documentElement.scrollHeight}},'*')}}
+function fit(){{
+  // The video's aspect ratio is not known a priori (unlike
+  // smart_generate_image, which reserves reduced_w:reduced_h): wait for the
+  // real dimensions before sizing — never fall back to a made-up ratio
+  // (DESIGN.md §10.4). Until then, report the current height and let the
+  // media events correct it.
+  if(!(video.videoWidth>0&&video.videoHeight>0)){{reportHeight();return;}}
+  const r=video.videoWidth/video.videoHeight;
+  // Sizing decision (DESIGN.md §6, 2026-08-04): 80vh cap. vh/vw units are
+  // useless inside the sandboxed iframe (§10.7), so the cap is 80% of the
+  // available screen height (screen.availHeight); the width derives from
+  // the container width + aspect ratio and the height never overflows the
+  // available screen space.
+  const maxH=(screen.availHeight||screen.height||0)*0.8;
+  let w=document.documentElement.clientWidth;
+  if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
+  player.style.width=w+'px';
+  player.style.height=(w/r)+'px';
+  reportHeight();
+}}
+video.addEventListener('loadedmetadata',fit);
+video.addEventListener('loadeddata',fit);
+video.addEventListener('canplay',fit);
+window.addEventListener('load',fit);
+addEventListener('resize',fit);
+new ResizeObserver(fit).observe(document.body);
+fit();
+</script>
+</body>
+</html>
+"""
+        )
+
     async def generate_video(
         self,
         prompt: str,
@@ -585,6 +678,13 @@ class Tools:
     ):
         """
         Animate an image into a video (image-to-video).
+
+        The video is displayed in the chat as a Rich UI embed (see DESIGN.md
+        §6): a self-contained player (autoplay muted loop playsinline
+        controls, height capped at 80vh) sized after the video metadata
+        loads. Terminal result — the bare HTMLResponse (no tuple) means the
+        LLM receives the middleware's generic message and should simply
+        acknowledge that the video was generated.
 
         :param prompt: Video description in English, enriched with motion details.
         :param image: Filename from a previous generation (e.g. "abc123.png") or a direct URL to an external image ("https://...").
@@ -1045,26 +1145,15 @@ class Tools:
                     }
                 )
 
-            # The HTML block the agent must emit to show the video
-            html_block = (
-                f'<html>\n'
-                f'<style>\n'
-                f'* {{ margin:0; padding:0; box-sizing:border-box; }}\n'
-                f'body {{ background:#0d0d0d; display:flex; align-items:center; justify-content:center; min-height:100vh; }}\n'
-                f'video {{ width:100%; height:100%; display:block; object-fit:contain; }}\n'
-                f'</style>\n'
-                f'<div style="background:#222; width:100%; height:100vh; display:flex;">\n'
-                f'  <video controls autoplay muted loop playsinline style="width:100%;height:100%;object-fit:contain;">\n'
-                f'    <source src="{video_url}" type="video/mp4">\n'
-                f'  </video>\n'
-                f'</div>\n'
-                f'</html>'
-            )
-
-            return (
-                f"{html_block}\n\n"
-                "Wrap the HTML block above in triple backticks and include it in your response "
-                "so the frontend renders the video."
+            # Rich UI embed (see DESIGN.md §6): terminal result → bare
+            # HTMLResponse (no tuple) so the LLM receives the middleware's
+            # generic message ("Embedded UI result is active and visible to
+            # the user."). The player is self-contained and sizes itself
+            # (80vh cap) after the video metadata loads; no download button
+            # (maintainer decision, 2026-08-04).
+            player = self._build_video_player(video_url)
+            return HTMLResponse(
+                content=player, headers={"Content-Disposition": "inline"}
             )
 
         except asyncio.CancelledError:

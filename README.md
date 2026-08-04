@@ -30,7 +30,7 @@ Dresses a person photo with an upper and a lower garment using the Flux.2 Klein 
 
 ### Generate Video
 
-Generates videos from text or images using Wan 2.1 (single-path) or Wan 2.2 (dual-path high/low resolution). Frames follow a 4n+1 constraint imposed by the WAN temporal VAE stride. The result renders as an HTML video element with autoplay, muted, and loop. See its README for valve documentation.
+Generates videos from text or images using Wan 2.1 (single-path) or Wan 2.2 (dual-path high/low resolution). Frames follow a 4n+1 constraint imposed by the WAN temporal VAE stride. The result renders as a Rich UI embed: a self-contained video player (autoplay muted loop, height capped at 80vh) shown inline in the chat. See its README for valve documentation.
 
 ## Installation
 

@@ -185,3 +185,87 @@ dlBtn.addEventListener('pointerup',download);
 </body>
 </html>
 """
+
+
+def build_video_player(video_url: str) -> str:
+    """
+    Build the self-contained video player embed for a single video URL.
+
+    The URL is HTML-escaped so query strings (e.g. &filename=...&type=...)
+    cannot break the markup.
+
+    Layout: the player fits the chat container width and its height is capped
+    at 80% of the available screen height (screen.availHeight) — the sizing
+    decision recorded in DESIGN.md §6 (2026-08-04): 80vh. `vh` units inside
+    the sandboxed iframe are useless (they refer to the iframe box, ~150px),
+    so the cap is expressed via the device screen, exactly like the image
+    viewer. The video's aspect ratio is NOT known a priori (unlike
+    smart_generate_image, which reserves reduced_w:reduced_h), so the embed
+    waits for the `loadedmetadata` event (videoWidth/videoHeight) before
+    sizing — never a made-up fallback ratio (DESIGN.md §10.4) — and reports
+    the player's own height via reportHeight() so the iframe hugs the video
+    (no empty frame on wide desktop screens).
+
+    The player uses the native controls (play/seek/volume/fullscreen); there
+    is no lightbox and no download button (maintainer decision, 2026-08-04).
+    `muted` is kept so autoplay works (browsers block autoplay with sound).
+    The native fullscreen of the <video> (via its controls) does NOT cause
+    the chat scroll jump, so no saveScroll/restoreScroll is needed here
+    (unlike the image lightbox, DESIGN.md §10.8).
+    """
+    src = html.escape(video_url, quote=True)
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{{
+  color-scheme:light dark;
+}}
+*{{margin:0;padding:0;box-sizing:border-box}}
+html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
+body{{display:flex;align-items:center;justify-content:center;background:transparent}}
+.player{{max-width:100%;overflow:hidden;border-radius:12px;background:#000}}
+.player video{{display:block;width:100%;height:100%;object-fit:contain;border-radius:12px}}
+</style>
+</head>
+<body>
+<div class="player" id="player">
+  <video id="video" src="{src}" autoplay muted loop playsinline controls preload="metadata"></video>
+</div>
+<script>
+const player=document.getElementById('player'),video=document.getElementById('video');
+function reportHeight(){{parent.postMessage({{type:'iframe:height',height:player.offsetHeight||document.documentElement.scrollHeight}},'*')}}
+function fit(){{
+  // The video's aspect ratio is not known a priori (unlike
+  // smart_generate_image, which reserves reduced_w:reduced_h): wait for the
+  // real dimensions before sizing — never fall back to a made-up ratio
+  // (DESIGN.md §10.4). Until then, report the current height and let the
+  // media events correct it.
+  if(!(video.videoWidth>0&&video.videoHeight>0)){{reportHeight();return;}}
+  const r=video.videoWidth/video.videoHeight;
+  // Sizing decision (DESIGN.md §6, 2026-08-04): 80vh cap. vh/vw units are
+  // useless inside the sandboxed iframe (§10.7), so the cap is 80% of the
+  // available screen height (screen.availHeight); the width derives from
+  // the container width + aspect ratio and the height never overflows the
+  // available screen space.
+  const maxH=(screen.availHeight||screen.height||0)*0.8;
+  let w=document.documentElement.clientWidth;
+  if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
+  player.style.width=w+'px';
+  player.style.height=(w/r)+'px';
+  reportHeight();
+}}
+video.addEventListener('loadedmetadata',fit);
+video.addEventListener('loadeddata',fit);
+video.addEventListener('canplay',fit);
+window.addEventListener('load',fit);
+addEventListener('resize',fit);
+new ResizeObserver(fit).observe(document.body);
+fit();
+</script>
+</body>
+</html>
+"""

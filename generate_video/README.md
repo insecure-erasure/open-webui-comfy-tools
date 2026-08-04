@@ -76,7 +76,7 @@ The Wan VAE (wan_2.1_vae.safetensors) is available from the original Wan reposit
 
 The LLM calls this tool when the user asks to animate an image into a video. The prompt describes the desired motion in English. The image parameter accepts a filename from a previous generation or a direct URL.
 
-The result renders as an HTML video element with autoplay, muted, and loop attributes.
+The result renders as a **Rich UI embed** (see DESIGN.md §6): a self-contained video player (`autoplay muted loop playsinline controls`) displayed inline in the chat via a sandboxed iframe. The player sizes itself after the video metadata loads, with the height capped at 80vh (80% of the available screen height). The tool returns a bare `HTMLResponse` — it is a terminal result with an empty context, so the LLM receives the middleware's generic message. No download button (native controls only).
 
 ## Workflow files
 
