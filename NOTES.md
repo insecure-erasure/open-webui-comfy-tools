@@ -65,6 +65,13 @@ cleanup (Phase 7) remains.
   - Terminal tools (`compare_images`, `generate_video`): **bare `HTMLResponse`**
     (no tuple) → the LLM gets the middleware's generic message. An empty dict
     `{}` IS sent to the LLM as context — do not use it.
+- **Failed-load retry (2026-08-04, cheap fix, no watchdog)**: occasionally a
+  slow/flaky fetch left the embed without the image (user had to "reload this
+  frame"). The symptom is a failed fetch, NOT a layout issue — a watchdog that
+  re-calls `fit()` cannot fix a missing download (and is hacky). Implemented
+  the standard cheap fix: on `img error`, clear + re-set `src` once per URL
+  (`retryOnce` in the viewer f-string). Verify with 8 node cases; gallery's 13
+  still pass.
 - **The image gallery (Phase 8, 2026-08-04, awaiting test)**: from any image
   lightbox (fullscreen), ‹ › buttons walk the images generated in the chat
   starting from the one being viewed. **Maintainer constraint: NO

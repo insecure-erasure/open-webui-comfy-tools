@@ -475,6 +475,19 @@ DOM-walk pattern (Inline Visualizer v2).
 - The NOTES.md regeneration script now produces the `gallery` parameter in the
   method signature (and its docstring).
 
+### Failed-load retry (cheap fix, no watchdog) — 2026-08-04
+
+**Problem**: occasionally a slow/flaky image fetch leaves the embed without the
+image; the user has to "reload this frame" (re-running the script re-fits).
+The symptom is a failed/failed-to-fire fetch, NOT a layout issue — the `<img>`
+needs no JS to display once the browser receives the bytes, so a watchdog that
+re-calls `fit()` cannot fix a missing download (and a persistent timer is
+hacky). The cheap, non-hacky fix is the standard one: on the `error` event,
+clear and re-set the img `src` a single time per URL (`retryOnce`). If the
+retry also fails, leave it alone (the browser shows the alt text). It ships in
+the same f-string (verified: 8 node cases for retryOnce + the 13 gallery cases
+still pass; f-strings byte-identical, 11255 chars).
+
 ---
 
 ## Appendix A — Verification against the Open WebUI source code

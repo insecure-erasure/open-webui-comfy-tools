@@ -412,6 +412,11 @@ class Tools:
         button keeps using `big.src`, so it always downloads the image
         currently shown. All gallery logic is JS inside the embed — the marker
         is the only contribution of the tool.
+
+        A failed image load is retried once (no watchdog): on `error` the img
+        src is cleared and re-set a single time per URL (flaky/slow fetches),
+        after which a second failure is left alone (the browser shows the alt
+        text).
         """
         src = html.escape(image_url, quote=True)
         gallery_attr = ' data-gallery="1"' if gallery else ''
@@ -511,6 +516,22 @@ window.addEventListener('load',fit);
 addEventListener('resize',fit);
 new ResizeObserver(fit).observe(document.body);
 fit();
+// Failed-image retry (cheap fix, NO watchdog — maintainer decision,
+// 2026-08-04, DESIGN.md §11): a slow/flaky fetch can leave the embed
+// without the image (no 'load' event → the viewer never sizes; reloading
+// the frame re-runs the script). On 'error' we clear and re-set the src a
+// single time per URL; if the retry also fails we leave it alone (the
+// browser shows the alt text).
+let retriedSrc=null;
+function retryOnce(img){{
+  if(retriedSrc===img.src)return;
+  retriedSrc=img.src;
+  const s=img.src;
+  img.removeAttribute('src');
+  requestAnimationFrame(()=>{{img.src=s;}});
+}}
+thumb.addEventListener('error',()=>retryOnce(thumb));
+big.addEventListener('error',()=>retryOnce(big));
 // Gallery (DESIGN.md §11): collect every image in the chat whose viewer
 // carries the data-gallery marker. The marker is the ONLY contribution of the
 // tool — the collection logic lives here, in the embed (maintainer
