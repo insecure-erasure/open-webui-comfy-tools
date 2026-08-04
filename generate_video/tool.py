@@ -589,8 +589,8 @@ class Tools:
         cannot break the markup.
 
         Layout: the player fits the chat container width and its height is capped
-        at 80% of the available screen height (screen.availHeight) — the sizing
-        decision recorded in DESIGN.md §6 (2026-08-04): 80vh. `vh` units inside
+        at 65% of the available screen height (screen.availHeight) — the sizing
+        decision recorded in DESIGN.md §6 (2026-08-04): 65vh. `vh` units inside
         the sandboxed iframe are useless (they refer to the iframe box, ~150px),
         so the cap is expressed via the device screen, exactly like the image
         viewer. The video's aspect ratio is NOT known a priori (unlike
@@ -640,12 +640,12 @@ function fit(){{
   // media events correct it.
   if(!(video.videoWidth>0&&video.videoHeight>0)){{reportHeight();return;}}
   const r=video.videoWidth/video.videoHeight;
-  // Sizing decision (DESIGN.md §6, 2026-08-04): 80vh cap. vh/vw units are
-  // useless inside the sandboxed iframe (§10.7), so the cap is 80% of the
+  // Sizing decision (DESIGN.md §6, 2026-08-04): 65vh cap. vh/vw units are
+  // useless inside the sandboxed iframe (§10.7), so the cap is 65% of the
   // available screen height (screen.availHeight); the width derives from
   // the container width + aspect ratio and the height never overflows the
   // available screen space.
-  const maxH=(screen.availHeight||screen.height||0)*0.8;
+  const maxH=(screen.availHeight||screen.height||0)*0.65;
   let w=document.documentElement.clientWidth;
   if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
   player.style.width=w+'px';
@@ -681,7 +681,7 @@ fit();
 
         The video is displayed in the chat as a Rich UI embed (see DESIGN.md
         §6): a self-contained player (autoplay muted loop playsinline
-        controls, height capped at 80vh) sized after the video metadata
+        controls, height capped at 65vh) sized after the video metadata
         loads. Terminal result — the bare HTMLResponse (no tuple) means the
         LLM receives the middleware's generic message and should simply
         acknowledge that the video was generated.
@@ -1149,7 +1149,7 @@ fit();
             # HTMLResponse (no tuple) so the LLM receives the middleware's
             # generic message ("Embedded UI result is active and visible to
             # the user."). The player is self-contained and sizes itself
-            # (80vh cap) after the video metadata loads; no download button
+            # (65vh cap) after the video metadata loads; no download button
             # (maintainer decision, 2026-08-04).
             player = self._build_video_player(video_url)
             return HTMLResponse(

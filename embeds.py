@@ -195,8 +195,8 @@ def build_video_player(video_url: str) -> str:
     cannot break the markup.
 
     Layout: the player fits the chat container width and its height is capped
-    at 80% of the available screen height (screen.availHeight) — the sizing
-    decision recorded in DESIGN.md §6 (2026-08-04): 80vh. `vh` units inside
+    at 65% of the available screen height (screen.availHeight) — the sizing
+    decision recorded in DESIGN.md §6 (2026-08-04): 65vh. `vh` units inside
     the sandboxed iframe are useless (they refer to the iframe box, ~150px),
     so the cap is expressed via the device screen, exactly like the image
     viewer. The video's aspect ratio is NOT known a priori (unlike
@@ -246,12 +246,12 @@ function fit(){{
   // media events correct it.
   if(!(video.videoWidth>0&&video.videoHeight>0)){{reportHeight();return;}}
   const r=video.videoWidth/video.videoHeight;
-  // Sizing decision (DESIGN.md §6, 2026-08-04): 80vh cap. vh/vw units are
-  // useless inside the sandboxed iframe (§10.7), so the cap is 80% of the
+  // Sizing decision (DESIGN.md §6, 2026-08-04): 65vh cap. vh/vw units are
+  // useless inside the sandboxed iframe (§10.7), so the cap is 65% of the
   // available screen height (screen.availHeight); the width derives from
   // the container width + aspect ratio and the height never overflows the
   // available screen space.
-  const maxH=(screen.availHeight||screen.height||0)*0.8;
+  const maxH=(screen.availHeight||screen.height||0)*0.65;
   let w=document.documentElement.clientWidth;
   if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
   player.style.width=w+'px';
