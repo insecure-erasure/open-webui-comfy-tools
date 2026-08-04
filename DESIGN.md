@@ -162,6 +162,92 @@ To try to replicate the appearance of the Open WebUI lightbox, the frontend was 
 
 ---
 
+## 10. Lessons learned — sizing the embed (from `compare_images`)
+
+Hard-won knowledge from the `compare_images` migration, directly reusable by the
+image viewer (Phases 2-5) and the video embed (Phase 6). Each item lists the
+problem and how it was solved.
+
+### 10.1 The iframe has no initial height (~150px) until `reportHeight()`
+
+**Problem**: the Rich UI iframe starts at the browser default height (~150px).
+The content is cut off until a height is reported.
+
+**Solution**: `reportHeight()` (postMessage `iframe:height`) must run on
+`window.load`, on image/video `load` events, on `resize`, and via a
+`ResizeObserver` on the body. Re-report whenever the content can change size.
+
+**Applies to**: image viewer (report after the image loads), video embed
+(report after `loadedmetadata`/`loadeddata`), any future embed.
+
+### 10.2 The sandboxed iframe cannot read the parent viewport
+
+**Problem**: with `allowSameOrigin` OFF, the embed is cross-origin and cannot
+read the chat container's dimensions or the viewport of the parent page.
+
+**Solution**: approximate the available vertical space with the device screen
+(`screen.availHeight`), which is readable inside the sandbox. For internal
+services this is faithful enough; it only diverges for very small / not
+maximized desktop windows.
+
+**Applies to**: any embed that needs a viewport-relative cap (image viewer
+70vh, video embed).
+
+### 10.3 Device orientation: detect conservatively, never cap a portrait device
+
+**Problem**: detecting landscape with `screen.width > screen.height` fired the
+height cap on portrait devices (reported mobile bug). Real failure modes:
+webviews that report 0-height screens, iOS that always reports portrait
+dimensions, DevTools without full emulation.
+
+**Solution**: conservative cascade — `screen.orientation.type` when available,
+then `window.orientation`, then a width/height comparison that requires
+`height > 0`. Any ambiguity or degenerate value is treated as **portrait**
+(no cap). The cap can only fire on an unambiguous landscape signal.
+
+**Applies to**: any embed with a device-orientation-dependent layout.
+
+### 10.4 Never size the embed area before the media has real dimensions
+
+**Problem**: sizing the slider with a fallback ratio (16:9) before the image
+had `naturalWidth`/`naturalHeight` mis-sized the area; and when the image was
+already cached, the `load` event never fired again to correct it (a frame
+reload fixed it visually).
+
+**Solution**: wait for real dimensions before sizing; re-run the sizing on
+image/video `load`, `window.load`, `resize`, and a `ResizeObserver`. If the
+media is already loaded, size it immediately from its real dimensions; if not,
+report the current height and let the load events correct it.
+
+**Applies to**: any embed that sizes itself from media dimensions.
+
+### 10.5 Interaction must use Pointer Events (not mouse events) for touch
+
+**Problem**: the divider did not move on mobile. `mousemove` (mouse-only) does
+not fire during a finger drag, so the width of the hit area was irrelevant.
+
+**Solution**: use **Pointer Events** (unify mouse + touch), `setPointerCapture`
+so the drag follows the finger even outside the element, and `touch-action:
+none` so the browser does not hijack the gesture for scrolling. Add
+draggable="false" and user-select:none to avoid native drag/selection
+competing with the gesture.
+
+**Applies to**: any interactive embed (slider, lightbox drag, etc.).
+
+### 10.6 Visual affordances and blend modes
+
+- A small, fully opaque **handle** (10x14px, ~30% of the original) at the
+  divider center signals the slider is draggable. It is purely visual
+  (`pointer-events: none`); the whole container is the drag surface, so it
+  neither enlarges nor blocks the hit area.
+- The divider uses `mix-blend-mode: difference` with a semi-transparent
+  white: it stays translucent and **inverts the colors** of the image it
+  passes over, staying visible on both light and dark content.
+
+**Applies to**: lightbox buttons/UI over images, video controls, any overlay.
+
+---
+
 ## Appendix A — Verification against the Open WebUI source code
 
 The assumptions in this document were verified against `open-webui/open-webui` (`main`) rather than relying only on the official docs.
