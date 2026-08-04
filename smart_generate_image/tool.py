@@ -510,13 +510,30 @@ function closeLightbox(){{
     restoreScroll();
   }}
 }}
-// Restore the parent scroll position after fullscreen. The embed runs with
-// allow-same-origin ON in the user's Open WebUI, so parent.scrollY/parent.scrollTo
-// are accessible (no SOP block). Save the parent scroll before opening and
-// restore it after closing on every close path.
-let savedScroll=0;
-function saveScroll(){{try{{savedScroll=(parent.scrollY||0)||0;}}catch(e){{savedScroll=0;}}}}
-function restoreScroll(){{requestAnimationFrame(()=>{{requestAnimationFrame(()=>{{try{{parent.scrollTo(0,savedScroll);}}catch(e){{}}document.documentElement.scrollTop=savedScroll;document.body.scrollTop=savedScroll;}});}});}}
+// Restore the scroll position after closing the lightbox. The chat scroll is
+// NOT on the parent window (parent.scrollY stays 0); it lives in an inner
+// scroll container inside Open WebUI's DOM. With allow-same-origin ON we can
+// walk the parent document, find the scrolled elements, and restore their
+// scrollTop. Save the scroll of the parent window AND of all inner scrolled
+// containers before opening, restore both after closing.
+let savedScrolls=[];
+function saveScroll(){{
+  savedScrolls=[];
+  try{{savedScrolls.push({{el:parent,top:parent.scrollY||0}});}}catch(e){{}}
+  try{{
+    const doc=parent.document||document;
+    const all=doc.querySelectorAll&&doc.querySelectorAll('*');
+    if(all)for(let i=0;i<all.length;i++){{
+      const el=all[i];
+      if(el.scrollTop>0&&el.scrollHeight>el.clientHeight)savedScrolls.push({{el:el,top:el.scrollTop}});
+    }}
+  }}catch(e){{}}
+}}
+function restoreScroll(){{requestAnimationFrame(()=>{{requestAnimationFrame(()=>{{
+  try{{parent.scrollTo(0,savedScrolls[0]&&savedScrolls[0].top||0);}}catch(e){{}}
+  for(let i=0;i<savedScrolls.length;i++){{try{{savedScrolls[i].el.scrollTop=savedScrolls[i].top;}}catch(e){{}}}}
+  document.documentElement.scrollTop=0;document.body.scrollTop=0;
+}});}});}}
 viewer.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;saveScroll();openLightbox();}});
 closeBtn.addEventListener('pointerup',()=>{{closeLightbox();restoreScroll();}});
 overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeLightbox();restoreScroll();}}}});
