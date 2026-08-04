@@ -2,12 +2,14 @@
 title: Compare Images
 author: Insecure Erasure
 description: Compare two images side by side with an interactive before/after slider
-version: 1.0
+version: 2.0
 """
 
 import html
 import logging
 from urllib.parse import urlparse
+
+from fastapi.responses import HTMLResponse
 
 log = logging.getLogger(__name__)
 
@@ -18,19 +20,31 @@ def _build_slider_html(image_a: str, image_b: str) -> str:
 
     The two image URLs are injected into the <img> tags. They are HTML-escaped
     so query strings (e.g. &filename=...&type=...) cannot break the markup.
-    The divider starts at 0%, exactly as in the original spec.
+
+    The slider fills the full width of the chat container and its height
+    follows the aspect ratio of the base image (image_a). A reportHeight()
+    postMessage keeps the sandboxed iframe height in sync with the slider
+    (required by Open WebUI: without it the iframe stays at ~150px and the
+    content is cut off). The divider starts at 50% so both images are visible
+    on load.
     """
     a = html.escape(image_a, quote=True)
     b = html.escape(image_b, quote=True)
 
     return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body{{margin:0;min-height:100vh;display:grid;place-items:center;background:#222}}
-#c{{position:relative;overflow:hidden;cursor:crosshair}}
-#c img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}}
-#top{{clip-path:inset(0 calc(100% - var(--p,0%)) 0 0)}}
-#d{{position:absolute;top:0;bottom:0;left:var(--p,0%);width:2px;background:#fff}}
+body{{margin:0;background:#222}}
+#c{{position:relative;width:100%;overflow:hidden;cursor:crosshair}}
+#c img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}}
+#top{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
+#d{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:#fff;transform:translateX(-50%)}}
 </style>
+</head>
+<body>
 <div id="c">
 <img src="{a}">
 <img id="top" src="{b}">
@@ -38,11 +52,21 @@ body{{margin:0;min-height:100vh;display:grid;place-items:center;background:#222}
 </div>
 <script>
 const c=document.getElementById('c'),im=document.querySelector('#c img');
-function fit(){{const r=im.naturalWidth/im.naturalHeight||1;let w=innerWidth,h=w/r;if(h>innerHeight){{h=innerHeight;w=h*r}}c.style.width=w+'px';c.style.height=h+'px'}}
-addEventListener('resize',fit);im.addEventListener('load',fit);new ResizeObserver(fit).observe(document.body);
+function reportHeight(){{parent.postMessage({{type:'iframe:height',height:document.documentElement.scrollHeight}},'*')}}
+function fit(){{
+  const r=(im.naturalWidth||16)/(im.naturalHeight||9);
+  c.style.height=(c.clientWidth/r)+'px';
+  reportHeight();
+}}
+addEventListener('resize',fit);
+im.addEventListener('load',fit);
+document.getElementById('top').addEventListener('load',fit);
+new ResizeObserver(fit).observe(document.body);
 c.addEventListener('mousemove',e=>{{const r=c.getBoundingClientRect(),p=Math.min(100,Math.max(0,(e.clientX-r.left)/r.width*100));c.style.setProperty('--p',p+'%')}});
 fit();
 </script>
+</body>
+</html>
 """
 
 
@@ -121,8 +145,10 @@ class Tools:
                 }
             )
 
-        return (
-            f"```html\n{html_block}\n```\n\n"
-            "Wrap the HTML block above in triple backticks and include it in your response "
-            "so the frontend renders the interactive comparison slider."
+        # Bare HTMLResponse (no tuple): this is a terminal result with an
+        # empty context, so the LLM receives the middleware's generic
+        # "Embedded UI result is active and visible to the user." message
+        # instead of any tool-specific context.
+        return HTMLResponse(
+            content=html_block, headers={"Content-Disposition": "inline"}
         )

@@ -15,7 +15,9 @@ Both arguments should be the image URLs produced by the other tools (e.g. `http:
 
 ## How it renders
 
-The tool returns an `HTMLResponse` with `Content-Disposition: inline`, so Open WebUI renders it as a **Rich UI embed**: an interactive sandboxed iframe right in the chat (see the official [Rich UI Embedding](https://docs.openwebui.com/features/extensibility/plugin/development/rich-ui/) docs). The tool also includes the recommended `iframe:height` postMessage so the iframe auto-sizes to the slider.
+The tool returns a bare `HTMLResponse` with `Content-Disposition: inline` (no context tuple), so Open WebUI renders it as a **Rich UI embed**: an interactive sandboxed iframe right in the chat (see the official [Rich UI Embedding](https://docs.openwebui.com/features/extensibility/plugin/development/rich-ui/) docs). The tool also includes the recommended `iframe:height` postMessage so the iframe auto-sizes to the slider.
+
+Because the comparison is a **terminal result** (it does not chain with any other tool), the LLM receives only the middleware's generic message ("Embedded UI result is active and visible to the user.") and no tool-specific context — the HTML never enters the LLM context.
 
 The slider uses the skeleton from the request with three adjustments:
 
