@@ -109,3 +109,4 @@ First because it is the simplest tool (no ComfyUI, no workflow) and its README a
 | 2026-08-04 | 0 | DESIGN.md and PLAN.md written | Verified middleware/iface against open-webui `main`; video sizing decision deferred (§6) |
 | 2026-08-04 | 0 | Scope confirmed with maintainer | `smart_fetch_url` = `smart_generate_image`; docs/code in English; `generate_caption` out of scope |
 | 2026-08-04 | 0 | Working agreement added to PLAN.md | One phase at a time; control returns to maintainer after each phase for testing; next phase only after go-ahead |
+| 2026-08-04 | 1 | `compare_images` migrated to Rich UI embed | `(HTMLResponse)` bare with `Content-Disposition: inline`, empty context (generic middleware message), divider 50%, `reportHeight()` contract, README aligned |
