@@ -152,16 +152,13 @@ function closeLightbox(){{
     restoreScroll();
   }}
 }}
-// Restore the parent scroll position after fullscreen: exiting fullscreen
-// scrolls the iframe's document back to the top, and since the iframe height
-// changes when the overlay opens, the chat scroll jumps up. Save the parent
-// scroll position before opening and restore it after closing. NOTE: in the
-// cross-origin sandbox parent.scrollTo is blocked, so the real fix is not
-// resizing the embed during fullscreen (see fit()); this is a best-effort
-// fallback for the embed-area lightbox (no fullscreen).
+// Restore the parent scroll position after fullscreen. The embed runs with
+// allow-same-origin ON in the user's Open WebUI, so parent.scrollY/parent.scrollTo
+// are accessible (no SOP block). Save the parent scroll before opening and
+// restore it after closing on every close path.
 let savedScroll=0;
-function saveScroll(){{try{{savedScroll=(parent.scrollY||0)||(document.documentElement.scrollTop||0);}}catch(e){{savedScroll=0;}}}}
-function restoreScroll(){{requestAnimationFrame(()=>{{try{{parent.scrollTo(0,savedScroll);}}catch(e){{}}document.documentElement.scrollTop=savedScroll;document.body.scrollTop=savedScroll;}});}}
+function saveScroll(){{try{{savedScroll=(parent.scrollY||0)||0;}}catch(e){{savedScroll=0;}}}}
+function restoreScroll(){{requestAnimationFrame(()=>{{requestAnimationFrame(()=>{{try{{parent.scrollTo(0,savedScroll);}}catch(e){{}}document.documentElement.scrollTop=savedScroll;document.body.scrollTop=savedScroll;}});}});}}
 viewer.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;saveScroll();openLightbox();}});
 closeBtn.addEventListener('pointerup',()=>{{closeLightbox();restoreScroll();}});
 overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeLightbox();restoreScroll();}}}});
