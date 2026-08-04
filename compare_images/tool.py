@@ -2,7 +2,7 @@
 title: Compare Images
 author: Insecure Erasure
 description: Compare two images side by side with an interactive before/after slider
-version: 2.1
+version: 2.2
 """
 
 import html
@@ -30,9 +30,14 @@ def _build_slider_html(image_a: str, image_b: str) -> str:
       vertical space; the width is scaled proportionally and the slider is
       centered.
 
-    The sandboxed iframe cannot read the parent viewport (cross-origin,
-    allowSameOrigin OFF), so the available height is approximated with the
-    device screen (screen.availHeight), which is readable inside the sandbox.
+    Device orientation is detected inside the sandboxed iframe (it cannot
+    read the parent viewport, and its own viewport aspect is misleading):
+    screen.orientation when available, then window.orientation, then a
+    width/height comparison. Detection is conservative: degenerate screen
+    values (e.g. 0-height in some webviews) or any ambiguity are treated as
+    portrait so the cap can never fire on a portrait device. The available
+    height for the cap is approximated with the device screen
+    (screen.availHeight).
 
     A reportHeight() postMessage keeps the sandboxed iframe height in sync
     with the slider (required by Open WebUI: without it the iframe stays at
@@ -64,16 +69,22 @@ body{{margin:0;background:#222}}
 <script>
 const c=document.getElementById('c'),im=document.querySelector('#c img');
 function reportHeight(){{parent.postMessage({{type:'iframe:height',height:document.documentElement.scrollHeight}},'*')}}
+function isLandscape(){{
+  if(screen.orientation&&screen.orientation.type)return screen.orientation.type.indexOf('landscape')===0;
+  if(typeof window.orientation==='number')return Math.abs(window.orientation)===90;
+  const sw=screen.width||0,sh=screen.height||0;
+  return sw>sh&&sh>0;
+}}
 function fit(){{
   const r=(im.naturalWidth||16)/(im.naturalHeight||9);
   // Adaptive sizing: portrait devices use the full width with no height cap;
   // landscape devices cap the height at 80% of the available vertical space
-  // and scale the width proportionally (centered). The sandboxed iframe
-  // cannot read the parent viewport, so the available height is approximated
-  // with the device screen (availHeight) — acceptable for internal services.
-  const landscape=(screen.width||0)>(screen.height||0);
-  const vh=screen.availHeight||screen.height||0;
-  const maxH=landscape?vh*0.8:0;
+  // and scale the width proportionally (centered). Orientation detection is
+  // conservative: any ambiguity (missing orientation API, degenerate screen
+  // values) is treated as portrait so the cap can never fire on a portrait
+  // device (the reported mobile bug). The available height is approximated
+  // with the device screen (availHeight), readable inside the sandbox.
+  const maxH=isLandscape()?(screen.availHeight||screen.height||0)*0.8:0;
   let w=document.documentElement.clientWidth;
   if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
   c.style.width=w+'px';

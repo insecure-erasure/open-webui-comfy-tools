@@ -34,7 +34,7 @@ The slider uses an adaptive sizing strategy depending on the device orientation:
 - **Vertical (portrait) devices**: the slider fills the full width of the chat container with **no height cap** (height follows the image aspect ratio).
 - **Horizontal (landscape) devices**: the height is **capped at 80% of the available vertical space**; the width is scaled proportionally and the slider is centered.
 
-Because the embed is a sandboxed cross-origin iframe, it cannot read the parent page's viewport. The available height is therefore approximated with the device screen (`screen.availHeight`, which is readable inside the sandbox).
+Because the embed is a sandboxed cross-origin iframe, it cannot read the parent page's viewport. Device orientation is therefore detected inside the embed: `screen.orientation` when available, then `window.orientation`, then a `screen.width`/`screen.height` comparison. Detection is **conservative**: degenerate screen values (e.g. 0-height in some webviews) or any ambiguity are treated as portrait, so the height cap can never fire on a portrait device.
 
 ## Requirements
 
