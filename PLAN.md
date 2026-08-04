@@ -110,4 +110,4 @@ First because it is the simplest tool (no ComfyUI, no workflow) and its README a
 | 2026-08-04 | 0 | Scope confirmed with maintainer | `smart_fetch_url` = `smart_generate_image`; docs/code in English; `generate_caption` out of scope |
 | 2026-08-04 | 0 | Working agreement added to PLAN.md | One phase at a time; control returns to maintainer after each phase for testing; next phase only after go-ahead |
 | 2026-08-04 | 1 | `compare_images` migrated to Rich UI embed | `(HTMLResponse)` bare with `Content-Disposition: inline`, empty context (generic middleware message), divider 50%, `reportHeight()` contract, README aligned |
-| 2026-08-04 | 1 | `compare_images` sizing fix (phase reopened) | Adaptive strategy: portrait = full width no cap; landscape = 80%% of available height cap (approximated via `screen.availHeight`), width scaled + centered. Tested in node (4 cases). Commits `e83c41a` |
+| 2026-08-04 | 1 | `compare_images` sizing fix (phase reopened) | Adaptive strategy: portrait = full width no cap; landscape = 80%% of available height cap (approximated via `screen.availHeight`), width scaled + centered. Tested in node (4 cases). Commit `c6c20e9` |
