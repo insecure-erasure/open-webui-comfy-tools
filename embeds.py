@@ -100,7 +100,8 @@ const viewer=document.getElementById('viewer'),thumb=document.getElementById('th
       closeBtn=document.getElementById('close'),dlBtn=document.getElementById('dl');
 const RESERVED_R={ratio_js};
 function reportHeight(){{parent.postMessage({{type:'iframe:height',height:viewer.offsetHeight||document.documentElement.scrollHeight}},'*')}}
-function fit(){{
+function log(msg){{try{{console.log('[viewer]',msg,'| overlay=',overlay.className,'| fs=',!!(document.fullscreenElement||document.webkitFullscreenElement),'| viewerH=',viewer.offsetHeight,'| docH=',document.documentElement.scrollHeight);}}catch(e){{}}}}
+function fit(){{log('fit() enter');
   // Sizing replicates the compare_images slider (DESIGN.md §10): the iframe
   // starts at ~150px and its own vh is useless, so derive from the container
   // width and the image aspect ratio, cap the height at 70% of the available
@@ -109,17 +110,18 @@ function fit(){{
   // full screen and resizing/reporting would blow up the embed and shift the
   // chat scroll — so skip sizing during fullscreen entirely (the overlay
   // covers everything anyway) and re-fit when fullscreen ends.
-  if(document.fullscreenElement||document.webkitFullscreenElement)return;
+  if(document.fullscreenElement||document.webkitFullscreenElement){{log('fit() skip (fullscreen)');return;}}
   let r=0;
   if(RESERVED_R)r=Number(RESERVED_R);
   if(!(r>0)&&thumb.naturalWidth>0&&thumb.naturalHeight>0)r=thumb.naturalWidth/thumb.naturalHeight;
-  if(!(r>0)){{reportHeight();return;}}
+  if(!(r>0)){{log('fit() no ratio yet');reportHeight();return;}}
   const maxH=(screen.availHeight||screen.height||0)*0.7;
   let w=document.documentElement.clientWidth;
   if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
   viewer.style.width=w+'px';
   viewer.style.height=(w/r)+'px';
   reportHeight();
+  log('fit() sized w='+w+' h='+(w/r));
 }}
 thumb.addEventListener('load',fit);
 big.addEventListener('load',fit);
@@ -130,20 +132,22 @@ fit();
 function openLightbox(){{
   overlay.classList.add('open');
   document.body.style.overflow='hidden';
+  log('openLightbox: request fullscreen');
   // Fill the browser window, not just the embed box: request fullscreen on
   // the document. The Open WebUI iframe has allowfullscreen; inside the
   // sandbox this requires a user gesture (the click that just happened).
   // Browsers that reject it (e.g. some mobile) fall back to the embed area.
   const el=document.documentElement;
-  try{{el.requestFullscreen&&el.requestFullscreen();}}catch(e){{}}
-  try{{el.webkitRequestFullscreen&&el.webkitRequestFullscreen();}}catch(e){{}}
+  try{{el.requestFullscreen&&el.requestFullscreen();}}catch(e){{log('requestFullscreen err '+e);}}
+  try{{el.webkitRequestFullscreen&&el.webkitRequestFullscreen();}}catch(e){{log('webkitRequestFullscreen err '+e);}}
 }}
 function closeLightbox(){{
+  log('closeLightbox: fs='+(!!(document.fullscreenElement||document.webkitFullscreenElement)));
   // If in fullscreen, exit it; the overlay is removed and the size re-fit in
   // the fullscreenchange handler (avoids a flash of the bare viewer fullscreen).
   if(document.fullscreenElement||document.webkitFullscreenElement){{
-    try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{}}
-    try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{}}
+    try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{log('exitFullscreen err '+e);}}
+    try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{log('webkitExitFullscreen err '+e);}}
   }}else{{
     overlay.classList.remove('open');
     document.body.style.overflow='';
@@ -165,7 +169,7 @@ closeBtn.addEventListener('pointerup',()=>{{closeLightbox();restoreScroll();}});
 overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeLightbox();restoreScroll();}}}});
 big.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;e.stopPropagation();}});
 document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{closeLightbox();restoreScroll();}}}});
-document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');document.body.style.overflow='';restoreScroll();fit();}}}});
+document.addEventListener('fullscreenchange',()=>{{log('fullscreenchange fs='+(!!(document.fullscreenElement||document.webkitFullscreenElement)));if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');document.body.style.overflow='';restoreScroll();fit();}}}});
 async function download(){{try{{const r=await fetch(big.src);if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}}catch(err){{const w=window.open(big.src,'_blank');if(w)w.focus();}}}}
 dlBtn.addEventListener('pointerup',download);
 </script>
