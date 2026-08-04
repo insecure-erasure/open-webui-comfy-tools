@@ -103,6 +103,58 @@ Unlike the image, the **video has no zoom viewer** (there is no "click to see bi
 
 > **Status: DECISION PENDING.** This is the last component to be tackled in the plan; the decision (A/B/C) is recorded here when it is made.
 
+### Implementation notes for the video embed (from Phases 1-5)
+
+Everything learned in the image/slider phases that directly applies to the
+video player — a future agent must read §10 before implementing this phase.
+
+1. **`vh`/`vw` units are useless inside the sandboxed iframe** (§10.7). They
+   refer to the iframe box (~150px initial), not the browser. Implement any
+   viewport-relative cap with **`screen.availHeight`** (readable in the
+   sandbox), exactly like the image viewer: size from the container width +
+   video aspect ratio, cap the height, and `reportHeight()`.
+2. **The video's aspect ratio is NOT known a priori** (unlike
+   `smart_generate_image`, which reserves `reduced_w:reduced_h`). The embed
+   must wait for the `<video>` `loadedmetadata` event to read
+   `videoWidth`/`videoHeight` before sizing (the image viewer waits for
+   `naturalWidth`/`naturalHeight` — §10.4). Until then, report a small
+   height and re-fit on `loadedmetadata`/`loadeddata`/`canplay`.
+3. **`reportHeight()` should report the player's own height** (the viewer
+   uses `viewer.offsetHeight`), not `document.scrollHeight`, so the iframe
+   hugs the video and no empty "frame" appears on wide desktop screens
+   (the Phase 2 fix).
+4. **The iframe must never have its own scroll**: `html,body{overflow:hidden}`
+   permanently (Phase 2 lesson). The chat scrolls the parent.
+5. **If the video player gets a lightbox/fullscreen**: reuse the Phase 2
+   pattern — fullscreen the **overlay element** (not `documentElement`), skip
+   sizing while in fullscreen, and restore the chat scroll by walking the
+   parent's scrolled containers (`saveScroll`/`restoreScroll`, §10.8). The
+   native browser fullscreen of a `<video>` (via its controls) does NOT cause
+   the chat scroll jump; only programmatic `requestFullscreen` does.
+6. **Autoplay needs `muted`** (browsers block autoplay with sound) — keep
+   `autoplay muted loop playsinline` (playsinline for iOS). Already in §4.
+7. **CORS**: the `<video>` loads like `<img>` (display needs no CORS). A
+   **download button** (if added) needs `fetch(blob)` → CORS on the ComfyUI
+   proxy (allow-all already decided, §7); without CORS, fall back to opening
+   the video in a new tab.
+8. **The environment runs with `allowSameOrigin` ON** (PLAN.md environment
+   note): the embed can access `parent.document`, so scroll restore works by
+   walking parent scrolled containers. Design the code to also work with
+   same-origin OFF (guard parent access in try/catch).
+9. **Instrumentation method** if sizing/scroll misbehaves: add `[viewer]`
+   console logs inside the iframe (overlay class, `fullscreenElement`,
+   `viewerH`, `docH`, `parent.scrollY`) and reproduce — don't guess (§10.8).
+10. **Which option (A/B/C) implies what**:
+    - **(A)** fill available area → cap height at ~`screen.availHeight * 0.92`
+      (or similar) so it never overflows; width = `min(container, h*ratio)`.
+    - **(B)** 70vh like the image → cap at `screen.availHeight * 0.7`;
+      identical to the image viewer.
+    - **(C)** max width + proportional height → width = container width,
+      height = width/ratio, no height cap (like the compare slider in
+      portrait); the height is whatever the aspect gives.
+    In all cases: centered container, `object-fit: contain`,
+    `max-width/max-height:100%`, and `reportHeight()` after sizing.
+
 ---
 
 ## 7. Distinct internal domains and CORS
