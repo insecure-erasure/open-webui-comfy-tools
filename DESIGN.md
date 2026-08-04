@@ -63,7 +63,7 @@
 *(Video player — terminal result)*
 
 - **`context`**: **empty**. Terminal result: the video is not reused as input to another tool. The LLM only needs to know that it was generated and shown.
-- **Embed**: `<video>` element (with `autoplay`, `muted`, `loop` — keep `muted` so autoplay works, since browsers block autoplay with sound).
+- **Embed**: `<video>` element with `controls autoplay muted loop playsinline` (keep `muted` so autoplay works, since browsers block autoplay with sound). Self-contained player (no lightbox, no download button — decision 2026-08-04), sized after `loadedmetadata` with the height capped at 80% of the available screen height (80vh decision, §6).
 - **Width**: maximum available.
 - **Chains**: no.
 - The migration here is especially valuable: the current hack (reproducing a complex `<video>` block) is the most fragile of all, with more risk of losing attributes / breaking HTML.
@@ -101,7 +101,16 @@ Unlike the image, the **video has no zoom viewer** (there is no "click to see bi
 - **Common technical requirement**: container with height limited to the available area (viewport unit) + `object-fit: contain` + `max-width`/`max-height` 100% + centered → adapts to vertical and horizontal screens **without overflowing the height**, and `reportHeight()` keeps the iframe at the real height.
 - **Question to resolve**: how much should the video "use the available area", given that it has no zoom.
 
-> **Status: DECISION PENDING.** This is the last component to be tackled in the plan; the decision (A/B/C) is recorded here when it is made.
+> **Status: DECISION MADE (2026-08-04) — 80vh cap, no download button.**
+> The maintainer chose an **80vh height cap** (between the proposed **B**/70vh
+> and **A**/fill-available): the player's height is capped at **80% of the
+> available screen height** (`screen.availHeight * 0.8`); the width derives
+> from the container width + video aspect ratio, exactly like the image
+> viewer. **No download button**: the player relies on the native video
+> controls (play/seek/volume/fullscreen). A forced download was considered
+> (CORS allow-all is in place, §7) but dropped by decision. Implemented in
+> Phase 6 via `embeds.build_video_player` (reference) / the tool's local
+> `_build_video_player` copy.
 
 ### Implementation notes for the video embed (from Phases 1-5)
 

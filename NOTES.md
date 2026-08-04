@@ -8,8 +8,10 @@ Conversation language with the maintainer: **Spanish**. Code and docs: **English
 ## Where we are
 
 The Rich UI migration (see `DESIGN.md` and `PLAN.md`) is **almost complete**. All
-image tools are migrated and **approved by the maintainer**. Only the video phase
-remains, postponed to a future session.
+image tools are migrated and **approved by the maintainer**. The video phase
+(`generate_video`) is **implemented and awaiting maintainer test** (80vh cap,
+no download — decisions recorded in DESIGN.md §6). Only the cross-cutting
+cleanup (Phase 7) remains.
 
 | Phase | Tool | Status |
 |---|---|---|
@@ -19,22 +21,14 @@ remains, postponed to a future session.
 | 3 | `edit_image` | ✅ approved |
 | 4 | `enhance_image` | ✅ approved |
 | 5 | `virtual_try_on` | ✅ approved |
-| 6 | `generate_video` | ⏸️ **postponed** — sizing decision A/B/C pending |
-| 7 | Cross-cutting cleanup | ⏳ pending (grep `image_md`, main README, CORS notes) |
+| 6 | `generate_video` | ✅ implemented — **awaiting maintainer test** (80vh cap, no download; decision in DESIGN.md §6) |
+| 7 | Cross-cutting cleanup | ⏳ pending (grep `image_md`, main README, CORS notes, duplicated `reportHeight` in image viewers) |
 
 ## How to resume (next session)
 
-1. **Read `DESIGN.md` first** — especially §6 (video sizing decision + the
-   "Implementation notes for the video embed" block) and §10 (lessons learned).
-   The video phase must not repeat the mistakes of Phases 1-5.
-2. **Phase 6 — `generate_video`**: before implementing, the maintainer must
-   decide the video embed sizing option (§6: **A** fill available area / **B**
-   70vh like images / **C** max width + proportional height). The decision is
-   recorded in §6 when made.
-3. **Phase 7 — cleanup**: grep the repo for leftover `image_md`,
-   `image_filename`, "Wrap the HTML block" instructions; update the main
-   `README.md` tools section; verify CORS notes in §7 against the real
-   reverse-proxy config (user-owned).
+1. **Read `DESIGN.md` first** — especially §6 (the **80vh / no-download decision** + the "Implementation notes for the video embed" block) and §10 (lessons learned).
+2. **Phase 6 — `generate_video`**: implemented (awaiting maintainer test). The video player embed (reference: `embeds.build_video_player`; tool copy: `_build_video_player`) sizes after `loadedmetadata` with an 80% `screen.availHeight` cap and native controls (no lightbox/download). If the test needs changes, reopen the phase.
+3. **Phase 7 — cleanup**: grep the repo for leftover `image_md`, `image_filename`, "Wrap the HTML block" instructions (now only in docs); update the main `README.md` tools section (done for video; verify the rest); verify CORS notes in §7 against the real reverse-proxy config (user-owned). **Also**: `embeds.py` and the 4 image-tool copies have a duplicated `reportHeight()` line (harmless JS no-op, the 2nd declaration wins) — dedupe in `embeds.py` and regenerate the image tool copies byte-identical.
 4. Follow the working agreement in `PLAN.md`: **one phase at a time**; after
    each phase's commit, return control to the maintainer for testing; next
    phase only after explicit approval.
@@ -69,10 +63,8 @@ remains, postponed to a future session.
   - Terminal tools (`compare_images`, `generate_video`): **bare `HTMLResponse`**
     (no tuple) → the LLM gets the middleware's generic message. An empty dict
     `{}` IS sent to the LLM as context — do not use it.
-- **The viewer sizing** (image): width = container width, height capped at
-  70% of `screen.availHeight`, `reportHeight()` = `viewer.offsetHeight`
-  (iframe hugs the image). `smart_generate_image` reserves the aspect ratio
-  (`reduced_w:reduced_h`); the other image tools don't (they size after load).
+- **The viewer sizing** (image): width = container width, height capped at 70% of `screen.availHeight`, `reportHeight()` = `viewer.offsetHeight` (iframe hugs the image). `smart_generate_image` reserves the aspect ratio (`reduced_w:reduced_h`); the other image tools don't (they size after load).
+- **The video embed (Phase 6)**: terminal result → **bare `HTMLResponse`** (no tuple), like `compare_images`. The player is a `<video autoplay muted loop playsinline controls>` sized from `videoWidth/videoHeight` after `loadedmetadata` (ratio NOT known a priori — no aspect reservation), capped at **80% of `screen.availHeight`** (80vh decision), `reportHeight()` = player's own height. **No lightbox and no download button** (decision): native controls give fullscreen, and native video fullscreen does NOT cause the chat scroll jump, so there is no saveScroll/restoreScroll. The iframe still must never scroll (`overflow:hidden`). Reference builder: `embeds.build_video_player` (no duplicated reportHeight there — the duplication only exists in the image viewer).
 - **Lightbox**: fullscreen the `.overlay` element (not `documentElement`),
   skip sizing while in fullscreen, restore the chat scroll on close by walking
   the parent's scrolled containers (`saveScroll`/`restoreScroll`, double rAF).

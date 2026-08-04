@@ -86,14 +86,17 @@ First because it is the simplest tool (no ComfyUI, no workflow) and its README a
 
 ---
 
-## Phase 6 — `generate_video` (terminal, pending decision)
+## Phase 6 — `generate_video` (terminal)
 
-- [ ] **BLOCKED / PENDING DECISION** — video embed sizing, DESIGN.md §6: choose **A** (fill available area, no restrictive cap) / **B** (70vh cap like images) / **C** (max width + proportional height). Decision is recorded in DESIGN.md §6 when made.
-- [ ] Return `HTMLResponse` with a `<video autoplay muted loop playsinline>` element (keep `muted` so autoplay works).
-- [ ] **Empty context**: bare `HTMLResponse` (generic middleware message).
-- [ ] `reportHeight()` contract for the video container.
-- [ ] Remove the fragile HTML-block reproduction hack (the current one is the most at risk of losing attributes / breaking).
-- [ ] Update docstring + README.
+- [x] **DECISION (2026-08-04)**: **80vh** height cap (DESIGN.md §6, between the proposed B/70vh and A/fill-available) + **no download button** (native controls only).
+- [x] Return `HTMLResponse` with a `<video autoplay muted loop playsinline>` element (keep `muted` so autoplay works) + `controls` (no lightbox → native controls are the only UI).
+- [x] **Empty context**: bare `HTMLResponse` (generic middleware message).
+- [x] `reportHeight()` contract for the video container: sized after `loadedmetadata` (ratio unknown a priori), cap = 80% of `screen.availHeight`, reports the player's own height.
+- [x] Remove the fragile HTML-block reproduction hack (the current one is the most at risk of losing attributes / breaking).
+- [x] Update docstring + README.
+
+**Notes**
+- Reference builder: `embeds.build_video_player`; byte-identical local copy `_build_video_player` in the tool (verified with the stub harness, 8 fit() cases pass in node).
 
 ---
 
@@ -136,4 +139,4 @@ First because it is the simplest tool (no ComfyUI, no workflow) and its README a
 | 2026-08-04 | 4 | **Phase 4 CLOSED — approved by maintainer** | `enhance_image` verified working in Open WebUI (viewer embed, lightbox, download, scroll preserved). Ready for Phase 5 |
 | 2026-08-04 | 5 | `virtual_try_on` migrated to Rich UI (implementation) | Same pattern, with the justified context exception: `{'image': url, 'prompt': text}` (prompt from `_extract_text`, used by the agent to reply). Viewer embedded (byte-identical to `embeds.py`), no aspect reservation. Removed image_md/image_filename + agent instruction; docstring + README updated. **Awaiting maintainer test** |
 | 2026-08-04 | 5 | **Phase 5 CLOSED — approved by maintainer** | `virtual_try_on` verified working in Open WebUI (viewer embed, lightbox, download, scroll preserved, prompt in context). Ready for Phase 6 (postponed) |
-| 2026-08-04 | 6 | Video phase postponed to another session; implementation notes added to DESIGN.md §6 | Added a 10-point "Implementation notes for the video embed" block under §6: vh is useless (use screen.availHeight), wait for loadedmetadata (aspect not known a priori), reportHeight = player height, iframe no own scroll, fullscreen pattern if lightbox (native video fullscreen is fine), autoplay needs muted, CORS for download, allowSameOrigin ON environment, instrumentation method, and what each sizing option A/B/C implies. Decision still pending. |
+| 2026-08-04 | 6 | `generate_video` migrated to Rich UI (implementation) | **Decision made: 80vh cap + no download button** (DESIGN.md §6). New `embeds.build_video_player` reference + byte-identical local `_build_video_player` copy (verified with stub harness; no duplicated reportHeight). Player: `autoplay muted loop playsinline controls preload=metadata`, sized after `loadedmetadata` (ratio unknown a priori — §10.4), cap 80% of `screen.availHeight`, reports the player's own height. Bare `HTMLResponse` (empty context) — hack removed; docstring + READMEs updated. **Awaiting maintainer test** |
