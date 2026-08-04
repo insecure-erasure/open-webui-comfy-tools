@@ -274,6 +274,74 @@ close the overlay when the browser leaves fullscreen natively (Escape).
 **Applies to**: any embed with a viewport-relative layout or an overlay that
 should fill the browser window.
 
+### 10.8 Chat scroll jumping to top when opening/closing the lightbox (the long fight)
+
+This was the hardest problem in Phase 2 — several wrong turns were made before
+the real fix. Recorded here so a future agent does not repeat them.
+
+**Symptom**: on the desktop, closing the lightbox (fullscreen) made the chat
+scroll to the top.
+
+**Wrong turns (do NOT repeat):**
+
+1. **Suspected the iframe height change** → reported `viewer.offsetHeight`
+instead of `document.scrollHeight` so the iframe hugs the image. Real, but
+it fixed an empty "frame" issue, not the scroll jump.
+2. **Suspected `parent.scrollTo` was the fix** → added save/restore of
+`parent.scrollY`. Useless: `parent.scrollTo` is **blocked cross-origin** (SOP)
+when the sandbox has no `allow-same-origin`, and even with same-origin ON the
+chat scroll is NOT on the parent window.
+3. **Suspected fullscreen of `documentElement` scrolled the parent** →
+switched to fullscreening the `.overlay` element (position:fixed inset:0),
+which avoids the browser scroll-to-top of the parent. Real improvement, but
+the jump persisted.
+4. **Suspected the iframe's own scrollTop** → forced `scrollTop=0` on the
+iframe document around fullscreen. Useless.
+5. **Made `fit()` skip sizing while in fullscreen** (the ResizeObserver re-ran
+fit on the fullscreen viewport and reported a huge height, shifting the
+chat). Real and necessary, but the jump persisted.
+
+**The real fix** (confirmed by the user):
+
+- The chat scroll in Open WebUI is **NOT on the parent window** —
+`parent.scrollY` stays `0` even when the chat is scrolled (verified with
+instrumentation logs). It lives in an **inner overflow container** inside
+Open WebUI's DOM.
+- With `allowSameOrigin` **ON** (the user's install has it enabled — see
+PLAN.md environment note), the embed can walk the parent document:
+  - `saveScroll()`: before opening, records `parent.scrollY` AND walks
+  `parent.document.querySelectorAll('*')`, saving `scrollTop` of every
+  element with `scrollTop>0 && scrollHeight>clientHeight`.
+  - `restoreScroll()`: after closing (on every close path: X, Escape,
+  backdrop, `fullscreenchange`), restores each saved `scrollTop` inside a
+  double `requestAnimationFrame` (so the layout has settled), plus
+  `parent.scrollTo` and `document.scrollTop=0`.
+- Also **fullscreen the `.overlay` element** (not `documentElement`) to avoid
+the parent scroll-to-top on enter, and **skip sizing in fullscreen**.
+
+**Diagnostic method that worked**: add `[viewer]` console logs inside the
+iframe showing `overlay class`, `fullscreenElement`, `viewer.offsetHeight`,
+`document.scrollHeight`, and later `parent.scrollY` /
+`parent.document.documentElement.scrollTop`. The logs proved the iframe never
+resizes (viewerH constant) and that `parent.scrollY=0` always → the scroll is
+in an inner container. Instrument, reproduce, inspect the logs — don't guess.
+
+**Gotchas**:
+
+- Firefox prints "An iframe which has both allow-scripts and
+allow-same-origin for its sandbox attribute can remove its sandboxing" —
+this is a real indicator that the iframe has `allow-same-origin` (the user's
+Open WebUI has it ON). It is NOT a false positive; use it as a signal that
+`parent.document` is accessible.
+- Console logs from a `srcdoc` iframe appear under the iframe's document
+context in DevTools — select the iframe frame to see them.
+- With same-origin ON, Open WebUI's `FullHeightIframe` also does auto-resize
+(via `resizeSameOrigin`) in addition to our `reportHeight` postMessage — both
+can coexist.
+
+**Applies to**: the lightbox in every image tool (Phases 3-5) and any future
+fullscreen overlay embed.
+
 ---
 
 ## Appendix A — Verification against the Open WebUI source code
