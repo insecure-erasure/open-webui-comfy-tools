@@ -19,6 +19,7 @@
 - **Embed**: self-contained image viewer.
   - Width: fit to the chat container.
   - Height: **capped at 70vh** maximum, centered (flexbox), `object-fit: contain` (no distortion).
+  - **Implementation note (learned in Phase 2)**: `vh` units inside the sandboxed iframe refer to the iframe box (~150px initial), not the browser viewport — so the 70vh cap is implemented as **70% of `screen.availHeight`** (approximation), and the height is derived from the container width + image aspect ratio, with `reportHeight()` keeping the iframe at the real height. The aspect ratio is known a priori for `smart_generate_image` (`reduced_w:reduced_h`) and reserved to avoid the load "jump".
   - The backend **does not measure** the image; the aspect ratio is known a priori (`reduced_w:reduced_h`), useful for aspect reservation and avoiding the "jump" on load.
 - **Modal viewer (lightbox) replicated inside the iframe**:
   - Open: a click on the thumbnail.
@@ -26,6 +27,7 @@
   - Close: X in the **top-left corner**.
   - Download: real button in the **top-right corner** (**forced download**, regardless of how ComfyUI serves the file).
   - **Appearance**: standard lightbox, **no exact replica** — full-screen overlay, dark/semi-transparent background, "floating" buttons over the image, `prefers-color-scheme`.
+  - **Implementation note (learned in Phase 2)**: a `position:fixed` overlay inside the iframe is confined to the iframe box, so it cannot fill the browser window by itself. The lightbox uses the **browser Fullscreen API** (`document.documentElement.requestFullscreen()`, the Open WebUI iframe has `allowfullscreen`, and the click is the required user gesture) so the image fills the browser window; browsers that reject it (e.g. some mobile/iOS) fall back to the embed area. Escape / X / backdrop close also exit fullscreen.
 - **Chains**: yes (to the other tools). That is why the `context` is actionable.
 
 ---
@@ -248,6 +250,27 @@ cursor on hover, while a click/tap still jumps it and dragging still works.
   passes over, staying visible on both light and dark content.
 
 **Applies to**: lightbox buttons/UI over images, video controls, any overlay.
+
+### 10.7 `vh`/`vw` inside the iframe are useless; and the lightbox needs the Fullscreen API
+
+Two related limitations hit the image viewer (Phase 2):
+
+- **`vh`/`vw` units inside the sandboxed iframe refer to the iframe box**, not
+the browser viewport. The iframe starts at ~150px, so `max-height:70vh`
+capped the image to ~105px ("the embed is very small"). Fix: size from the
+container width + aspect ratio and cap with `screen.availHeight` (the device
+screen is readable inside the sandbox), exactly like the compare slider.
+- **A `position:fixed` overlay inside the iframe is confined to the iframe
+box**, so it cannot fill the browser window. Fix: use the **browser
+Fullscreen API** (`document.documentElement.requestFullscreen()`) on the
+click that opens the lightbox — the Open WebUI iframe has `allowfullscreen`
+and the click is the required user gesture. On close (X / Escape / backdrop)
+exit fullscreen. Fallback: browsers that reject it (e.g. some mobile/iOS)
+show the overlay inside the embed area. Listen to `fullscreenchange` to
+close the overlay when the browser leaves fullscreen natively (Escape).
+
+**Applies to**: any embed with a viewport-relative layout or an overlay that
+should fill the browser window.
 
 ---
 

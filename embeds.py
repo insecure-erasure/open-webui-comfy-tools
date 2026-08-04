@@ -12,10 +12,14 @@ are generated from. Keep the copies byte-identical to this source to avoid
 drift (see DESIGN.md Appendix B).
 
 Lesson learned in compare_images (DESIGN.md §10): the sandboxed iframe starts
-at ~150px and cannot read the parent viewport, so the viewer reports its own
-height via postMessage, approximates viewport-relative caps with the device
-screen, waits for real image dimensions before sizing, and uses Pointer
-Events for interaction.
+at ~150px and cannot read the parent viewport, so `vh`/`vw` units inside the
+embed are useless (they refer to the iframe box, not the browser). The viewer
+sizes itself from the container width + image aspect ratio, caps the height
+at 70% of the available screen height (screen.availHeight), and reports its
+height via postMessage. The lightbox uses the browser Fullscreen API (the
+Open WebUI iframe has allowfullscreen) so the image fills the browser window
+instead of the embed box; it falls back to the embed area where fullscreen is
+not available (e.g. some mobile browsers).
 """
 
 import html
@@ -28,25 +32,27 @@ def build_image_viewer(image_url: str, aspect_ratio: tuple[int, int] | None = No
     The URL is HTML-escaped so query strings (e.g. &filename=...&type=...)
     cannot break the markup.
 
-    Layout: the image is centered and fits the chat container width, with a
-    height cap of 70vh. If aspect_ratio (reduced_w, reduced_h) is provided,
+    Layout: the image is centered, fits the chat container width, and its
+    height is capped at 70% of the available screen height (approximation of
+    70vh of the real browser viewport, since the iframe's own vh is useless —
+    see DESIGN.md §10). If aspect_ratio (reduced_w, reduced_h) is provided,
     the embed reserves that aspect before the image loads to avoid the
     "jump"; otherwise it sizes after the image has real dimensions.
 
-    Clicking the image opens a lightbox overlay: the image is fit to the
-    screen (no scroll), an X in the top-left closes it, and a download button
-    in the top-right forces a download (fetch blob -> object URL -> anchor
-    with download attr). The theme follows prefers-color-scheme.
+    Clicking the image opens a lightbox that fills the browser window via the
+    Fullscreen API (X top-left closes it, download button top-right forces a
+    download via fetch blob -> object URL -> anchor). The theme follows
+    prefers-color-scheme.
     """
     src = html.escape(image_url, quote=True)
     if aspect_ratio:
         w, h = aspect_ratio
         if w > 0 and h > 0:
-            reserved = f"aspect-ratio:{w}/{h};"
+            ratio_js = f"{w}/{h}"
         else:
-            reserved = ""
+            ratio_js = "null"
     else:
-        reserved = ""
+        ratio_js = "null"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -61,8 +67,8 @@ def build_image_viewer(image_url: str, aspect_ratio: tuple[int, int] | None = No
 html,body{{height:100%}}
 body{{display:flex;align-items:center;justify-content:center;background:transparent}}
 img{{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}}
-.viewer{{max-width:100%;{reserved}max-height:70vh;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:zoom-in;border-radius:12px}}
-.viewer img{{display:block;max-width:100%;max-height:70vh;object-fit:contain;border-radius:12px}}
+.viewer{{max-width:100%;overflow:hidden;cursor:zoom-in;border-radius:12px}}
+.viewer img{{display:block;width:100%;height:100%;object-fit:contain;border-radius:12px}}
 .overlay{{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:999}}
 .overlay.open{{display:flex}}
 .overlay img{{max-width:100vw;max-height:100vh;object-fit:contain;box-shadow:0 4px 30px rgba(0,0,0,.5);border-radius:4px}}
@@ -92,23 +98,53 @@ img{{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}}
 const viewer=document.getElementById('viewer'),thumb=document.getElementById('thumb'),
       overlay=document.getElementById('overlay'),big=document.getElementById('big'),
       closeBtn=document.getElementById('close'),dlBtn=document.getElementById('dl');
+const RESERVED_R={ratio_js};
 function reportHeight(){{parent.postMessage({{type:'iframe:height',height:document.documentElement.scrollHeight}},'*')}}
-function fit(){{reportHeight()}}
-// Resize the iframe once the image has real dimensions (see DESIGN.md §10.4).
+function fit(){{
+  // Sizing replicates the compare_images slider (DESIGN.md §10): the iframe
+  // starts at ~150px and its own vh is useless, so derive from the container
+  // width and the image aspect ratio, cap the height at 70% of the available
+  // screen height (screen.availHeight), and report the resulting height.
+  let r=0;
+  if(RESERVED_R)r=Number(RESERVED_R);
+  if(!(r>0)&&thumb.naturalWidth>0&&thumb.naturalHeight>0)r=thumb.naturalWidth/thumb.naturalHeight;
+  if(!(r>0)){{reportHeight();return;}}
+  const maxH=(screen.availHeight||screen.height||0)*0.7;
+  let w=document.documentElement.clientWidth;
+  if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
+  viewer.style.width=w+'px';
+  viewer.style.height=(w/r)+'px';
+  reportHeight();
+}}
 thumb.addEventListener('load',fit);
 big.addEventListener('load',fit);
 window.addEventListener('load',fit);
 addEventListener('resize',fit);
 new ResizeObserver(fit).observe(document.body);
-// Report the initial height so the iframe is not stuck at ~150px.
 fit();
-function openLightbox(){{overlay.classList.add('open');document.body.style.overflow='hidden'}}
-function closeLightbox(){{overlay.classList.remove('open');document.body.style.overflow=''}}
-viewer.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;if(e.detail===0||e.pointerType!=='mouse'){{openLightbox();return;}}openLightbox();}});
+function openLightbox(){{
+  overlay.classList.add('open');
+  document.body.style.overflow='hidden';
+  // Fill the browser window, not just the embed box: request fullscreen on
+  // the document. The Open WebUI iframe has allowfullscreen; inside the
+  // sandbox this requires a user gesture (the click that just happened).
+  // Browsers that reject it (e.g. some mobile) fall back to the embed area.
+  const el=document.documentElement;
+  try{{el.requestFullscreen&&el.requestFullscreen();}}catch(e){{}}
+  try{{el.webkitRequestFullscreen&&el.webkitRequestFullscreen();}}catch(e){{}}
+}}
+function closeLightbox(){{
+  overlay.classList.remove('open');
+  document.body.style.overflow='';
+  try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{}}
+  try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{}}
+}}
+viewer.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;openLightbox();}});
 closeBtn.addEventListener('pointerup',closeLightbox);
 overlay.addEventListener('pointerup',e=>{{if(e.target===overlay)closeLightbox();}});
-big.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;if(e.detail===0||e.pointerType!=='mouse'){{return;}}e.stopPropagation();}});
+big.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;e.stopPropagation();}});
 document.addEventListener('keydown',e=>{{if(e.key==='Escape')closeLightbox();}});
+document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement))overlay.classList.remove('open');}});
 async function download(){{try{{const r=await fetch(big.src);if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}}catch(err){{const w=window.open(big.src,'_blank');if(w)w.focus();}}}}
 dlBtn.addEventListener('pointerup',download);
 </script>
