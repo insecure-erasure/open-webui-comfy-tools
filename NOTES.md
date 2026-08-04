@@ -68,7 +68,7 @@ cleanup (Phase 7) remains.
 - **Lightbox**: fullscreen the `.overlay` element (not `documentElement`),
   skip sizing while in fullscreen, restore the chat scroll on close by walking
   the parent's scrolled containers (`saveScroll`/`restoreScroll`, double rAF).
-- **compare_images**: interactive before/after slider with adaptive sizing (portrait full width / landscape 80%% cap), pointer events, hover on desktop. **Fullscreen (2026-08-04)**: floating bottom-right button (maximize icon) opens a fullscreen overlay with its OWN interactive slider (embed behavior unchanged); Fullscreen API on the overlay element (+ webkit fallback), sized to the real viewport waiting for real dimensions; exit via Escape / restore button (bottom-right, icon flips inward) / backdrop; saveScroll/restoreScroll + fit() skipped while fullscreen, re-fit on fullscreenchange (same §10.8 pattern as the image lightbox).
+- **compare_images**: interactive before/after slider with adaptive sizing (portrait full width / landscape 80%% cap), pointer events, hover on desktop. **Fullscreen (2026-08-04, approved)**: floating bottom-right button (maximize icon) opens a fullscreen overlay with its OWN interactive slider (embed behavior unchanged); Fullscreen API on the overlay element (+ webkit fallback), sized to the real viewport waiting for real dimensions; exit via Escape / restore button (bottom-right, icon flips inward) / backdrop; saveScroll/restoreScroll + fit() skipped while fullscreen, re-fit on fullscreenchange (same §10.8 pattern as the image lightbox).
 
 ## How to regenerate a tool copy from `embeds.py`
 
