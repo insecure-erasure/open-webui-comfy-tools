@@ -37,8 +37,10 @@ Each accepts a filename from a previous generation or a direct URL to an externa
 
 The tool returns:
 
-1. **The try-on result image** — rendered from the "Random Preview Image" node (the final preview node of the workflow).
+1. **The try-on result image** — rendered from the "Random Preview Image" node (the final preview node of the workflow), displayed as a **Rich UI embed** (same image viewer as Smart Generate Image: centered, capped at 70% of the screen height, lightbox with fullscreen zoom + forced download, chat scroll preserved on close).
 2. **The generated prompt** — extracted from the "Prompt preview" node (ShowText). The workflow builds this prompt dynamically: Florence-2 captions the subject, then the caption is combined with the garment references ("TRYON A woman. Replace the outfit with...").
+
+In the tool result, the **LLM receives the context** `{ "image": <url>, "prompt": <text> }` (the image URL + the generated prompt) — never the HTML. The URL is actionable for chained tool calls; the prompt is used by the agent to reply to the user.
 
 ## Models
 
