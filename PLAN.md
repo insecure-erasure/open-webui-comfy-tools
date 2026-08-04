@@ -5,6 +5,13 @@ Language of code and docs: **English**. Conversation/notes with the maintainer: 
 
 **Status legend**: `[ ]` not started · `[~]` in progress · `[x]` done · `[?]` blocked / needs decision
 
+## Working agreement
+
+- **One phase at a time.** After each phase's implementation is committed, **control returns to the maintainer** for testing the result of that phase.
+- The next phase only starts after the maintainer gives the go-ahead (explicit approval or "continue").
+- If a test fails or the maintainer requests changes, the phase is reopened (status back to `[~]`) until approved.
+- No two phases are implemented back to back without an explicit green light in between.
+
 ---
 
 ## Phase 0 — Documentation (this branch)
@@ -101,3 +108,4 @@ First because it is the simplest tool (no ComfyUI, no workflow) and its README a
 |------|-------|---------------|-------|
 | 2026-08-04 | 0 | DESIGN.md and PLAN.md written | Verified middleware/iface against open-webui `main`; video sizing decision deferred (§6) |
 | 2026-08-04 | 0 | Scope confirmed with maintainer | `smart_fetch_url` = `smart_generate_image`; docs/code in English; `generate_caption` out of scope |
+| 2026-08-04 | 0 | Working agreement added to PLAN.md | One phase at a time; control returns to maintainer after each phase for testing; next phase only after go-ahead |
