@@ -2,7 +2,7 @@
 title: Compare Images
 author: Insecure Erasure
 description: Compare two images side by side with an interactive before/after slider
-version: 2.6
+version: 2.7
 """
 
 import html
@@ -43,6 +43,22 @@ def _build_slider_html(image_a: str, image_b: str) -> str:
     with the slider (required by Open WebUI: without it the iframe stays at
     ~150px and the content is cut off). The divider starts at 50%% so both
     images are visible on load.
+
+    A fullscreen mode is available via a floating button at the bottom-right
+    of the slider (the standard maximize icon): it opens the comparison in a
+    fullscreen overlay with its OWN interactive slider (same
+    drag/tap/hover/divider behavior — the embed behavior is unchanged). The
+    overlay is fullscreened via the browser Fullscreen API (the Open WebUI
+    iframe has allowfullscreen; the click is the required user gesture) —
+    the same mechanism the image viewer's lightbox uses (DESIGN.md §10.7) —
+    so it fills the browser window; browsers that reject it (e.g. some
+    mobile/iOS) fall back to the embed area. The overlay slider is sized to
+    the real viewport (in fullscreen the iframe viewport IS the screen),
+    waiting for real image dimensions (§10.4). Escape, the restore
+    (minimize) button, or clicking the dark backdrop close it. The chat
+    scroll is preserved around the fullscreen via saveScroll/restoreScroll
+    (DESIGN.md §10.8); the embed's fit() skips sizing while in fullscreen
+    and re-fits on fullscreenchange.
     """
     a = html.escape(image_a, quote=True)
     b = html.escape(image_b, quote=True)
@@ -54,6 +70,7 @@ def _build_slider_html(image_a: str, image_b: str) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 body{{margin:0;background:#222}}
+html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
 #c{{position:relative;width:100%;margin:0 auto;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}}
 #c img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}
 #top{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
@@ -61,6 +78,22 @@ body{{margin:0;background:#222}}
 #h{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
 #h span{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}
 #h span:last-child{{transform:rotate(-135deg)}}
+.btn{{position:absolute;display:flex;align-items:center;justify-content:center;background:rgba(28,28,28,.75);border:none;border-radius:8px;color:#f5f5f5;cursor:pointer;padding:6px;z-index:5}}
+.btn svg{{display:block}}
+#fs{{bottom:8px;right:8px}}
+@media (prefers-color-scheme: light){{
+  .btn{{background:rgba(235,235,235,.82);color:#1a1a1a}}
+}}
+.overlay{{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:999}}
+.overlay.open{{display:flex}}
+#c2{{position:relative;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 4px 30px rgba(0,0,0,.5);border-radius:4px}}
+#c2 img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}
+#top2{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
+#d2{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}
+#h2{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
+#h2 span{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}
+#h2 span:last-child{{transform:rotate(-135deg)}}
+#fs2{{bottom:14px;right:14px;z-index:1001}}
 </style>
 </head>
 <body>
@@ -69,9 +102,28 @@ body{{margin:0;background:#222}}
 <img id="top" src="{b}" draggable="false">
 <div id="d"></div>
 <div id="h"><span></span><span></span></div>
+<button id="fs" class="btn" title="Fullscreen" aria-label="Fullscreen">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+</button>
+</div>
+<div class="overlay" id="overlay">
+<div id="c2">
+<img src="{a}" draggable="false">
+<img id="top2" src="{b}" draggable="false">
+<div id="d2"></div>
+<div id="h2"><span></span><span></span></div>
+</div>
+<button id="fs2" class="btn" title="Exit fullscreen" aria-label="Exit fullscreen">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+</button>
 </div>
 <script>
-const c=document.getElementById('c'),im=document.querySelector('#c img');
+const c=document.getElementById('c'),topImg=document.getElementById('top'),
+      im=document.querySelector('#c img'),
+      c2=document.getElementById('c2'),top2=document.getElementById('top2'),
+      im2=document.querySelector('#c2 img'),
+      overlay=document.getElementById('overlay'),
+      fsBtn=document.getElementById('fs'),fs2Btn=document.getElementById('fs2');
 function reportHeight(){{parent.postMessage({{type:'iframe:height',height:document.documentElement.scrollHeight}},'*')}}
 function isLandscape(){{
   if(screen.orientation&&screen.orientation.type)return screen.orientation.type.indexOf('landscape')===0;
@@ -80,20 +132,17 @@ function isLandscape(){{
   return sw>sh&&sh>0;
 }}
 function fit(){{
-  // Only size the slider once the base image has real dimensions. The old
-  // 16:9 fallback mis-sized the area when the images were not loaded yet,
-  // and if the image was already cached the load event never fired to
-  // correct it (the reported "reload the frame" fix). Same aspect ratio
-  // between both images is assumed; the area follows the base image.
+  // Only size the slider once the base image has real dimensions (DESIGN.md
+  // §10.4). Skip sizing while in browser fullscreen: the iframe viewport is
+  // then the full screen, and resizing/reporting would blow up the embed and
+  // shift the chat scroll (§10.8) — the overlay covers everything anyway;
+  // re-fit on fullscreenchange when leaving.
+  if(document.fullscreenElement||document.webkitFullscreenElement)return;
   if(!(im.naturalWidth>0&&im.naturalHeight>0)){{reportHeight();return;}}
   const r=im.naturalWidth/im.naturalHeight;
-  // Adaptive sizing: portrait devices use the full width with no height cap;
-  // landscape devices cap the height at 80% of the available vertical space
-  // and scale the width proportionally (centered). Orientation detection is
-  // conservative: any ambiguity (missing orientation API, degenerate screen
-  // values) is treated as portrait so the cap can never fire on a portrait
-  // device (the reported mobile bug). The available height is approximated
-  // with the device screen (availHeight), readable inside the sandbox.
+  // Adaptive sizing (unchanged): portrait full width no cap; landscape cap
+  // 80% of the available vertical space, width scaled proportionally.
+  // Orientation detection is conservative (degenerate/ambiguous → portrait).
   const maxH=isLandscape()?(screen.availHeight||screen.height||0)*0.8:0;
   let w=document.documentElement.clientWidth;
   if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
@@ -101,23 +150,100 @@ function fit(){{
   c.style.height=(w/r)+'px';
   reportHeight();
 }}
+function fitOverlay(){{
+  // The overlay slider is sized to the REAL viewport: in fullscreen the
+  // iframe viewport IS the screen, so no orientation heuristic is needed —
+  // contain the images (same aspect ratio assumed) within it, centered.
+  // Wait for real dimensions (§10.4); the URLs are the same cached ones as
+  // the embed, and the load listeners below cover the cold case.
+  if(!(im2.naturalWidth>0&&im2.naturalHeight>0))return;
+  const r=im2.naturalWidth/im2.naturalHeight;
+  const vw=document.documentElement.clientWidth||0,vh=document.documentElement.clientHeight||0;
+  let w=vw,h=vw/r;
+  if(h>vh){{h=vh;w=h*r;}}
+  c2.style.width=w+'px';
+  c2.style.height=h+'px';
+}}
 im.addEventListener('load',fit);
-document.getElementById('top').addEventListener('load',fit);
-window.addEventListener('load',fit);
+topImg.addEventListener('load',fit);
+im2.addEventListener('load',fitOverlay);
+top2.addEventListener('load',fitOverlay);
+window.addEventListener('load',()=>{{fit();fitOverlay();}});
 addEventListener('resize',fit);
+addEventListener('resize',()=>{{if(document.fullscreenElement||document.webkitFullscreenElement)fitOverlay();}});
 new ResizeObserver(fit).observe(document.body);
-let dragging=false;
-function setP(x){{const rect=c.getBoundingClientRect(),p=Math.min(100,Math.max(0,(x-rect.left)/rect.width*100));c.style.setProperty('--p',p+'%');}}
-// Pointer events unify mouse + touch (mobile). On desktop the divider
-// follows the mouse while hovering (no click needed); a click/tap jumps
-// to that position; dragging works with any pointer (mouse/touch/pen).
-// touch-action:none keeps the browser from hijacking the gesture for
-// scrolling; the handle (#h) is a purely visual affordance
-// (pointer-events:none) and the container is the drag surface.
-c.addEventListener('pointerdown',e=>{{dragging=true;try{{c.setPointerCapture(e.pointerId)}}catch{{}}setP(e.clientX);e.preventDefault();}});
-c.addEventListener('pointermove',e=>{{if(dragging||e.pointerType==='mouse')setP(e.clientX);}});
-c.addEventListener('pointerup',()=>{{dragging=false;}});
-c.addEventListener('pointercancel',()=>{{dragging=false;}});
+// Interactive slider — shared by the embed (#c) and the fullscreen overlay
+// (#c2). Pointer Events unify mouse + touch: on desktop the divider follows
+// the mouse on hover (no click), a click/tap jumps, dragging works with any
+// pointer; touch-action:none keeps the browser from hijacking the gesture;
+// the handle is a purely visual affordance (pointer-events:none). The
+// fullscreen button (#fs) lives inside #c, so the handlers ignore any event
+// whose target is a .btn to keep it from moving the divider.
+function setupSlider(el){{
+  let dragging=false;
+  function setP(x){{const rect=el.getBoundingClientRect(),p=Math.min(100,Math.max(0,(x-rect.left)/rect.width*100));el.style.setProperty('--p',p+'%');}}
+  const onBtn=e=>e.target.closest&&e.target.closest('.btn');
+  el.addEventListener('pointerdown',e=>{{if(onBtn(e))return;dragging=true;try{{el.setPointerCapture(e.pointerId)}}catch{{}}setP(e.clientX);e.preventDefault();}});
+  el.addEventListener('pointermove',e=>{{if((dragging||e.pointerType==='mouse')&&!onBtn(e))setP(e.clientX);}});
+  el.addEventListener('pointerup',()=>{{dragging=false;}});
+  el.addEventListener('pointercancel',()=>{{dragging=false;}});
+}}
+setupSlider(c);
+setupSlider(c2);
+// Fullscreen (DESIGN.md §10.7/§10.8): fullscreen the OVERLAY element (not
+// documentElement) so the parent chat does not scroll to top on enter; the
+// overlay slider is interactive exactly like the embed one. Escape, the
+// restore (minimize) button, or clicking the dark backdrop exit. The chat
+// scroll lives in an inner container in Open WebUI's DOM — save/restore it
+// around the fullscreen (same-origin ON; guarded with try/catch so it also
+// works OFF).
+let savedScrolls=[];
+function saveScroll(){{
+  savedScrolls=[];
+  try{{savedScrolls.push({{el:parent,top:parent.scrollY||0}});}}catch(e){{}}
+  try{{
+    const doc=parent.document||document;
+    const all=doc.querySelectorAll&&doc.querySelectorAll('*');
+    if(all)for(let i=0;i<all.length;i++){{
+      const el=all[i];
+      if(el.scrollTop>0&&el.scrollHeight>el.clientHeight)savedScrolls.push({{el:el,top:el.scrollTop}});
+    }}
+  }}catch(e){{}}
+}}
+function restoreScroll(){{requestAnimationFrame(()=>{{requestAnimationFrame(()=>{{
+  try{{parent.scrollTo(0,savedScrolls[0]&&savedScrolls[0].top||0);}}catch(e){{}}
+  for(let i=0;i<savedScrolls.length;i++){{try{{savedScrolls[i].el.scrollTop=savedScrolls[i].top;}}catch(e){{}}}}
+  document.documentElement.scrollTop=0;document.body.scrollTop=0;
+}});}});}}
+function openFullscreen(){{
+  overlay.classList.add('open');
+  fitOverlay();
+  saveScroll();
+  try{{overlay.requestFullscreen&&overlay.requestFullscreen();}}catch(e){{}}
+  try{{overlay.webkitRequestFullscreen&&overlay.webkitRequestFullscreen();}}catch(e){{}}
+}}
+function closeFullscreen(){{
+  if(document.fullscreenElement||document.webkitFullscreenElement){{
+    try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{}}
+    try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{}}
+  }}else{{
+    overlay.classList.remove('open');
+    restoreScroll();
+  }}
+}}
+fsBtn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;openFullscreen();}});
+fs2Btn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;closeFullscreen();restoreScroll();}});
+overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeFullscreen();restoreScroll();}}}});
+document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{closeFullscreen();restoreScroll();}}}});
+document.addEventListener('fullscreenchange',()=>{{
+  if(!(document.fullscreenElement||document.webkitFullscreenElement)){{
+    overlay.classList.remove('open');
+    restoreScroll();
+    fit();
+  }}else{{
+    fitOverlay();
+  }}
+}});
 // If the base image was already loaded (e.g. from cache) before this script
 // ran, fit() uses its real dimensions immediately; otherwise it reports the
 // current height and the load events correct it when the image arrives.

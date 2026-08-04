@@ -33,6 +33,10 @@ The handle is **small (~40% of the original size, 13x18px) and fully opaque** (s
 
 The slider area is only sized once the base image has real dimensions. The previous fallback ratio (16:9) mis-sized the area when the images were not loaded yet, and if the image was already cached the `load` event never fired to correct it (a frame reload fixed it visually). Now `fit()` waits for `naturalWidth`/`naturalHeight`, and re-runs on the image `load` events, the window `load`, `resize`, and a `ResizeObserver`. Both images are assumed to share the same aspect ratio; the area follows the base image (`image_a`).
 
+### Fullscreen mode
+
+A floating **fullscreen button** (bottom-right corner of the slider, the standard maximize icon) opens the comparison in a **fullscreen overlay** with its own interactive slider — the same drag/tap/hover/divider behavior, so the comparison stays interactive at full size. It uses the browser **Fullscreen API** (the Open WebUI iframe has `allowfullscreen`, the same mechanism the image viewer's lightbox uses), so it fills the browser window; on browsers that reject it (e.g. some mobile/iOS) the overlay falls back to the embed area. Exit with **Escape**, the **restore (minimize) button** (bottom-right, the icon flips to an inward-pointing frame), or clicking the dark backdrop. The chat scroll is preserved around the fullscreen (the embed's `fit()` is skipped while in fullscreen and re-runs on exit, so the chat position does not jump).
+
 ## Sizing strategy (adaptive)
 
 The slider uses an adaptive sizing strategy depending on the device orientation:
