@@ -363,7 +363,6 @@ const viewer=document.getElementById('viewer'),thumb=document.getElementById('th
       closeBtn=document.getElementById('close'),dlBtn=document.getElementById('dl');
 const RESERVED_R={ratio_js};
 function reportHeight(){{parent.postMessage({{type:'iframe:height',height:viewer.offsetHeight||document.documentElement.scrollHeight}},'*')}}
-function reportHeight(){{parent.postMessage({{type:'iframe:height',height:viewer.offsetHeight||document.documentElement.scrollHeight}},'*')}}
 function fit(){{
   // Sizing replicates the compare_images slider (DESIGN.md §10): the iframe
   // starts at ~150px and its own vh is useless, so derive from the container

@@ -22,13 +22,13 @@ cleanup (Phase 7) remains.
 | 4 | `enhance_image` | ✅ approved |
 | 5 | `virtual_try_on` | ✅ approved |
 | 6 | `generate_video` | ✅ **approved by maintainer** (65vh cap, no download; decision in DESIGN.md §6) |
-| 7 | Cross-cutting cleanup | ⏳ pending (grep `image_md`, main README, CORS notes, duplicated `reportHeight` in image viewers) |
+| 7 | Cross-cutting cleanup | ⏳ mostly pending — duplicated `reportHeight` in image viewers **deduped** (2026-08-04); grep `image_md`, main README, CORS notes left |
 
 ## How to resume (next session)
 
 1. **Read `DESIGN.md` first** — especially §6 (the **65vh / no-download decision** + the "Implementation notes for the video embed" block) and §10 (lessons learned).
 2. **Phase 6 — `generate_video`**: **APPROVED by maintainer (2026-08-04)** — the video player embed (reference: `embeds.build_video_player`; tool copy: `_build_video_player`) sizes after `loadedmetadata` with a 65% `screen.availHeight` cap and native controls (no lightbox/download). The 65vh cap was chosen because the sandboxed iframe cannot deduct the Open WebUI input bar from `screen.availHeight`, so a more aggressive cap leaves room for vertical videos to fit without clipping.
-3. **Phase 7 — cleanup**: grep the repo for leftover `image_md`, `image_filename`, "Wrap the HTML block" instructions (now only in docs); update the main `README.md` tools section (done for video; verify the rest); verify CORS notes in §7 against the real reverse-proxy config (user-owned). **Also**: `embeds.py` and the 4 image-tool copies have a duplicated `reportHeight()` line (harmless JS no-op, the 2nd declaration wins) — dedupe in `embeds.py` and regenerate the image tool copies byte-identical.
+3. **Phase 7 — cleanup**: grep the repo for leftover `image_md`, `image_filename`, "Wrap the HTML block" instructions (now only in docs); update the main `README.md` tools section (done for video; verify the rest); verify CORS notes in §7 against the real reverse-proxy config (user-owned). ~~Dedupe the duplicated `reportHeight()` in the image viewer (embeds.py + 4 image-tool copies)~~ — **DONE (2026-08-04, commit below)**: one line removed per file, all copies verified byte-identical.
 4. Follow the working agreement in `PLAN.md`: **one phase at a time**; after
    each phase's commit, return control to the maintainer for testing; next
    phase only after explicit approval.
