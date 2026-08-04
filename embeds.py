@@ -100,7 +100,7 @@ const viewer=document.getElementById('viewer'),thumb=document.getElementById('th
       closeBtn=document.getElementById('close'),dlBtn=document.getElementById('dl');
 const RESERVED_R={ratio_js};
 function reportHeight(){{parent.postMessage({{type:'iframe:height',height:viewer.offsetHeight||document.documentElement.scrollHeight}},'*')}}
-function log(msg){{try{{console.log('[viewer]',msg,'| overlay=',overlay.className,'| fs=',!!(document.fullscreenElement||document.webkitFullscreenElement),'| viewerH=',viewer.offsetHeight,'| docH=',document.documentElement.scrollHeight);}}catch(e){{}}}}
+function log(msg){{try{{const pY=parent.scrollY!==undefined?parent.scrollY:'n/a';const pST=parent.document?parent.document.documentElement.scrollTop:'n/a';console.log('[viewer]',msg,'| overlay=',overlay.className,'| fs=',!!(document.fullscreenElement||document.webkitFullscreenElement),'| viewerH=',viewer.offsetHeight,'| docH=',document.documentElement.scrollHeight,'| pY=',pY,'| pDocST=',pST);}}catch(e){{console.log('[viewer]',msg,'| (parent not accessible)');}}}}
 function fit(){{log('fit() enter');
   // Sizing replicates the compare_images slider (DESIGN.md §10): the iframe
   // starts at ~150px and its own vh is useless, so derive from the container
