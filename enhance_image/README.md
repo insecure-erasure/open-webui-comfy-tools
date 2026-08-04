@@ -20,6 +20,16 @@ Upscales or enhances a previously generated image using SeedVR2. Loads images vi
 
 The LLM calls this tool when the user explicitly asks to enhance or upscale an image. Pass a filename from a previous generation or a direct URL to an external image.
 
+## How it renders
+
+The tool returns an `HTMLResponse` with `Content-Disposition: inline` plus a context tuple, so Open WebUI renders it as a **Rich UI embed**: a self-contained image viewer in a sandboxed iframe right in the chat (same viewer as Smart Generate Image).
+
+- The image is centered, fits the chat container width, and its height is capped at **70% of the available screen height**; the viewer sizes itself after the image loads (the output dimensions are not known in advance, so there is no aspect reservation).
+- Clicking the image opens a **lightbox** that fills the browser window via the **Fullscreen API** (image fit to screen, no scroll), with an X to close (top-left) and a **download** button (top-right) that forces the download.
+- On close, the chat scroll position is preserved (no jump to the top).
+
+The **LLM only receives the context** `{ "image": <url> }` (the enhanced image URL) — never the HTML. The URL is the actionable value for chained tool calls.
+
 ## Models
 
 The workflow uses two models that are downloaded automatically on first run:
