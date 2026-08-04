@@ -65,6 +65,14 @@ cleanup (Phase 7) remains.
   - Terminal tools (`compare_images`, `generate_video`): **bare `HTMLResponse`**
     (no tuple) → the LLM gets the middleware's generic message. An empty dict
     `{}` IS sent to the LLM as context — do not use it.
+- **Prompt caption in the lightbox (2026-08-04)**: in fullscreen only, images
+  generated from a prompt show it in white at the bottom over a gradient
+  (transparent top → dark bottom, `.88` under the text + `text-shadow`). Only
+  tools that accept a prompt: SGI (`prompt`), edit (`edit_prompt`), try-on
+  (workflow prompt); **enhance has NO prompt → no caption**. `data-prompt`
+  HTML-escaped on `.viewer` (HTML identifier only, no backend logic); gallery
+  now collects `{src,prompt}` and the caption follows navigation; `textContent`
+  never `innerHTML`. 18 node cases; f-strings byte-identical (13310 chars).
 - **Failed-load retry (2026-08-04, cheap fix, no watchdog)**: occasionally a
   slow/flaky fetch left the embed without the image (user had to "reload this
   frame"). The symptom is a failed fetch, NOT a layout issue — a watchdog that
@@ -115,12 +123,14 @@ pre_lines, fstr_lines = body[:ret_idx], body[ret_idx:]
 pre = textwrap.dedent('\n'.join(pre_lines))
 pre_indented = '\n'.join(('        ' + l) if l.strip() else '' for l in pre.splitlines())
 fstring = re.search(r'return (f""".*?""")', '\n'.join(fstr_lines), re.S).group(1)
-method = ('    def _build_image_viewer(self, image_url: str, aspect_ratio: tuple[int, int] | None = None, gallery: bool = False) -> str:\n'
+method = ('    def _build_image_viewer(self, image_url: str, aspect_ratio: tuple[int, int] | None = None, gallery: bool = False, prompt: str | None = None) -> str:\n'
           + pre_indented + '\n'
           '        return (\n' + fstring + '\n        )\n')
 # then insert `method` after the tool's __init__ (see the tool files), and
-# pass gallery=True from the tool's return path (all four image tools do).
-# The method docstring must also be kept in sync (gallery paragraph, §11).
+# pass gallery=True (all four image tools) and prompt=... from the return
+# path ONLY for tools with a prompt input (SGI, edit, try-on; NOT enhance).
+# The method docstring must also be kept in sync (gallery + prompt caption
+# paragraphs, §11-12).
 PYEOF
 ```
 

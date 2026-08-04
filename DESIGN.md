@@ -510,6 +510,75 @@ still pass; f-strings byte-identical, 11255 chars).
 
 ---
 
+## 12. Prompt caption in the lightbox (cross-cutting, 2026-08-04)
+
+Requested by the maintainer: in **fullscreen only** (never the thumbnail), the
+images that were generated from a **prompt** show the prompt text overlaid at
+the bottom, in white, over a translucent gradient that goes from clearer at the
+top to darker at the bottom.
+
+### Only for tools that accept a prompt (maintainer constraint)
+
+| Tool | Prompt shown | Why |
+|------|--------------|-----|
+| `smart_generate_image` | `prompt` (the LLM prompt) | input prompt |
+| `edit_image` | `edit_prompt` (the LLM edit prompt) | input prompt |
+| `virtual_try_on` | `prompt` (workflow-generated, `_extract_text`) | workflow prompt |
+| `enhance_image` | **none** | only receives `image` (no prompt input) |
+
+So `enhance_image` builds its viewer without `prompt` and its images show no
+caption. `compare_images`/`generate_video` are excluded as always.
+
+### How it works
+
+- The viewer builder accepts `prompt: str | None = None`. When provided it is
+  HTML-escaped and added as a `data-prompt` attribute on the `.viewer` div —
+  another HTML identifier, never backend logic (same constraint as the gallery
+  marker).
+- In the lightbox, a `#caption` div sits over the image (`position:absolute`
+  bottom). `updateCaption()` reads the prompt of the currently shown image and
+  sets `caption.textContent` (never `innerHTML` — the prompt is arbitrary
+  user/LLM text) and toggles `.show` (max 5 lines via `-webkit-line-clamp`).
+- The gallery now collects `{src, prompt}` pairs: when navigating, the caption
+  follows the shown image's prompt (images without `data-prompt` show no
+  caption).
+
+### The gradient (why it reads well)
+
+The white text must sit on the **darkest** zone (maximum white-on-dark
+contrast), so the gradient darkens toward the bottom:
+
+```css
+background: linear-gradient(to bottom,
+  rgba(0,0,0,0)   0%,   /* fully transparent at the top — does not dirty the image */
+  rgba(0,0,0,.3)  30%,  /* gentle transition */
+  rgba(0,0,0,.65) 65%,  /* mid zone */
+  rgba(0,0,0,.88) 100%) /* darkest at the bottom, under the text */
+```
+
+The text is in the bottom zone (0.65→0.88 opacity), which is always dark
+enough for white even over a bright image; a subtle `text-shadow`
+(`0 1px 4px rgba(0,0,0,.75)`) reinforces the edges. The padding
+(`56px 24px 18px`) keeps the gradient visible above and around the text
+block. The gradient is `pointer-events:none` and confined to the lightbox
+(the thumbnail never shows it).
+
+### Escaping & safety
+
+- `data-prompt` is HTML-escaped (`html.escape(quote=True)`) at build time.
+- The caption uses `textContent`, never `innerHTML` — arbitrary prompt text
+  cannot execute markup.
+
+### Verification
+
+18 node cases pass (gallery order with prompts, caption shown/hidden per
+image, prompt follows navigation incl. wrap-around, dedupe first-prompt-wins,
+unshift with own prompt, openLightbox reset, same-origin OFF degradation
+still shows the own caption). F-strings byte-identical to `embeds.py`
+(13310 chars, same sha256).
+
+---
+
 ## Appendix A — Verification against the Open WebUI source code
 
 The assumptions in this document were verified against `open-webui/open-webui` (`main`) rather than relying only on the official docs.

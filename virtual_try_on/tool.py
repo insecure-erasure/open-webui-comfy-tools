@@ -288,7 +288,7 @@ class Tools:
         self.citation = False
 
 
-    def _build_image_viewer(self, image_url: str, aspect_ratio: tuple[int, int] | None = None, gallery: bool = False) -> str:
+    def _build_image_viewer(self, image_url: str, aspect_ratio: tuple[int, int] | None = None, gallery: bool = False, prompt: str | None = None) -> str:
         """
         Build the self-contained image viewer embed for a single image URL.
 
@@ -318,6 +318,15 @@ class Tools:
         currently shown. All gallery logic is JS inside the embed — the marker
         is the only contribution of the tool.
 
+        Prompt caption: when prompt is provided it is added as a `data-prompt`
+        attribute (HTML-escaped) — another HTML identifier, never backend
+        logic. In the lightbox only (never the thumbnail), a gradient overlay
+        at the bottom shows the prompt in white: the gradient goes from
+        transparent at the top to dark at the bottom so the white text (in the
+        darkest zone) stays readable over any image content; a subtle
+        text-shadow reinforces it. When the gallery navigates, the caption
+        follows the shown image's prompt.
+
         A failed image load is retried once (no watchdog): on `error` the img
         src is cleared and re-set a single time per URL (flaky/slow fetches),
         after which a second failure is left alone (the browser shows the alt
@@ -325,6 +334,7 @@ class Tools:
         """
         src = html.escape(image_url, quote=True)
         gallery_attr = ' data-gallery="1"' if gallery else ''
+        prompt_attr = f' data-prompt="{html.escape(prompt, quote=True)}"' if prompt else ''
         if aspect_ratio:
             w, h = aspect_ratio
             if w > 0 and h > 0:
@@ -360,6 +370,8 @@ img{{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}}
 #prev{{top:50%;left:14px;transform:translateY(-50%)}}
 #next{{top:50%;right:14px;transform:translateY(-50%)}}
 .counter{{position:fixed;bottom:14px;right:14px;z-index:1000;display:none;align-items:center;justify-content:center;background:rgba(28,28,28,.75);color:#f5f5f5;border-radius:8px;padding:5px 12px;font:600 13px system-ui,sans-serif;pointer-events:none}}
+.caption{{position:absolute;left:0;right:0;bottom:0;display:none;padding:56px 24px 18px;color:#fff;text-align:center;font:500 15px/1.5 system-ui,sans-serif;text-shadow:0 1px 4px rgba(0,0,0,.75);white-space:pre-wrap;overflow:hidden;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.3) 30%,rgba(0,0,0,.65) 65%,rgba(0,0,0,.88) 100%)}}
+.caption.show{{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}}
 @media (prefers-color-scheme: light){{
   .btn{{background:rgba(235,235,235,.82);color:#1a1a1a}}
   .counter{{background:rgba(235,235,235,.82);color:#1a1a1a}}
@@ -367,11 +379,12 @@ img{{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}}
 </style>
 </head>
 <body>
-<div class="viewer" id="viewer"{gallery_attr}>
+<div class="viewer" id="viewer"{gallery_attr}{prompt_attr}>
   <img id="thumb" src="{src}" alt="Generated image">
 </div>
 <div class="overlay" id="overlay">
   <img id="big" src="{src}" alt="Generated image">
+  <div id="caption" class="caption"></div>
   <button id="close" class="btn" title="Close" aria-label="Close">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
   </button>
@@ -391,7 +404,7 @@ const viewer=document.getElementById('viewer'),thumb=document.getElementById('th
       overlay=document.getElementById('overlay'),big=document.getElementById('big'),
       closeBtn=document.getElementById('close'),dlBtn=document.getElementById('dl'),
       prevBtn=document.getElementById('prev'),nextBtn=document.getElementById('next'),
-      counter=document.getElementById('counter');
+      counter=document.getElementById('counter'),caption=document.getElementById('caption');
 const RESERVED_R={ratio_js};
 function reportHeight(){{parent.postMessage({{type:'iframe:height',height:viewer.offsetHeight||document.documentElement.scrollHeight}},'*')}}
 function fit(){{
@@ -445,6 +458,16 @@ big.addEventListener('error',()=>retryOnce(big));
 // ON); with same-origin OFF every contentDocument is null, the gallery stays
 // empty and the lightbox behaves exactly as before.
 let gallery=[],galleryIdx=-1;
+function updateCaption(){{
+  // Prompt caption of the currently shown image (DESIGN.md §12): only in the
+  // lightbox, never the thumbnail. The gradient goes from transparent at the
+  // top to dark at the bottom so the white text (in the darkest zone) stays
+  // readable over any image content. textContent (never innerHTML) — the
+  // prompt is arbitrary user/LLM text.
+  const p=(gallery[galleryIdx]&&gallery[galleryIdx].prompt)||'';
+  if(p){{caption.textContent=p;caption.classList.add('show');}}
+  else{{caption.classList.remove('show');caption.textContent='';}}
+}}
 function collectGallery(){{
   gallery=[];galleryIdx=-1;
   try{{
@@ -460,24 +483,29 @@ function collectGallery(){{
       // reflects its own image (its image would drop out and duplicates would
       // appear). thumb.src is the stable per-embed identity.
       const im=cd.getElementById('thumb');
-      if(im&&im.src&&gallery.indexOf(im.src)<0)gallery.push(im.src);
+      // data-prompt is the prompt of that embed's image, shown when the
+      // gallery navigates to it.
+      const pr=v.getAttribute('data-prompt')||'';
+      if(im&&im.src&&!gallery.some(g=>g.src===im.src))gallery.push({{src:im.src,prompt:pr}});
     }}
   }}catch(e){{}}
   // Defensive: after the reset below big.src === thumb.src and this embed's
   // own thumb is normally collected (its iframe is in the parent DOM); if for
   // any reason it was not collected, unshift it so the current view is present.
-  if(gallery.indexOf(big.src)<0)gallery.unshift(big.src);
-  galleryIdx=gallery.indexOf(big.src);
+  if(!gallery.some(g=>g.src===big.src))gallery.unshift({{src:big.src,prompt:viewer.getAttribute('data-prompt')||''}});
+  galleryIdx=gallery.findIndex(g=>g.src===big.src);
   const multi=gallery.length>1;
   prevBtn.style.display=nextBtn.style.display=counter.style.display=multi?'flex':'none';
   if(multi&&galleryIdx>=0)counter.textContent=(galleryIdx+1)+'/'+gallery.length;
+  updateCaption();
 }}
 function showImage(i){{
   // Wrap-around navigation; a no-op when there is only one image.
   if(gallery.length<2)return;
   galleryIdx=((i%gallery.length)+gallery.length)%gallery.length;
-  big.src=gallery[galleryIdx];
+  big.src=gallery[galleryIdx].src;
   counter.textContent=(galleryIdx+1)+'/'+gallery.length;
+  updateCaption();
 }}
 function openLightbox(){{
   // Start from this embed's own image: big.src may be left pointing at a
@@ -940,7 +968,7 @@ dlBtn.addEventListener('pointerup',download);
             # the minimal context: it is the prompt generated by the workflow,
             # which the agent uses to reply to the user. The output dimensions
             # are unknown a priori, so the viewer sizes after the image loads.
-            viewer = self._build_image_viewer(image_url, gallery=True)
+            viewer = self._build_image_viewer(image_url, gallery=True, prompt=prompt)
             return HTMLResponse(
                 content=viewer, headers={"Content-Disposition": "inline"}
             ), {"image": image_url, "prompt": prompt}
