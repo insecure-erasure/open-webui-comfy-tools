@@ -19,7 +19,7 @@
 - **Embed**: self-contained image viewer.
   - Width: fit to the chat container.
   - Height: **capped at 70vh** maximum, centered (flexbox), `object-fit: contain` (no distortion).
-  - **Implementation note (learned in Phase 2)**: `vh` units inside the sandboxed iframe refer to the iframe box (~150px initial), not the browser viewport — so the 70vh cap is implemented as **70% of `screen.availHeight`** (approximation), and the height is derived from the container width + image aspect ratio, with `reportHeight()` keeping the iframe at the real height. The aspect ratio is known a priori for `smart_generate_image` (`reduced_w:reduced_h`) and reserved to avoid the load "jump".
+  - **Implementation note (learned in Phase 2)**: `vh` units inside the sandboxed iframe refer to the iframe box (~150px initial), not the browser viewport — so the 70vh cap is implemented as **70% of `screen.availHeight`** (approximation), and the height is derived from the container width + image aspect ratio, with `reportHeight()` keeping the iframe at the real height. `reportHeight()` reports the **viewer's own height** (`viewer.offsetHeight`), not the document's, so the iframe hugs the image and no empty "frame" appears around it when the height cap makes the viewer narrower than the container (desktop wide screens).
   - The backend **does not measure** the image; the aspect ratio is known a priori (`reduced_w:reduced_h`), useful for aspect reservation and avoiding the "jump" on load.
 - **Modal viewer (lightbox) replicated inside the iframe**:
   - Open: a click on the thumbnail.

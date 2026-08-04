@@ -29,7 +29,7 @@ Models for FLUX.2 Klein (flux-2-klein-9b-nvfp4, flux2-vae-small-bf16, qwen_3_8b_
 
 The tool returns an `HTMLResponse` with `Content-Disposition: inline` plus a context tuple, so Open WebUI renders it as a **Rich UI embed**: a self-contained image viewer in a sandboxed iframe right in the chat (see the official [Rich UI Embedding](https://docs.openwebui.com/features/extensibility/plugin/development/rich-ui/) docs).
 
-- The image is centered, fits the chat container width, and its height is capped at **70% of the available screen height** (approximation of 70vh of the real browser viewport — the iframe's own `vh` would refer to the small embed box). The aspect ratio (from the requested resolution) is reserved to avoid the load "jump".
+- The image is centered, fits the chat container width, and its height is capped at **70% of the available screen height** (approximation of 70vh of the real browser viewport — the iframe's own `vh` would refer to the small embed box). The embed's iframe hugs the image (no empty frame around it on wide desktop screens). The aspect ratio (from the requested resolution) is reserved to avoid the load "jump".
 - Clicking the image opens a **lightbox** that fills the browser window via the **Fullscreen API** (image fit to screen, no scroll), with an X to close (top-left) and a **download** button (top-right) that forces the download. Browsers that don't allow fullscreen (e.g. some mobile/iOS) fall back to showing it inside the embed area. On close (X / Escape / backdrop) the parent chat scroll position is restored so the page doesn't jump to the top.
 - Theme follows `prefers-color-scheme`.
 
