@@ -18,7 +18,7 @@ Language of code and docs: **English**. Conversation/notes with the maintainer: 
 
 - [x] `DESIGN.md` written (design notes + source verification against open-webui `main`).
 - [x] `PLAN.md` created (this file).
-- [ ] `compare_images/README.md` already documents Rich UI — verify it matches the final code.
+- [x] `compare_images/README.md` already documents Rich UI — verify it matches the final code.
 
 **Notes**
 - Branch: `refactor/native_embeds` (clean, identical to `master` at start).
@@ -30,13 +30,13 @@ Language of code and docs: **English**. Conversation/notes with the maintainer: 
 
 First because it is the simplest tool (no ComfyUI, no workflow) and its README already describes the Rich UI version — the code is migrated to match the README, validating the whole pattern end to end.
 
-- [ ] Return `HTMLResponse` with `Content-Disposition: inline` instead of the markdown-hack string.
-- [ ] **Empty context**: return the bare `HTMLResponse` (no tuple) so the LLM receives the middleware's generic message. Do **not** return `{}` (an empty dict *is* sent to the LLM as context — see DESIGN.md §A.1).
-- [ ] Keep the slider HTML (escaped URLs, divider 50%) and ensure it follows the `reportHeight()` contract (load + image load + resize + ResizeObserver).
-- [ ] Keep `urlparse` validation of both URLs and the error/status messages.
-- [ ] Update README if anything drifted.
+- [x] Return `HTMLResponse` with `Content-Disposition: inline` instead of the markdown-hack string.
+- [x] **Empty context**: return the bare `HTMLResponse` (no tuple) so the LLM receives the middleware's generic message. Do **not** return `{}` (an empty dict *is* sent to the LLM as context — see DESIGN.md §A.1).
+- [x] Keep the slider HTML (escaped URLs, divider 50%) and ensure it follows the `reportHeight()` contract (load + image load + resize + ResizeObserver).
+- [x] Keep `urlparse` validation of both URLs and the error/status messages.
+- [x] Update README if anything drifted.
 
-**Definition of done**: comparing two URLs renders the slider as a sandboxed embed; the LLM does not see any HTML; no instruction to the agent.
+**Definition of done**: comparing two URLs renders the slider as a sandboxed embed; the LLM does not see any HTML; no instruction to the agent. — **APPROVED by maintainer (2026-08-04)**.
 
 **Notes**
 - This phase defines the shared patterns (embed + height reporting) that the image/video tools reuse.
@@ -117,3 +117,4 @@ First because it is the simplest tool (no ComfyUI, no workflow) and its README a
 | 2026-08-04 | 1 | Visual polish: smaller opaque handle + invert divider (phase reopened) | Handle reduced to ~30%% (10×14px) and fully opaque; divider now translucent white with `mix-blend-mode: difference` so it inverts the colors it passes over. Commit `e157cd2` |
 | 2026-08-04 | 1 | Lessons learned documented in DESIGN.md §10 | Embed sizing/behavior lessons from `compare_images` recorded for reuse in the image viewer (Phases 2-5) and video embed (Phase 6): no-initial-height + reportHeight, sandbox cannot read parent viewport, conservative orientation detection, wait for real media dimensions, Pointer Events for touch, visual affordances/blend modes. Commit `940d9ea` |
 | 2026-08-04 | 1 | Restore desktop hover + handle at 40%% (phase reopened) | Divider follows the mouse on hover (desktop) while keeping click/tap jump and touch drag (`pointermove` acts also for mouse with no button). Handle resized to 13×18px (~40%% of original). Commit `4ae7419` |
+| 2026-08-04 | 1 | **Phase 1 CLOSED — approved by maintainer** | `compare_images` fully migrated and tested (embed, adaptive sizing, orientation, race fix, touch, hover, handle). Ready for Phase 2 |
