@@ -131,20 +131,14 @@ new ResizeObserver(fit).observe(document.body);
 fit();
 function openLightbox(){{
   overlay.classList.add('open');
-  // Force the iframe document scroll to 0 before entering fullscreen so the
-  // browser has nothing to restore when exiting (the scroll jump on close).
-  document.documentElement.scrollTop=0;document.body.scrollTop=0;
   log('openLightbox: request fullscreen');
-  // The iframe must never have its own scroll (the chat scrolls the parent).
-  // The overlay is position:fixed so it covers the viewport without needing
-  // to lock the body scroll.
-  // Fill the browser window, not just the embed box: request fullscreen on
-  // the document. The Open WebUI iframe has allowfullscreen; inside the
-  // sandbox this requires a user gesture (the click that just happened).
-  // Browsers that reject it (e.g. some mobile) fall back to the embed area.
-  const el=document.documentElement;
-  try{{el.requestFullscreen&&el.requestFullscreen();}}catch(e){{log('requestFullscreen err '+e);}}
-  try{{el.webkitRequestFullscreen&&el.webkitRequestFullscreen();}}catch(e){{log('webkitRequestFullscreen err '+e);}}
+  // Fullscreen the OVERLAY element, not the documentElement: the overlay is
+  // already position:fixed inset:0, so the browser expands it to the window
+  // WITHOUT scrolling the parent chat to the top (the known scroll jump when
+  // fullscreening documentElement). Exiting also leaves the parent scroll
+  // untouched.
+  try{{overlay.requestFullscreen&&overlay.requestFullscreen();}}catch(e){{log('requestFullscreen err '+e);}}
+  try{{overlay.webkitRequestFullscreen&&overlay.webkitRequestFullscreen();}}catch(e){{log('webkitRequestFullscreen err '+e);}}
 }}
 function closeLightbox(){{
   log('closeLightbox: fs='+(!!(document.fullscreenElement||document.webkitFullscreenElement)));
@@ -173,7 +167,7 @@ closeBtn.addEventListener('pointerup',()=>{{closeLightbox();restoreScroll();}});
 overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeLightbox();restoreScroll();}}}});
 big.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;e.stopPropagation();}});
 document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{closeLightbox();restoreScroll();}}}});
-document.addEventListener('fullscreenchange',()=>{{log('fullscreenchange fs='+(!!(document.fullscreenElement||document.webkitFullscreenElement)));if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');document.documentElement.scrollTop=0;document.body.scrollTop=0;restoreScroll();fit();}}}});
+document.addEventListener('fullscreenchange',()=>{{log('fullscreenchange fs='+(!!(document.fullscreenElement||document.webkitFullscreenElement)));if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');restoreScroll();fit();}}}});
 async function download(){{try{{const r=await fetch(big.src);if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}}catch(err){{const w=window.open(big.src,'_blank');if(w)w.focus();}}}}
 dlBtn.addEventListener('pointerup',download);
 </script>
