@@ -946,7 +946,7 @@ dlBtn.addEventListener('pointerup',download);
             viewer = self._build_image_viewer(image_url, aspect_ratio=(reduced_w, reduced_h))
             return HTMLResponse(
                 content=viewer, headers={"Content-Disposition": "inline"}
-            ), {{"image": image_url}}
+            ), {"image": image_url}
 
         except asyncio.CancelledError:
             log.info("smart_generate_image cancelled by user")
