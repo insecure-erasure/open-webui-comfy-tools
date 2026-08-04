@@ -455,12 +455,17 @@ function collectGallery(){{
       if(!cd)continue;
       const v=cd.querySelector('.viewer[data-gallery]');
       if(!v)continue;
-      const im=cd.getElementById('big');
+      // Read the THUMBNAIL src, not the lightbox img: big.src is mutated by
+      // gallery navigation, so after navigating once an embed's big no longer
+      // reflects its own image (its image would drop out and duplicates would
+      // appear). thumb.src is the stable per-embed identity.
+      const im=cd.getElementById('thumb');
       if(im&&im.src&&gallery.indexOf(im.src)<0)gallery.push(im.src);
     }}
   }}catch(e){{}}
-  // The currently shown image is always in the gallery (it might not have
-  // been collected, e.g. if this embed's own iframe is not reachable).
+  // Defensive: after the reset below big.src === thumb.src and this embed's
+  // own thumb is normally collected (its iframe is in the parent DOM); if for
+  // any reason it was not collected, unshift it so the current view is present.
   if(gallery.indexOf(big.src)<0)gallery.unshift(big.src);
   galleryIdx=gallery.indexOf(big.src);
   const multi=gallery.length>1;
@@ -475,6 +480,10 @@ function showImage(i){{
   counter.textContent=(galleryIdx+1)+'/'+gallery.length;
 }}
 function openLightbox(){{
+  // Start from this embed's own image: big.src may be left pointing at a
+  // gallery-navigated URL from a previous open — reset it so the view, the
+  // counter index and the download are consistent with the thumbnail.
+  big.src=thumb.src;
   collectGallery();
   overlay.classList.add('open');
   // Fullscreen the OVERLAY element, not the documentElement: the overlay is

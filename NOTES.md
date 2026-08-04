@@ -70,8 +70,16 @@ cleanup (Phase 7) remains.
   frame"). The symptom is a failed fetch, NOT a layout issue — a watchdog that
   re-calls `fit()` cannot fix a missing download (and is hacky). Implemented
   the standard cheap fix: on `img error`, clear + re-set `src` once per URL
-  (`retryOnce` in the viewer f-string). Verify with 8 node cases; gallery's 13
+  (`retryOnce` in the viewer f-string). Verify with 8 node cases; gallery's 16
   still pass.
+- **Gallery scope limitation (2026-08-04)**: the gallery only sees the images
+  of **mounted** messages — Open WebUI renders only the last ~8 messages
+  (`Messages.svelte` `messagesCount=8`; older messages are unmounted from the
+  DOM until the user scrolls up, which reloads the previous window). Not data
+  loss: it mirrors what the chat itself shows. Also fixed a real bug:
+  `collectGallery` now reads `#thumb.src` (stable identity) instead of
+  `#big.src` (mutated by gallery navigation → images dropped/duplicated after
+  navigating), and `openLightbox()` resets `big.src=thumb.src`. 16 node cases.
 - **The image gallery (Phase 8, 2026-08-04, awaiting test)**: from any image
   lightbox (fullscreen), ‹ › buttons walk the images generated in the chat
   starting from the one being viewed. **Maintainer constraint: NO

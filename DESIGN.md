@@ -425,11 +425,17 @@ logic lives in JS inside the embed.
   and `generate_video` never use `.viewer`, so they are naturally excluded.
 - When a gallery lightbox opens, `collectGallery()` runs before showing the
   overlay: it walks the parent chat DOM (`parent.document.querySelectorAll('iframe')`
-  → `contentDocument` → `.viewer[data-gallery]` → `#big.src`) and collects every
-  marked image in the conversation, in DOM order (= exact chronological order).
+  → `contentDocument` → `.viewer[data-gallery]` → **`#thumb.src`**) and
+  collects every marked image in the conversation, in DOM order (= exact
+  chronological order). The **thumbnail src** is read (not `#big.src`):
+  `big.src` is mutated by gallery navigation, so after navigating once an
+  embed's `big` no longer reflects its own image (its image would drop out
+  and duplicates would appear); `thumb.src` is the stable per-embed identity.
   Duplicates are deduped; if the currently shown image is not among the
   collected ones (e.g. the embed's own iframe is not reachable), it is
-  unshifted to the front so the current image is always present.
+  unshifted to the front so the current image is always present. `openLightbox()`
+  first resets `big.src = thumb.src` so the view, the counter index and the
+  download always start from the embed's own image.
 - The lightbox then shows:
   - ‹ › buttons, vertically centered at the left/right edges (same `.btn` style).
   - A "n/N" counter in the **bottom-right corner** (maintainer decision).
@@ -442,6 +448,20 @@ logic lives in JS inside the embed.
 - The gallery is **ephemeral**: rebuilt every time the lightbox opens, never
   modifies the chat or the thumbnails, and reflects live DOM state (deleted or
   regenerated messages drop out automatically — no stale data).
+
+### Known limitation — Open WebUI's lazy message window (2026-08-04)
+
+The chat only renders the **last ~8 messages** (`Messages.svelte`,
+`messagesCount = 8`, extended by `loadMoreMessages` when scrolling up); older
+messages are **unmounted from the DOM** by the keyed `{#each}`. Because the
+gallery walks the DOM, it can only see the images of **mounted** messages:
+as the conversation grows, older images leave the gallery until the user
+scrolls up (which loads the previous window back into the DOM). This mirrors
+exactly what the chat itself shows (the thumbnails are equally absent from
+older messages), so it is inherent to Open WebUI's rendering, not a data
+loss. Fetching the full history via the Open WebUI API (chat id + token are
+reachable with same-origin ON) was considered and **parked** as fragile and
+out of scope for now.
 
 ### Degradation
 
