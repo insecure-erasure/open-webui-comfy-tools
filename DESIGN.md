@@ -406,6 +406,77 @@ fullscreen overlay embed.
 
 ---
 
+## 11. Image gallery in the lightbox (cross-cutting, 2026-08-04)
+
+Feature requested by the maintainer to explore all images generated during a
+conversation from any image lightbox: in fullscreen, ‹ › buttons walk the
+images generated in the chat starting from the one being viewed.
+
+**Constraint (maintainer)**: NO backend/Python gallery logic inside the tools.
+The tool only adds an HTML identifier to the generated HTML; all gallery
+logic lives in JS inside the embed.
+
+### How it works
+
+- The viewer builder accepts `gallery: bool = False`. When True it adds
+  `data-gallery="1"` to the `.viewer` div — the ONLY contribution of the tool.
+- The four image tools (`smart_generate_image`, `edit_image`, `enhance_image`,
+  `virtual_try_on`) all build their viewer with `gallery=True`. `compare_images`
+  and `generate_video` never use `.viewer`, so they are naturally excluded.
+- When a gallery lightbox opens, `collectGallery()` runs before showing the
+  overlay: it walks the parent chat DOM (`parent.document.querySelectorAll('iframe')`
+  → `contentDocument` → `.viewer[data-gallery]` → `#big.src`) and collects every
+  marked image in the conversation, in DOM order (= exact chronological order).
+  Duplicates are deduped; if the currently shown image is not among the
+  collected ones (e.g. the embed's own iframe is not reachable), it is
+  unshifted to the front so the current image is always present.
+- The lightbox then shows:
+  - ‹ › buttons, vertically centered at the left/right edges (same `.btn` style).
+  - A "n/N" counter in the **bottom-right corner** (maintainer decision).
+  - ArrowLeft / ArrowRight keyboard navigation (only while the overlay is
+    open; Escape still closes).
+  - **Wrap-around** at the ends (maintainer decision).
+- Navigation only swaps `big.src`; the overlay's `object-fit: contain` re-fits
+  the new image automatically, and the **download button keeps using `big.src`**,
+  so it always downloads the currently shown image.
+- The gallery is **ephemeral**: rebuilt every time the lightbox opens, never
+  modifies the chat or the thumbnails, and reflects live DOM state (deleted or
+  regenerated messages drop out automatically — no stale data).
+
+### Degradation
+
+- Requires `allowSameOrigin` ON (the user's install has it ON): with OFF, every
+  `contentDocument` is null (guarded), the gallery is empty and the lightbox
+  behaves exactly as before — the controls only appear when the gallery has
+  more than one image.
+- With a single image in the gallery the controls stay hidden.
+
+### Why DOM walk instead of localStorage (decision)
+
+localStorage in a sandboxed iframe is **per-iframe** (opaque origin) with
+same-origin OFF → it would not work at all; with same-origin ON it works, but
+adds: per-browser data only (other users/machines see nothing), stale URLs
+forever (deleted/regenerated messages), dedupe-on-reload complexity, and the
+need to plumb the `chat_id` into the HTML. The DOM walk is live, reflects
+exactly what is rendered, works for any user/browser, and needs no extra
+plumbing. The official Rich UI docs themselves point to the same-origin
+DOM-walk pattern (Inline Visualizer v2).
+
+### Implementation notes
+
+- `gallery_attr = ' data-gallery="1"' if gallery else ''` interpolated into
+  the `.viewer` div. The f-string is otherwise unchanged, so the four tool
+  copies remain byte-identical to `embeds.py` (verified: 10560 chars, same
+  sha256; 13 JS cases pass in node).
+- The `collectGallery`/`showImage` JS is part of the same f-string, so it ships
+  inside every image embed (even `gallery=False` ones — harmless, the marker
+  gates participation).
+- The four tools call `self._build_image_viewer(url, aspect_ratio=..., gallery=True)`.
+- The NOTES.md regeneration script now produces the `gallery` parameter in the
+  method signature (and its docstring).
+
+---
+
 ## Appendix A — Verification against the Open WebUI source code
 
 The assumptions in this document were verified against `open-webui/open-webui` (`main`) rather than relying only on the official docs.

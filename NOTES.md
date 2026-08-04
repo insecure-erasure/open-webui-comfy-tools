@@ -10,7 +10,9 @@ Conversation language with the maintainer: **Spanish**. Code and docs: **English
 The Rich UI migration (see `DESIGN.md` and `PLAN.md`) is **complete** for all
 six tools. The video phase
 (`generate_video`) was **approved by the maintainer** (2026-08-04, 65vh cap,
-no download). Only the cross-cutting
+no download). The **image gallery** (Phase 8, post-migration) is
+**implemented and awaiting maintainer test** (controls visible only with >1
+image in the conversation). Only the cross-cutting
 cleanup (Phase 7) remains.
 
 | Phase | Tool | Status |
@@ -63,6 +65,19 @@ cleanup (Phase 7) remains.
   - Terminal tools (`compare_images`, `generate_video`): **bare `HTMLResponse`**
     (no tuple) → the LLM gets the middleware's generic message. An empty dict
     `{}` IS sent to the LLM as context — do not use it.
+- **The image gallery (Phase 8, 2026-08-04, awaiting test)**: from any image
+  lightbox (fullscreen), ‹ › buttons walk the images generated in the chat
+  starting from the one being viewed. **Maintainer constraint: NO
+  backend/Python gallery logic in the tools** — the tool only adds an HTML
+  identifier (`data-gallery="1"` on `.viewer`, via `gallery=True`); all
+  gallery logic is JS inside the embed. `collectGallery()` walks the parent
+  chat DOM (same-origin ON; guarded → degrades to a single image, controls
+  hidden). Controls: ‹ › vertically centered, "n/N" counter **bottom-right**,
+  ArrowLeft/ArrowRight while the overlay is open, **wrap-around**; the
+  download button keeps using `big.src`. The 4 image tools pass
+  `gallery=True`; the 4 f-strings stay byte-identical to `embeds.py` (10560
+  chars). The NOTES.md regeneration script below now emits the `gallery`
+  parameter + docstring. 13 node cases pass.
 - **The viewer sizing** (image): width = container width, height capped at 70% of `screen.availHeight`, `reportHeight()` = `viewer.offsetHeight` (iframe hugs the image). `smart_generate_image` reserves the aspect ratio (`reduced_w:reduced_h`); the other image tools don't (they size after load).
 - **The video embed (Phase 6)**: terminal result → **bare `HTMLResponse`** (no tuple), like `compare_images`. The player is a `<video autoplay muted loop playsinline controls>` sized from `videoWidth/videoHeight` after `loadedmetadata` (ratio NOT known a priori — no aspect reservation), capped at **65% of `screen.availHeight`** (65vh decision), `reportHeight()` = player's own height. **No lightbox and no download button** (decision): native controls give fullscreen, and native video fullscreen does NOT cause the chat scroll jump, so there is no saveScroll/restoreScroll. The iframe still must never scroll (`overflow:hidden`). Reference builder: `embeds.build_video_player` (no duplicated reportHeight there — the duplication only exists in the image viewer).
 - **Lightbox**: fullscreen the `.overlay` element (not `documentElement`),
@@ -85,10 +100,12 @@ pre_lines, fstr_lines = body[:ret_idx], body[ret_idx:]
 pre = textwrap.dedent('\n'.join(pre_lines))
 pre_indented = '\n'.join(('        ' + l) if l.strip() else '' for l in pre.splitlines())
 fstring = re.search(r'return (f""".*?""")', '\n'.join(fstr_lines), re.S).group(1)
-method = ('    def _build_image_viewer(self, image_url: str, aspect_ratio: tuple[int, int] | None = None) -> str:\n'
+method = ('    def _build_image_viewer(self, image_url: str, aspect_ratio: tuple[int, int] | None = None, gallery: bool = False) -> str:\n'
           + pre_indented + '\n'
           '        return (\n' + fstring + '\n        )\n')
-# then insert `method` after the tool's __init__ (see the tool files)
+# then insert `method` after the tool's __init__ (see the tool files), and
+# pass gallery=True from the tool's return path (all four image tools do).
+# The method docstring must also be kept in sync (gallery paragraph, §11).
 PYEOF
 ```
 
@@ -98,6 +115,10 @@ Verify with: load both modules (stub fastapi/httpx/pydantic), call
 
 ## Gotchas that cost a lot of time (do not repeat)
 
+- When regenerating f-strings from `embeds.py` with a regex, the image viewer
+  f-string closes with THREE newlines before `def build_video_player` — match
+  with `"""\n\s*def build_video_player` (a literal `\n\n\n` broke the first
+  attempt).
 - **`context` must be a plain dict** `{"image": url}` — double braces
   `{{"image": url}}` (from an f-string) become a **set containing a dict** →
   `unhashable type: 'dict'`. Watch for this whenever editing returns that came

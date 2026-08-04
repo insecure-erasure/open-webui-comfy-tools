@@ -288,7 +288,7 @@ class Tools:
         self.citation = False
 
 
-    def _build_image_viewer(self, image_url: str, aspect_ratio: tuple[int, int] | None = None) -> str:
+    def _build_image_viewer(self, image_url: str, aspect_ratio: tuple[int, int] | None = None, gallery: bool = False) -> str:
         """
         Build the self-contained image viewer embed for a single image URL.
 
@@ -306,8 +306,20 @@ class Tools:
         Fullscreen API (X top-left closes it, download button top-right forces a
         download via fetch blob -> object URL -> anchor). The theme follows
         prefers-color-scheme.
+
+        Gallery: when gallery=True the viewer adds a `data-gallery="1"` marker
+        attribute. Opening the lightbox then walks the parent chat DOM
+        (same-origin ON — guarded, so same-origin OFF just yields an empty
+        gallery) and collects every image in the conversation whose viewer
+        carries the marker. The lightbox shows ‹ › buttons (vertically
+        centered), a "n/N" counter (bottom-right) and ArrowLeft/ArrowRight
+        keyboard navigation with wrap-around (DESIGN.md §11). The download
+        button keeps using `big.src`, so it always downloads the image
+        currently shown. All gallery logic is JS inside the embed — the marker
+        is the only contribution of the tool.
         """
         src = html.escape(image_url, quote=True)
+        gallery_attr = ' data-gallery="1"' if gallery else ''
         if aspect_ratio:
             w, h = aspect_ratio
             if w > 0 and h > 0:
@@ -337,15 +349,20 @@ img{{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}}
 .overlay img{{max-width:100vw;max-height:100vh;object-fit:contain;box-shadow:0 4px 30px rgba(0,0,0,.5);border-radius:4px}}
 .btn{{position:fixed;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(28,28,28,.75);border:none;border-radius:8px;color:#f5f5f5;cursor:pointer;padding:6px}}
 .btn svg{{display:block}}
+.btn.nav{{display:none}}
 #close{{top:14px;left:14px}}
 #dl{{top:14px;right:14px}}
+#prev{{top:50%;left:14px;transform:translateY(-50%)}}
+#next{{top:50%;right:14px;transform:translateY(-50%)}}
+.counter{{position:fixed;bottom:14px;right:14px;z-index:1000;display:none;align-items:center;justify-content:center;background:rgba(28,28,28,.75);color:#f5f5f5;border-radius:8px;padding:5px 12px;font:600 13px system-ui,sans-serif;pointer-events:none}}
 @media (prefers-color-scheme: light){{
   .btn{{background:rgba(235,235,235,.82);color:#1a1a1a}}
+  .counter{{background:rgba(235,235,235,.82);color:#1a1a1a}}
 }}
 </style>
 </head>
 <body>
-<div class="viewer" id="viewer">
+<div class="viewer" id="viewer"{gallery_attr}>
   <img id="thumb" src="{src}" alt="Generated image">
 </div>
 <div class="overlay" id="overlay">
@@ -356,11 +373,20 @@ img{{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}}
   <button id="dl" class="btn" title="Download" aria-label="Download">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
   </button>
+  <button id="prev" class="btn nav" title="Previous image" aria-label="Previous image">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
+  <button id="next" class="btn nav" title="Next image" aria-label="Next image">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+  </button>
+  <div id="counter" class="counter"></div>
 </div>
 <script>
 const viewer=document.getElementById('viewer'),thumb=document.getElementById('thumb'),
       overlay=document.getElementById('overlay'),big=document.getElementById('big'),
-      closeBtn=document.getElementById('close'),dlBtn=document.getElementById('dl');
+      closeBtn=document.getElementById('close'),dlBtn=document.getElementById('dl'),
+      prevBtn=document.getElementById('prev'),nextBtn=document.getElementById('next'),
+      counter=document.getElementById('counter');
 const RESERVED_R={ratio_js};
 function reportHeight(){{parent.postMessage({{type:'iframe:height',height:viewer.offsetHeight||document.documentElement.scrollHeight}},'*')}}
 function fit(){{
@@ -390,7 +416,45 @@ window.addEventListener('load',fit);
 addEventListener('resize',fit);
 new ResizeObserver(fit).observe(document.body);
 fit();
+// Gallery (DESIGN.md §11): collect every image in the chat whose viewer
+// carries the data-gallery marker. The marker is the ONLY contribution of the
+// tool — the collection logic lives here, in the embed (maintainer
+// constraint: no backend/Python gallery logic in the tools). Requires
+// same-origin access to the parent chat DOM (the user's Open WebUI has it
+// ON); with same-origin OFF every contentDocument is null, the gallery stays
+// empty and the lightbox behaves exactly as before.
+let gallery=[],galleryIdx=-1;
+function collectGallery(){{
+  gallery=[];galleryIdx=-1;
+  try{{
+    const frames=parent.document.querySelectorAll('iframe');
+    for(let i=0;i<frames.length;i++){{
+      let cd=null;
+      try{{cd=frames[i].contentDocument;}}catch(e){{}}
+      if(!cd)continue;
+      const v=cd.querySelector('.viewer[data-gallery]');
+      if(!v)continue;
+      const im=cd.getElementById('big');
+      if(im&&im.src&&gallery.indexOf(im.src)<0)gallery.push(im.src);
+    }}
+  }}catch(e){{}}
+  // The currently shown image is always in the gallery (it might not have
+  // been collected, e.g. if this embed's own iframe is not reachable).
+  if(gallery.indexOf(big.src)<0)gallery.unshift(big.src);
+  galleryIdx=gallery.indexOf(big.src);
+  const multi=gallery.length>1;
+  prevBtn.style.display=nextBtn.style.display=counter.style.display=multi?'flex':'none';
+  if(multi&&galleryIdx>=0)counter.textContent=(galleryIdx+1)+'/'+gallery.length;
+}}
+function showImage(i){{
+  // Wrap-around navigation; a no-op when there is only one image.
+  if(gallery.length<2)return;
+  galleryIdx=((i%gallery.length)+gallery.length)%gallery.length;
+  big.src=gallery[galleryIdx];
+  counter.textContent=(galleryIdx+1)+'/'+gallery.length;
+}}
 function openLightbox(){{
+  collectGallery();
   overlay.classList.add('open');
   // Fullscreen the OVERLAY element, not the documentElement: the overlay is
   // already position:fixed inset:0, so the browser expands it to the window
@@ -439,7 +503,13 @@ viewer.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==
 closeBtn.addEventListener('pointerup',()=>{{closeLightbox();restoreScroll();}});
 overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeLightbox();restoreScroll();}}}});
 big.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;e.stopPropagation();}});
-document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{closeLightbox();restoreScroll();}}}});
+prevBtn.addEventListener('pointerup',e=>{{e.stopPropagation();showImage(galleryIdx-1);}});
+nextBtn.addEventListener('pointerup',e=>{{e.stopPropagation();showImage(galleryIdx+1);}});
+document.addEventListener('keydown',e=>{{
+  if(e.key==='Escape'){{closeLightbox();restoreScroll();}}
+  else if(e.key==='ArrowLeft'){{if(overlay.classList.contains('open'))showImage(galleryIdx-1);}}
+  else if(e.key==='ArrowRight'){{if(overlay.classList.contains('open'))showImage(galleryIdx+1);}}
+}});
 document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');restoreScroll();fit();}}}});
 async function download(){{try{{const r=await fetch(big.src);if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}}catch(err){{const w=window.open(big.src,'_blank');if(w)w.focus();}}}}
 dlBtn.addEventListener('pointerup',download);
@@ -840,7 +910,7 @@ dlBtn.addEventListener('pointerup',download);
             # the minimal context: it is the prompt generated by the workflow,
             # which the agent uses to reply to the user. The output dimensions
             # are unknown a priori, so the viewer sizes after the image loads.
-            viewer = self._build_image_viewer(image_url)
+            viewer = self._build_image_viewer(image_url, gallery=True)
             return HTMLResponse(
                 content=viewer, headers={"Content-Disposition": "inline"}
             ), {"image": image_url, "prompt": prompt}

@@ -6,6 +6,10 @@ This project breaks that black box open. Each tool is a standalone Python script
 
 There is no wrapper library, no abstraction layer, and no handholding. Each tool talks directly to the ComfyUI REST API and gives you the same control you would have from the ComfyUI web interface.
 
+All tools render their results as **Rich UI embeds**: the tool returns an `HTMLResponse` with `Content-Disposition: inline` (plus a context tuple for the LLM) and Open WebUI's middleware emits an `embeds` event, so the frontend displays a self-contained, sandboxed iframe inline in the chat — no HTML block ever reaches the LLM's context. See the official [Rich UI Embedding](https://docs.openwebui.com/features/extensibility/plugin/development/rich-ui/) documentation for how this works (height reporting via `postMessage`, sandbox flags, context tuples, prompt submission, `window.args` injection).
+
+Image tools additionally share an **image gallery**: opening any image's lightbox (fullscreen) shows ‹ › buttons, a "n/N" counter (bottom-right) and arrow-key navigation to walk every image generated in the conversation by the four image tools (Smart Generate Image, Edit Image, Enhance Image, Virtual Try-On), with wrap-around. See DESIGN.md §11.
+
 ## Tools
 
 ### Smart Generate Image

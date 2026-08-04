@@ -108,6 +108,37 @@ First because it is the simplest tool (no ComfyUI, no workflow) and its README a
 
 ---
 
+## Phase 8 — Image gallery in the lightbox (cross-cutting, post-migration)
+
+Requested by the maintainer: from any image lightbox (fullscreen), ‹ › buttons
+walk the images generated in the conversation, starting from the one being
+viewed. **Maintainer constraint: NO backend/Python gallery logic in the tools**
+— the tool only adds an HTML identifier; all gallery logic is JS inside the
+embed. Only the four image tools participate (`smart_generate_image`,
+`edit_image`, `enhance_image`, `virtual_try_on`); `compare_images` /
+`generate_video` never use `.viewer`, so they are naturally excluded.
+
+- [x] `embeds.build_image_viewer` gains `gallery: bool = False` → adds
+      `data-gallery="1"` to the `.viewer` div (the only tool contribution).
+- [x] Gallery JS in the embed: `collectGallery()` walks the parent chat DOM
+      (same-origin ON; guarded → degrades gracefully to a single image),
+      dedupes, keeps the current image present; `showImage(i)` navigates with
+      **wrap-around**; controls = ‹ › buttons (vertically centered), "n/N"
+      counter (**bottom-right**, maintainer decision), ArrowLeft/ArrowRight
+      keyboard navigation. Download keeps using `big.src`.
+- [x] Four tools pass `gallery=True` in their `_build_image_viewer` call;
+      method signature + docstring updated; f-strings stay byte-identical to
+      `embeds.py` (verified, 10560 chars) and the 4 generated HTMLs match the
+      reference (stub harness).
+- [x] JS logic tested in node: 13 cases (collection order, marker filter,
+      dedupe, unshift fallback, wrap-around, counter, degraded same-origin OFF).
+- [x] Docs updated (DESIGN.md §11, this plan, NOTES.md, tool READMEs).
+- [ ] **Awaiting maintainer test in Open WebUI** (controls visible only with
+      >1 image in the conversation; nav + counter + keyboard + download of the
+      currently shown image).
+
+---
+
 ## Progress log
 
 | Date | Phase | What was done | Notes |
@@ -141,3 +172,4 @@ First because it is the simplest tool (no ComfyUI, no workflow) and its README a
 | 2026-08-04 | 5 | **Phase 5 CLOSED — approved by maintainer** | `virtual_try_on` verified working in Open WebUI (viewer embed, lightbox, download, scroll preserved, prompt in context). Ready for Phase 6 (postponed) |
 | 2026-08-04 | 6 | **Phase 6 CLOSED — approved by maintainer** | `generate_video` verified working in Open WebUI: 65vh cap chosen after testing (80vh and 70vh clipped vertical videos on desktop because `screen.availHeight` does not account for the Open WebUI input bar; 65vh leaves enough margin; mobile perfect; 3:2 videos fine). Player embed with native controls (autoplay muted loop playsinline), no download button. Ready for Phase 7 (cleanup) |
 | 2026-08-04 | 1 | `compare_images`: fullscreen mode added (post-approval improvement) | Floating bottom-right button (maximize icon) opens a fullscreen overlay with its own interactive slider (same drag/tap/hover/divider). Fullscreen API on the overlay element (+ webkit), overlay sized to the real viewport waiting for real dimensions (§10.4), exit via Escape/restore button/backdrop, saveScroll/restoreScroll + fit() skip while fullscreen and re-fit on fullscreenchange (§10.8). Pointer handlers guard against .btn targets so the button never moves the divider. Verified: 12 integration cases in node on the exact generated script (fit, fitOverlay, fullscreen guard, open/close paths, pointer guards). **APPROVED by maintainer** — working in Open WebUI |
+| 2026-08-04 | 8 | Gallery in the image lightbox (implementation) | `embeds.build_image_viewer` gains `gallery` param → `data-gallery="1"` marker on `.viewer` (the only tool contribution; NO Python/backend gallery logic, per maintainer constraint). Gallery JS in the embed: `collectGallery()` walks the parent chat DOM (same-origin ON, guarded), dedupe, current-image-unshift fallback; `showImage(i)` with **wrap-around**; ‹ › buttons (vertically centered), "n/N" counter **bottom-right**, ArrowLeft/ArrowRight while the overlay is open; download keeps using `big.src`. The 4 image tools pass `gallery=True`; f-strings byte-identical to `embeds.py` (10560 chars, same sha256) and generated HTMLs match the reference. 13 node cases pass (order, marker filter, dedupe, unshift, wrap, counter, same-origin OFF). Docs: DESIGN.md §11, PLAN, NOTES, tool READMEs. **Awaiting maintainer test** |
