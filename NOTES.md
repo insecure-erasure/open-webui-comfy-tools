@@ -7,10 +7,10 @@ Conversation language with the maintainer: **Spanish**. Code and docs: **English
 
 ## Where we are
 
-The Rich UI migration (see `DESIGN.md` and `PLAN.md`) is **almost complete**. All
-image tools are migrated and **approved by the maintainer**. The video phase
-(`generate_video`) is **implemented and awaiting maintainer test** (65vh cap,
-no download — decisions recorded in DESIGN.md §6). Only the cross-cutting
+The Rich UI migration (see `DESIGN.md` and `PLAN.md`) is **complete** for all
+six tools. The video phase
+(`generate_video`) was **approved by the maintainer** (2026-08-04, 65vh cap,
+no download). Only the cross-cutting
 cleanup (Phase 7) remains.
 
 | Phase | Tool | Status |
@@ -21,13 +21,13 @@ cleanup (Phase 7) remains.
 | 3 | `edit_image` | ✅ approved |
 | 4 | `enhance_image` | ✅ approved |
 | 5 | `virtual_try_on` | ✅ approved |
-| 6 | `generate_video` | ✅ implemented — **awaiting maintainer test** (65vh cap, no download; decision in DESIGN.md §6) |
+| 6 | `generate_video` | ✅ **approved by maintainer** (65vh cap, no download; decision in DESIGN.md §6) |
 | 7 | Cross-cutting cleanup | ⏳ pending (grep `image_md`, main README, CORS notes, duplicated `reportHeight` in image viewers) |
 
 ## How to resume (next session)
 
 1. **Read `DESIGN.md` first** — especially §6 (the **65vh / no-download decision** + the "Implementation notes for the video embed" block) and §10 (lessons learned).
-2. **Phase 6 — `generate_video`**: implemented (awaiting maintainer test). The video player embed (reference: `embeds.build_video_player`; tool copy: `_build_video_player`) sizes after `loadedmetadata` with a 65% `screen.availHeight` cap and native controls (no lightbox/download). If the test needs changes, reopen the phase.
+2. **Phase 6 — `generate_video`**: **APPROVED by maintainer (2026-08-04)** — the video player embed (reference: `embeds.build_video_player`; tool copy: `_build_video_player`) sizes after `loadedmetadata` with a 65% `screen.availHeight` cap and native controls (no lightbox/download). The 65vh cap was chosen because the sandboxed iframe cannot deduct the Open WebUI input bar from `screen.availHeight`, so a more aggressive cap leaves room for vertical videos to fit without clipping.
 3. **Phase 7 — cleanup**: grep the repo for leftover `image_md`, `image_filename`, "Wrap the HTML block" instructions (now only in docs); update the main `README.md` tools section (done for video; verify the rest); verify CORS notes in §7 against the real reverse-proxy config (user-owned). **Also**: `embeds.py` and the 4 image-tool copies have a duplicated `reportHeight()` line (harmless JS no-op, the 2nd declaration wins) — dedupe in `embeds.py` and regenerate the image tool copies byte-identical.
 4. Follow the working agreement in `PLAN.md`: **one phase at a time**; after
    each phase's commit, return control to the maintainer for testing; next
