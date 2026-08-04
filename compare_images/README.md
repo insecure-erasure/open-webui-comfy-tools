@@ -27,6 +27,8 @@ The slider uses the skeleton from the request with three adjustments:
 
 The interaction uses **Pointer Events**, which unify mouse and touch: drag anywhere on the slider (or tap to move the divider) works on desktop and mobile. A small narrow **handle** with arrows is shown in the center of the divider as a visual affordance that the slider can be moved. `touch-action: none` on the container keeps the browser from hijacking the drag for scrolling.
 
+The handle is **small (~30% of the original size) and fully opaque** (solid background). The divider itself uses `mix-blend-mode: difference` with a semi-transparent white, so it appears **translucent and inverts the colors** of the image it passes over.
+
 ### Robust image-load handling
 
 The slider area is only sized once the base image has real dimensions. The previous fallback ratio (16:9) mis-sized the area when the images were not loaded yet, and if the image was already cached the `load` event never fired to correct it (a frame reload fixed it visually). Now `fit()` waits for `naturalWidth`/`naturalHeight`, and re-runs on the image `load` events, the window `load`, `resize`, and a `ResizeObserver`. Both images are assumed to share the same aspect ratio; the area follows the base image (`image_a`).

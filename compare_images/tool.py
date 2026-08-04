@@ -2,7 +2,7 @@
 title: Compare Images
 author: Insecure Erasure
 description: Compare two images side by side with an interactive before/after slider
-version: 2.4
+version: 2.5
 """
 
 import html
@@ -57,9 +57,9 @@ body{{margin:0;background:#222}}
 #c{{position:relative;width:100%;margin:0 auto;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}}
 #c img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}
 #top{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
-#d{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:#fff;transform:translateX(-50%);pointer-events:none;box-shadow:0 0 4px rgba(0,0,0,.45)}}
-#h{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:32px;height:46px;border-radius:10px;background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.18);box-shadow:0 2px 10px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;gap:5px;cursor:grab;pointer-events:none}}
-#h span{{width:8px;height:8px;border-left:2.5px solid #444;border-bottom:2.5px solid #444;transform:rotate(45deg)}}
+#d{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}
+#h{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:10px;height:14px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
+#h span{{width:3px;height:3px;border-left:1.2px solid #444;border-bottom:1.2px solid #444;transform:rotate(45deg)}}
 #h span:last-child{{transform:rotate(-135deg)}}
 </style>
 </head>
