@@ -497,12 +497,19 @@ function closeLightbox(){{
   try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{}}
   try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{}}
 }}
-viewer.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;openLightbox();}});
-closeBtn.addEventListener('pointerup',closeLightbox);
-overlay.addEventListener('pointerup',e=>{{if(e.target===overlay)closeLightbox();}});
+// Restore the parent scroll position after fullscreen: exiting fullscreen
+// scrolls the iframe's document back to the top, and since the iframe height
+// changes when the overlay opens, the chat scroll jumps up. Save the parent
+// scroll position before opening and restore it after closing.
+let savedScroll=0;
+function saveScroll(){{try{{savedScroll=(parent.scrollY||0)||(document.documentElement.scrollTop||0);}}catch(e){{savedScroll=0;}}}}
+function restoreScroll(){{requestAnimationFrame(()=>{{try{{parent.scrollTo(0,savedScroll);}}catch(e){{}}document.documentElement.scrollTop=savedScroll;document.body.scrollTop=savedScroll;}});}}
+viewer.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;saveScroll();openLightbox();}});
+closeBtn.addEventListener('pointerup',()=>{{closeLightbox();restoreScroll();}});
+overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeLightbox();restoreScroll();}}}});
 big.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;e.stopPropagation();}});
-document.addEventListener('keydown',e=>{{if(e.key==='Escape')closeLightbox();}});
-document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement))overlay.classList.remove('open');}});
+document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{closeLightbox();restoreScroll();}}}});
+document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');restoreScroll();}}}});
 async function download(){{try{{const r=await fetch(big.src);if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}}catch(err){{const w=window.open(big.src,'_blank');if(w)w.focus();}}}}
 dlBtn.addEventListener('pointerup',download);
 </script>
