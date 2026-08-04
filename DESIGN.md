@@ -230,13 +230,16 @@ not fire during a finger drag, so the width of the hit area was irrelevant.
 so the drag follows the finger even outside the element, and `touch-action:
 none` so the browser does not hijack the gesture for scrolling. Add
 draggable="false" and user-select:none to avoid native drag/selection
-competing with the gesture.
+competing with the gesture. Keep the desktop hover behavior by also acting on
+`pointermove` with no button pressed for mouse pointers
+(`if (dragging || e.pointerType === 'mouse')`) — the divider follows the
+cursor on hover, while a click/tap still jumps it and dragging still works.
 
 **Applies to**: any interactive embed (slider, lightbox drag, etc.).
 
 ### 10.6 Visual affordances and blend modes
 
-- A small, fully opaque **handle** (10x14px, ~30% of the original) at the
+- A small, fully opaque **handle** (13x18px, ~40% of the original) at the
   divider center signals the slider is draggable. It is purely visual
   (`pointer-events: none`); the whole container is the drag surface, so it
   neither enlarges nor blocks the hit area.

@@ -2,7 +2,7 @@
 title: Compare Images
 author: Insecure Erasure
 description: Compare two images side by side with an interactive before/after slider
-version: 2.5
+version: 2.6
 """
 
 import html
@@ -58,8 +58,8 @@ body{{margin:0;background:#222}}
 #c img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}
 #top{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
 #d{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}
-#h{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:10px;height:14px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
-#h span{{width:3px;height:3px;border-left:1.2px solid #444;border-bottom:1.2px solid #444;transform:rotate(45deg)}}
+#h{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
+#h span{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}
 #h span:last-child{{transform:rotate(-135deg)}}
 </style>
 </head>
@@ -108,12 +108,14 @@ addEventListener('resize',fit);
 new ResizeObserver(fit).observe(document.body);
 let dragging=false;
 function setP(x){{const rect=c.getBoundingClientRect(),p=Math.min(100,Math.max(0,(x-rect.left)/rect.width*100));c.style.setProperty('--p',p+'%');}}
-// Pointer events unify mouse + touch (mobile). Drag anywhere on the slider
-// or tap to move the divider. touch-action:none keeps the browser from
-// hijacking the gesture for scrolling; the handle (#h) is a purely visual
-// affordance (pointer-events:none) and the container is the drag surface.
+// Pointer events unify mouse + touch (mobile). On desktop the divider
+// follows the mouse while hovering (no click needed); a click/tap jumps
+// to that position; dragging works with any pointer (mouse/touch/pen).
+// touch-action:none keeps the browser from hijacking the gesture for
+// scrolling; the handle (#h) is a purely visual affordance
+// (pointer-events:none) and the container is the drag surface.
 c.addEventListener('pointerdown',e=>{{dragging=true;try{{c.setPointerCapture(e.pointerId)}}catch{{}}setP(e.clientX);e.preventDefault();}});
-c.addEventListener('pointermove',e=>{{if(dragging)setP(e.clientX);}});
+c.addEventListener('pointermove',e=>{{if(dragging||e.pointerType==='mouse')setP(e.clientX);}});
 c.addEventListener('pointerup',()=>{{dragging=false;}});
 c.addEventListener('pointercancel',()=>{{dragging=false;}});
 // If the base image was already loaded (e.g. from cache) before this script
