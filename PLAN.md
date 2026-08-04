@@ -54,6 +54,7 @@ First because it is the simplest tool (no ComfyUI, no workflow) and its README a
 **Notes**
 - This tool is the reference implementation for §5 of DESIGN.md (general rule for image-returning tools).
 - The viewer HTML written here is the copy-paste source for Phases 3–5.
+- **Each tool must be self-contained**: Open WebUI runs each tool as a single pasted script and cannot import repo modules. The viewer is embedded as a local `_build_image_viewer` method inside each tool, generated from `embeds.py` (the reference). Keep copies byte-identical to avoid drift.
 
 ---
 
@@ -119,3 +120,4 @@ First because it is the simplest tool (no ComfyUI, no workflow) and its README a
 | 2026-08-04 | 1 | Restore desktop hover + handle at 40%% (phase reopened) | Divider follows the mouse on hover (desktop) while keeping click/tap jump and touch drag (`pointermove` acts also for mouse with no button). Handle resized to 13×18px (~40%% of original). Commit `4ae7419` |
 | 2026-08-04 | 1 | **Phase 1 CLOSED — approved by maintainer** | `compare_images` fully migrated and tested (embed, adaptive sizing, orientation, race fix, touch, hover, handle). Ready for Phase 2 |
 | 2026-08-04 | 2 | `smart_generate_image` migrated to Rich UI (implementation) | New `embeds.py` shared image-viewer (70vh cap, centered, aspect reservation via reduced_w:reduced_h, lightbox zoom/close/forced download, prefers-color-scheme, reportHeight, Pointer Events). Tool returns `(HTMLResponse, context)` with `{'image': url}`; removed image_md/image_filename + agent instruction; docstring + README updated. **Awaiting maintainer test** |
+| 2026-08-04 | 2 | Fix: tool must be self-contained (no `embeds` import) | Open WebUI loads each tool as a single pasted module and cannot import repo modules (`No module named 'embeds'`). The viewer is now embedded as a local `_build_image_viewer` method inside the tool (byte-identical to `embeds.py`, which remains the reference for Phases 3-5). Commit `…` |

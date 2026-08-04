@@ -4,6 +4,13 @@ Shared embed builders for the Rich UI migration (see DESIGN.md).
 Central source of truth for the image-viewer embed HTML used by the image
 tools (smart_generate_image, edit_image, enhance_image, virtual_try_on).
 
+IMPORTANT: Open WebUI runs each tool as a single self-contained module (the
+script pasted in Workspace → Tools) and cannot import repo modules like this
+one. Therefore each tool embeds its own copy of the viewer as a local method
+(`_build_image_viewer`), and this module is the reference that the tool copies
+are generated from. Keep the copies byte-identical to this source to avoid
+drift (see DESIGN.md Appendix B).
+
 Lesson learned in compare_images (DESIGN.md §10): the sandboxed iframe starts
 at ~150px and cannot read the parent viewport, so the viewer reports its own
 height via postMessage, approximates viewport-relative caps with the device
