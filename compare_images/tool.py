@@ -2,7 +2,7 @@
 title: Compare Images
 author: Insecure Erasure
 description: Compare two images side by side with an interactive before/after slider
-version: 2.2
+version: 2.3
 """
 
 import html
@@ -76,7 +76,13 @@ function isLandscape(){{
   return sw>sh&&sh>0;
 }}
 function fit(){{
-  const r=(im.naturalWidth||16)/(im.naturalHeight||9);
+  // Only size the slider once the base image has real dimensions. The old
+  // 16:9 fallback mis-sized the area when the images were not loaded yet,
+  // and if the image was already cached the load event never fired to
+  // correct it (the reported "reload the frame" fix). Same aspect ratio
+  // between both images is assumed; the area follows the base image.
+  if(!(im.naturalWidth>0&&im.naturalHeight>0)){{reportHeight();return;}}
+  const r=im.naturalWidth/im.naturalHeight;
   // Adaptive sizing: portrait devices use the full width with no height cap;
   // landscape devices cap the height at 80% of the available vertical space
   // and scale the width proportionally (centered). Orientation detection is
@@ -91,11 +97,15 @@ function fit(){{
   c.style.height=(w/r)+'px';
   reportHeight();
 }}
-addEventListener('resize',fit);
 im.addEventListener('load',fit);
 document.getElementById('top').addEventListener('load',fit);
+window.addEventListener('load',fit);
+addEventListener('resize',fit);
 new ResizeObserver(fit).observe(document.body);
 c.addEventListener('mousemove',e=>{{const rect=c.getBoundingClientRect(),p=Math.min(100,Math.max(0,(e.clientX-rect.left)/rect.width*100));c.style.setProperty('--p',p+'%')}});
+// If the base image was already loaded (e.g. from cache) before this script
+// ran, fit() uses its real dimensions immediately; otherwise it reports the
+// current height and the load events correct it when the image arrives.
 fit();
 </script>
 </body>

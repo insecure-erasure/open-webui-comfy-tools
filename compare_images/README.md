@@ -27,6 +27,10 @@ The slider uses the skeleton from the request with three adjustments:
 
 The interaction is mouse-driven (`mousemove` on the container); touch is not handled.
 
+### Robust image-load handling
+
+The slider area is only sized once the base image has real dimensions. The previous fallback ratio (16:9) mis-sized the area when the images were not loaded yet, and if the image was already cached the `load` event never fired to correct it (a frame reload fixed it visually). Now `fit()` waits for `naturalWidth`/`naturalHeight`, and re-runs on the image `load` events, the window `load`, `resize`, and a `ResizeObserver`. Both images are assumed to share the same aspect ratio; the area follows the base image (`image_a`).
+
 ## Sizing strategy (adaptive)
 
 The slider uses an adaptive sizing strategy depending on the device orientation:
