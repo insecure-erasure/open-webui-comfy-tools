@@ -27,11 +27,16 @@ The LLM calls this tool when the user explicitly asks to edit or modify an exist
 
 ## How it renders
 
-The tool returns an `HTMLResponse` with `Content-Disposition: inline` plus a context tuple, so Open WebUI renders it as a **Rich UI embed**: a self-contained image viewer in a sandboxed iframe right in the chat (same viewer as Smart Generate Image).
+The tool returns an `HTMLResponse` with `Content-Disposition: inline` plus a context tuple, so Open WebUI renders it as a **Rich UI embed**: a self-contained **before/after comparison slider** in a sandboxed iframe right in the chat (the same embed as Compare Images).
 
-- The image is centered, fits the chat container width, and its height is capped at **70% of the available screen height**; the viewer sizes itself after the image loads (the output dimensions are not known in advance, so there is no aspect reservation).
-- Clicking the image opens a **lightbox** that fills the browser window via the **Fullscreen API** (image fit to screen, no scroll), with an X to close (top-left) and a **download** button (top-right) that forces the download.
-- On close, the chat scroll position is preserved (no jump to the top).
+- The embed shows the **original image vs the edited one** with an interactive divider (drag / tap / desktop hover), so the edit can be inspected side by side. Both images share the same aspect ratio (the edit workflow keeps the input size), so the slider fits both with `object-fit: cover`.
+- The slider fills the chat container width; on portrait devices it is full width with no height cap, on landscape devices the height is capped at **80% of the available screen height** and the slider is centered.
+- A floating **maximize button** (bottom-right) opens the comparison in a **fullscreen overlay with its own interactive slider** (same drag/tap/hover behavior) via the **Fullscreen API**. The fullscreen shows only the comparison (plus the prompt caption and the exit button); Escape, the restore button, or clicking the dark backdrop close it.
+- The **prompt caption** (the edit prompt) is shown at the bottom of the fullscreen over a gradient, exactly like the image viewer's lightbox.
+- The edited image still appears in the **conversation gallery** of the other image tools (smart_generate_image, virtual_try_on) with its edit prompt — it uses the same gallery markers as the viewer. The edit slider itself does not navigate the gallery.
+- On open/close, the chat scroll position is preserved (no jump to the top).
+
+The **LLM only receives the context** `{ "image": <url> }` (the edited image URL) — never the HTML. The URL is the actionable value for chained tool calls.
 
 The **LLM only receives the context** `{ "image": <url> }` (the edited image URL) — never the HTML. The URL is the actionable value for chained tool calls.
 

@@ -2,7 +2,7 @@
 title: Edit Image
 author: Insecure Erasure
 description: Edit a previously generated image using Flux 2 inpainting/editing
-version: 1.1
+version: 1.2
 """
 
 import asyncio
@@ -237,257 +237,179 @@ class Tools:
         self.valves = self.Valves()
         self.citation = False
 
-    def _build_image_viewer(self, image_url: str, aspect_ratio: tuple[int, int] | None = None, gallery: bool = False, prompt: str | None = None) -> str:
+    def _build_compare_slider(
+        self,
+        image_a: str,
+        image_b: str,
+        gallery: bool = False,
+        prompt: str | None = None,
+    ) -> str:
         """
-        Build the self-contained image viewer embed for a single image URL.
+        Build the before/after comparison slider as a standalone HTML document.
 
-        The URL is HTML-escaped so query strings (e.g. &filename=...&type=...)
-        cannot break the markup.
+        The same embed as compare_images/upscale_image (DESIGN.md §10): the
+        preview IS the interactive divider slider (original vs edited), and a
+        floating maximize button (bottom-right) opens the fullscreen overlay
+        with its OWN interactive slider. NO gallery navigation: the fullscreen
+        only shows the comparison (plus the prompt caption, a plain text
+        overlay, and the exit button).
 
-        Layout: the image is centered, fits the chat container width, and its
-        height is capped at 70% of the available screen height (approximation of
-        70vh of the real browser viewport, since the iframe's own vh is useless —
-        see DESIGN.md §10). If aspect_ratio (reduced_w, reduced_h) is provided,
-        the embed reserves that aspect before the image loads to avoid the
-        "jump"; otherwise it sizes after the image has real dimensions.
+        The two image URLs are injected into the <img> tags. They are
+        HTML-escaped so query strings (e.g. &filename=...&type=...) cannot
+        break the markup.
 
-        Clicking the image opens a lightbox that fills the browser window via the
-        Fullscreen API (X top-left closes it, download button top-right forces a
-        download via fetch blob -> object URL -> anchor). The theme follows
-        prefers-color-scheme.
+        Gallery collection markers (maintainer request, 2026-08-05): when
+        gallery=True the container carries `class="viewer"` +
+        `data-gallery="1"` and the edited <img> gets `id="thumb"` with a
+        `data-prompt` — the SAME markers the image viewer uses. This makes the
+        edited image collectible by the conversation gallery that the OTHER
+        viewer embeds (smart_generate_image, virtual_try_on) open — it appears
+        there with its edit prompt. This slider itself does NOT navigate the
+        gallery: it only shows the before/after comparison.
 
-        Gallery: when gallery=True the viewer adds a `data-gallery="1"` marker
-        attribute. Opening the lightbox then walks the parent chat DOM
-        (same-origin ON — guarded, so same-origin OFF just yields an empty
-        gallery) and collects every image in the conversation whose viewer
-        carries the marker. The lightbox shows ‹ › buttons (vertically
-        centered), a "n/N" counter (bottom-right) and ArrowLeft/ArrowRight
-        keyboard navigation with wrap-around (DESIGN.md §11). The download
-        button keeps using `big.src`, so it always downloads the image
-        currently shown. All gallery logic is JS inside the embed — the marker
-        is the only contribution of the tool.
-
-        Prompt caption: when prompt is provided it is added as a `data-prompt`
-        attribute (HTML-escaped) — another HTML identifier, never backend
-        logic. In the lightbox only (never the thumbnail), a gradient overlay
-        at the bottom shows the prompt in white: the gradient goes from
-        transparent at the top to dark at the bottom so the white text (in the
-        darkest zone) stays readable over any image content; a subtle
-        text-shadow reinforces it. When the gallery navigates, the caption
-        follows the shown image's prompt.
-
-        A failed image load is retried once (no watchdog): on `error` the img
-        src is cleared and re-set a single time per URL (flaky/slow fetches),
-        after which a second failure is left alone (the browser shows the alt
-        text).
+        Sizing: same as compare_images — portrait full width no cap, landscape
+        capped at 80% of the available screen height; both images share the
+        aspect ratio (the edit keeps the input size).
         """
-        src = html.escape(image_url, quote=True)
-        gallery_attr = ' data-gallery="1"' if gallery else ''
-        prompt_attr = f' data-prompt="{html.escape(prompt, quote=True)}"' if prompt else ''
-        if aspect_ratio:
-            w, h = aspect_ratio
-            if w > 0 and h > 0:
-                ratio_js = f"{w}/{h}"
-            else:
-                ratio_js = "null"
-        else:
-            ratio_js = "null"
-        return (
-f"""<!DOCTYPE html>
+        a = html.escape(image_a, quote=True)
+        b = html.escape(image_b, quote=True)
+        gallery_attr = ' class="viewer" data-gallery="1"' if gallery else ''
+        prompt_attr = (
+            f' data-prompt="{html.escape(prompt, quote=True)}"'
+            if prompt
+            else ''
+        )
+        return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-:root{{
-  color-scheme:light dark;
-}}
-*{{margin:0;padding:0;box-sizing:border-box}}
+body{{margin:0;background:#222}}
 html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
-body{{display:flex;align-items:center;justify-content:center;background:transparent}}
-img{{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}}
-.viewer{{max-width:100%;overflow:hidden;cursor:zoom-in;border-radius:12px}}
-.viewer img{{display:block;width:100%;height:100%;object-fit:contain;border-radius:12px}}
-.overlay{{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:999}}
-.overlay.open{{display:flex}}
-.overlay img{{max-width:100vw;max-height:100vh;object-fit:contain;box-shadow:0 4px 30px rgba(0,0,0,.5);border-radius:4px}}
-.btn{{position:fixed;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(28,28,28,.75);border:none;border-radius:8px;color:#f5f5f5;cursor:pointer;padding:6px}}
+#c{{position:relative;width:100%;margin:0 auto;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}}
+#c img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}
+#thumb{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
+#d{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}
+#h{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
+#h span{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}
+#h span:last-child{{transform:rotate(-135deg)}}
+.btn{{position:absolute;display:flex;align-items:center;justify-content:center;background:rgba(28,28,28,.75);border:none;border-radius:8px;color:#f5f5f5;cursor:pointer;padding:6px;z-index:5}}
 .btn svg{{display:block}}
-.btn.nav{{display:none}}
-#close{{top:14px;left:14px}}
-#dl{{top:14px;right:14px}}
-#prev{{top:50%;left:14px;transform:translateY(-50%)}}
-#next{{top:50%;right:14px;transform:translateY(-50%)}}
-.counter{{position:fixed;bottom:14px;right:14px;z-index:1000;display:none;align-items:center;justify-content:center;background:rgba(28,28,28,.75);color:#f5f5f5;border-radius:8px;padding:5px 12px;font:600 13px system-ui,sans-serif;pointer-events:none}}
-.caption{{position:absolute;left:0;right:0;bottom:0;display:none;padding:56px 24px 18px;color:#fff;text-align:center;font:500 15px/1.5 system-ui,sans-serif;text-shadow:0 1px 4px rgba(0,0,0,.75);white-space:pre-wrap;overflow:hidden;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.3) 30%,rgba(0,0,0,.65) 65%,rgba(0,0,0,.88) 100%)}}
-.caption.show{{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}}
+#fs{{bottom:8px;right:8px}}
 @media (prefers-color-scheme: light){{
   .btn{{background:rgba(235,235,235,.82);color:#1a1a1a}}
-  .counter{{background:rgba(235,235,235,.82);color:#1a1a1a}}
 }}
+.overlay{{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:999}}
+.overlay.open{{display:flex}}
+#c2{{position:relative;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 4px 30px rgba(0,0,0,.5);border-radius:4px}}
+#c2 img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}
+#top2{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
+#d2{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}
+#h2{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
+#h2 span{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}
+#h2 span:last-child{{transform:rotate(-135deg)}}
+#fs2{{bottom:14px;right:14px;z-index:1001}}
+.caption{{position:absolute;left:0;right:0;bottom:0;display:none;padding:56px 24px 18px;color:#fff;text-align:center;font:500 15px/1.5 system-ui,sans-serif;text-shadow:0 1px 4px rgba(0,0,0,.75);white-space:pre-wrap;overflow:hidden;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.3) 30%,rgba(0,0,0,.65) 65%,rgba(0,0,0,.88) 100%)}}
+.caption.show{{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}}
 </style>
 </head>
 <body>
-<div class="viewer" id="viewer"{gallery_attr}{prompt_attr}>
-  <img id="thumb" src="{src}" alt="Generated image">
+<div id="c"{gallery_attr}{prompt_attr}>
+<img src="{a}" draggable="false">
+<img id="thumb" src="{b}" draggable="false">
+<div id="d"></div>
+<div id="h"><span></span><span></span></div>
+<button id="fs" class="btn" title="Fullscreen" aria-label="Fullscreen">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+</button>
 </div>
 <div class="overlay" id="overlay">
-  <img id="big" src="{src}" alt="Generated image">
-  <div id="caption" class="caption"></div>
-  <button id="close" class="btn" title="Close" aria-label="Close">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-  </button>
-  <button id="dl" class="btn" title="Download" aria-label="Download">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-  </button>
-  <button id="prev" class="btn nav" title="Previous image" aria-label="Previous image">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-  </button>
-  <button id="next" class="btn nav" title="Next image" aria-label="Next image">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-  </button>
-  <div id="counter" class="counter"></div>
+<div id="c2">
+<img src="{a}" draggable="false">
+<img id="top2" src="{b}" draggable="false">
+<div id="d2"></div>
+<div id="h2"><span></span><span></span></div>
+</div>
+<div id="caption" class="caption"></div>
+<button id="fs2" class="btn" title="Exit fullscreen" aria-label="Exit fullscreen">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+</button>
 </div>
 <script>
-const viewer=document.getElementById('viewer'),thumb=document.getElementById('thumb'),
-      overlay=document.getElementById('overlay'),big=document.getElementById('big'),
-      closeBtn=document.getElementById('close'),dlBtn=document.getElementById('dl'),
-      prevBtn=document.getElementById('prev'),nextBtn=document.getElementById('next'),
-      counter=document.getElementById('counter'),caption=document.getElementById('caption');
-const RESERVED_R={ratio_js};
-function reportHeight(){{parent.postMessage({{type:'iframe:height',height:viewer.offsetHeight||document.documentElement.scrollHeight}},'*')}}
+const c=document.getElementById('c'),topImg=document.getElementById('thumb'),
+      im=document.querySelector('#c img'),
+      c2=document.getElementById('c2'),top2=document.getElementById('top2'),
+      im2=document.querySelector('#c2 img'),
+      overlay=document.getElementById('overlay'),
+      fsBtn=document.getElementById('fs'),fs2Btn=document.getElementById('fs2'),
+      caption=document.getElementById('caption');
+function reportHeight(){{parent.postMessage({{type:'iframe:height',height:document.documentElement.scrollHeight}},'*')}}
+function isLandscape(){{
+  if(screen.orientation&&screen.orientation.type)return screen.orientation.type.indexOf('landscape')===0;
+  if(typeof window.orientation==='number')return Math.abs(window.orientation)===90;
+  const sw=screen.width||0,sh=screen.height||0;
+  return sw>sh&&sh>0;
+}}
 function fit(){{
-  // Sizing replicates the compare_images slider (DESIGN.md §10): the iframe
-  // starts at ~150px and its own vh is useless, so derive from the container
-  // width and the image aspect ratio, cap the height at 70% of the available
-  // screen height (screen.availHeight), and report the resulting height.
-  // While the lightbox is in browser fullscreen the iframe viewport is the
-  // full screen and resizing/reporting would blow up the embed and shift the
-  // chat scroll — so skip sizing during fullscreen entirely (the overlay
-  // covers everything anyway) and re-fit when fullscreen ends.
+  // Same sizing as the compare slider (§10): portrait full width no cap,
+  // landscape capped at 80% of screen.availHeight. Skip while in browser
+  // fullscreen (§10.8); re-fit on fullscreenchange.
   if(document.fullscreenElement||document.webkitFullscreenElement)return;
-  let r=0;
-  if(RESERVED_R)r=Number(RESERVED_R);
-  if(!(r>0)&&thumb.naturalWidth>0&&thumb.naturalHeight>0)r=thumb.naturalWidth/thumb.naturalHeight;
-  if(!(r>0)){{reportHeight();return;}}
-  const maxH=(screen.availHeight||screen.height||0)*0.7;
+  if(!(im.naturalWidth>0&&im.naturalHeight>0)){{reportHeight();return;}}
+  const r=im.naturalWidth/im.naturalHeight;
+  const maxH=isLandscape()?(screen.availHeight||screen.height||0)*0.8:0;
   let w=document.documentElement.clientWidth;
   if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
-  viewer.style.width=w+'px';
-  viewer.style.height=(w/r)+'px';
+  c.style.width=w+'px';
+  c.style.height=(w/r)+'px';
   reportHeight();
 }}
-thumb.addEventListener('load',fit);
-big.addEventListener('load',fit);
-window.addEventListener('load',fit);
-addEventListener('resize',fit);
-new ResizeObserver(fit).observe(document.body);
-fit();
-// Failed-image retry (cheap fix, NO watchdog — maintainer decision,
-// 2026-08-04, DESIGN.md §11): a slow/flaky fetch can leave the embed
-// without the image (no 'load' event → the viewer never sizes; reloading
-// the frame re-runs the script). On 'error' we clear and re-set the src a
-// single time per URL; if the retry also fails we leave it alone (the
-// browser shows the alt text).
-let retriedSrc=null;
-function retryOnce(img){{
-  if(retriedSrc===img.src)return;
-  retriedSrc=img.src;
-  const s=img.src;
-  img.removeAttribute('src');
-  requestAnimationFrame(()=>{{img.src=s;}});
+function fitOverlay(){{
+  // Size the overlay slider to the REAL viewport (in fullscreen the iframe
+  // viewport IS the screen); wait for real dimensions (§10.4).
+  if(!(im2.naturalWidth>0&&im2.naturalHeight>0))return;
+  const r=im2.naturalWidth/im2.naturalHeight;
+  const vw=document.documentElement.clientWidth||0,vh=document.documentElement.clientHeight||0;
+  let w=vw,h=vw/r;
+  if(h>vh){{h=vh;w=h*r;}}
+  c2.style.width=w+'px';
+  c2.style.height=h+'px';
 }}
-thumb.addEventListener('error',()=>retryOnce(thumb));
-big.addEventListener('error',()=>retryOnce(big));
-// Gallery (DESIGN.md §11): collect every image in the chat whose viewer
-// carries the data-gallery marker. The marker is the ONLY contribution of the
-// tool — the collection logic lives here, in the embed (maintainer
-// constraint: no backend/Python gallery logic in the tools). Requires
-// same-origin access to the parent chat DOM (the user's Open WebUI has it
-// ON); with same-origin OFF every contentDocument is null, the gallery stays
-// empty and the lightbox behaves exactly as before.
-let gallery=[],galleryIdx=-1;
-function updateCaption(){{
-  // Prompt caption of the currently shown image (DESIGN.md §12): only in the
-  // lightbox, never the thumbnail. The gradient goes from transparent at the
-  // top to dark at the bottom so the white text (in the darkest zone) stays
-  // readable over any image content. textContent (never innerHTML) — the
-  // prompt is arbitrary user/LLM text.
-  const p=(gallery[galleryIdx]&&gallery[galleryIdx].prompt)||'';
+im.addEventListener('load',fit);
+topImg.addEventListener('load',fit);
+im2.addEventListener('load',fitOverlay);
+top2.addEventListener('load',fitOverlay);
+window.addEventListener('load',()=>{{fit();fitOverlay();}});
+addEventListener('resize',fit);
+addEventListener('resize',()=>{{if(document.fullscreenElement||document.webkitFullscreenElement)fitOverlay();}});
+new ResizeObserver(fit).observe(document.body);
+// Interactive slider — shared by the embed (#c) and the fullscreen overlay
+// (#c2). Pointer Events unify mouse + touch (§10.5); touch-action:none keeps
+// the browser from hijacking the gesture; the handle is purely visual
+// (pointer-events:none). Ignore events on .btn (fullscreen button).
+function setupSlider(el){{
+  let dragging=false;
+  function setP(x){{const rect=el.getBoundingClientRect(),p=Math.min(100,Math.max(0,(x-rect.left)/rect.width*100));el.style.setProperty('--p',p+'%');}}
+  const onBtn=e=>e.target.closest&&e.target.closest('.btn');
+  el.addEventListener('pointerdown',e=>{{if(onBtn(e))return;dragging=true;try{{el.setPointerCapture(e.pointerId)}}catch{{}}setP(e.clientX);e.preventDefault();}});
+  el.addEventListener('pointermove',e=>{{if((dragging||e.pointerType==='mouse')&&!onBtn(e))setP(e.clientX);}});
+  el.addEventListener('pointerup',()=>{{dragging=false;}});
+  el.addEventListener('pointercancel',()=>{{dragging=false;}});
+}}
+setupSlider(c);
+setupSlider(c2);
+// Prompt caption (DESIGN.md §12): shown in the fullscreen only, as plain
+// text over a bottom gradient (textContent, never innerHTML).
+function showCaption(){{
+  const p=c.getAttribute('data-prompt')||'';
   if(p){{caption.textContent=p;caption.classList.add('show');}}
   else{{caption.classList.remove('show');caption.textContent='';}}
 }}
-function collectGallery(){{
-  gallery=[];galleryIdx=-1;
-  try{{
-    const frames=parent.document.querySelectorAll('iframe');
-    for(let i=0;i<frames.length;i++){{
-      let cd=null;
-      try{{cd=frames[i].contentDocument;}}catch(e){{}}
-      if(!cd)continue;
-      const v=cd.querySelector('.viewer[data-gallery]');
-      if(!v)continue;
-      // Read the THUMBNAIL src, not the lightbox img: big.src is mutated by
-      // gallery navigation, so after navigating once an embed's big no longer
-      // reflects its own image (its image would drop out and duplicates would
-      // appear). thumb.src is the stable per-embed identity.
-      const im=cd.getElementById('thumb');
-      // data-prompt is the prompt of that embed's image, shown when the
-      // gallery navigates to it.
-      const pr=v.getAttribute('data-prompt')||'';
-      if(im&&im.src&&!gallery.some(g=>g.src===im.src))gallery.push({{src:im.src,prompt:pr}});
-    }}
-  }}catch(e){{}}
-  // Defensive: after the reset below big.src === thumb.src and this embed's
-  // own thumb is normally collected (its iframe is in the parent DOM); if for
-  // any reason it was not collected, unshift it so the current view is present.
-  if(!gallery.some(g=>g.src===big.src))gallery.unshift({{src:big.src,prompt:viewer.getAttribute('data-prompt')||''}});
-  galleryIdx=gallery.findIndex(g=>g.src===big.src);
-  const multi=gallery.length>1;
-  prevBtn.style.display=nextBtn.style.display=counter.style.display=multi?'flex':'none';
-  if(multi&&galleryIdx>=0)counter.textContent=(galleryIdx+1)+'/'+gallery.length;
-  updateCaption();
-}}
-function showImage(i){{
-  // Wrap-around navigation; a no-op when there is only one image.
-  if(gallery.length<2)return;
-  galleryIdx=((i%gallery.length)+gallery.length)%gallery.length;
-  big.src=gallery[galleryIdx].src;
-  counter.textContent=(galleryIdx+1)+'/'+gallery.length;
-  updateCaption();
-}}
-function openLightbox(){{
-  // Start from this embed's own image: big.src may be left pointing at a
-  // gallery-navigated URL from a previous open — reset it so the view, the
-  // counter index and the download are consistent with the thumbnail.
-  big.src=thumb.src;
-  collectGallery();
-  overlay.classList.add('open');
-  // Fullscreen the OVERLAY element, not the documentElement: the overlay is
-  // already position:fixed inset:0, so the browser expands it to the window
-  // WITHOUT scrolling the parent chat to the top (the known scroll jump when
-  // fullscreening documentElement). Exiting also leaves the parent scroll
-  // untouched.
-  try{{overlay.requestFullscreen&&overlay.requestFullscreen();}}catch(e){{}}
-  try{{overlay.webkitRequestFullscreen&&overlay.webkitRequestFullscreen();}}catch(e){{}}
-}}
-function closeLightbox(){{
-  // If in fullscreen, exit it; the overlay is removed and the size re-fit in
-  // the fullscreenchange handler (avoids a flash of the bare viewer fullscreen).
-  if(document.fullscreenElement||document.webkitFullscreenElement){{
-    try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{}}
-    try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{}}
-  }}else{{
-    overlay.classList.remove('open');
-    restoreScroll();
-  }}
-}}
-// Restore the scroll position after closing the lightbox. The chat scroll is
-// NOT on the parent window (parent.scrollY stays 0); it lives in an inner
-// scroll container inside Open WebUI's DOM. With allow-same-origin ON we can
-// walk the parent document, find the scrolled elements, and restore their
-// scrollTop. Save the scroll of the parent window AND of all inner scrolled
-// containers before opening, restore both after closing.
+// Chat scroll preservation around the fullscreen (§10.8): the scroll is NOT
+// on the parent window; it lives in an inner container in Open WebUI's DOM.
+// Save the parent window AND all inner scrolled containers before opening,
+// restore them after closing (same-origin ON; guarded for OFF).
 let savedScrolls=[];
 function saveScroll(){{
   savedScrolls=[];
@@ -506,27 +428,33 @@ function restoreScroll(){{requestAnimationFrame(()=>{{requestAnimationFrame(()=>
   for(let i=0;i<savedScrolls.length;i++){{try{{savedScrolls[i].el.scrollTop=savedScrolls[i].top;}}catch(e){{}}}}
   document.documentElement.scrollTop=0;document.body.scrollTop=0;
 }});}});}}
-viewer.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;saveScroll();openLightbox();}});
-closeBtn.addEventListener('pointerup',()=>{{closeLightbox();restoreScroll();}});
-overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeLightbox();restoreScroll();}}}});
-big.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;e.stopPropagation();}});
-prevBtn.addEventListener('pointerup',e=>{{e.stopPropagation();showImage(galleryIdx-1);}});
-nextBtn.addEventListener('pointerup',e=>{{e.stopPropagation();showImage(galleryIdx+1);}});
-document.addEventListener('keydown',e=>{{
-  if(e.key==='Escape'){{closeLightbox();restoreScroll();}}
-  else if(e.key==='ArrowLeft'){{if(overlay.classList.contains('open'))showImage(galleryIdx-1);}}
-  else if(e.key==='ArrowRight'){{if(overlay.classList.contains('open'))showImage(galleryIdx+1);}}
-}});
+function openFullscreen(){{
+  overlay.classList.add('open');
+  fitOverlay();
+  showCaption();
+  saveScroll();
+  try{{overlay.requestFullscreen&&overlay.requestFullscreen();}}catch(e){{}}
+  try{{overlay.webkitRequestFullscreen&&overlay.webkitRequestFullscreen();}}catch(e){{}}
+}}
+function closeFullscreen(){{
+  if(document.fullscreenElement||document.webkitFullscreenElement){{
+    try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{}}
+    try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{}}
+  }}else{{
+    overlay.classList.remove('open');
+    restoreScroll();
+  }}
+}}
+fsBtn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;openFullscreen();}});
+fs2Btn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;closeFullscreen();restoreScroll();}});
+overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeFullscreen();restoreScroll();}}}});
+document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{closeFullscreen();restoreScroll();}}}});
 document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');restoreScroll();fit();}}}});
-async function download(){{try{{const r=await fetch(big.src);if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}}catch(err){{const w=window.open(big.src,'_blank');if(w)w.focus();}}}}
-dlBtn.addEventListener('pointerup',download);
+fit();
 </script>
 </body>
 </html>
 """
-        )
-
-
     async def edit_image(
         self,
         image: str,
@@ -544,14 +472,18 @@ dlBtn.addEventListener('pointerup',download);
         Only call when the user explicitly asks to edit or modify an
         existing image. Pass an image filename or a direct URL.
 
-        The edited image is displayed in the chat as a Rich UI embed (image
-        viewer with zoom and download). The tool returns the image URL as
-        context ({'image': <url>}); use it for chained tool calls
-        (enhance_image, virtual_try_on, generate_video) or to refer to the
-        edited image.
+        The edited image is displayed in the chat as a Rich UI embed (a
+        before/after comparison slider, original vs edited, the same embed as
+        compare_images). The tool returns the image URL as context
+        ({'image': <url>}); use it for chained tool calls (upscale_image,
+        virtual_try_on, generate_video) or to refer to the edited image.
 
-        :param image: The filename previously generated from smart_generate_image or enhance_image, or a direct URL to an external image.
-        :param edit_prompt: Natural language description of the edit to apply (e.g., "Change the cat's fur to orange", "Add a sunset background"). Be specific and descriptive.
+        :param image: The filename previously generated from
+            smart_generate_image or upscale_image, or a direct URL to an
+            external image.
+        :param edit_prompt: Natural language description of the edit to apply
+            (e.g., "Change the cat's fur to orange", "Add a sunset
+            background"). Be specific and descriptive.
         """
         if __request__ is None:
             log.error("edit_image called without request context")
@@ -902,13 +834,28 @@ dlBtn.addEventListener('pointerup',download);
 
             # Rich UI embed (see DESIGN.md): the LLM receives only the
             # actionable context ({'image': url}) and never sees the HTML.
-            # The output dimensions are unknown a priori (they depend on the
-            # input image), so the viewer sizes itself after the image loads
-            # (no aspect reservation). The URL (not the filename) is emitted
-            # so downstream tools and compare_images can use it directly.
-            viewer = self._build_image_viewer(edit_url, gallery=True, prompt=edit_prompt)
+            # The result is a before/after comparison slider (the same embed
+            # as compare_images, DESIGN.md §10): the ORIGINAL image vs the
+            # EDITED one, in the chat embed AND in the fullscreen overlay
+            # (floating maximize button, bottom-right). Both images share the
+            # same aspect ratio (the edit workflow keeps the input size), so
+            # the slider's single-box sizing fits both with object-fit:cover.
+            # The original URL is the passthrough argument when it is a URL,
+            # or the temp-file URL (type=temp — the same directory the Load
+            # Image node reads from) when it is a filename from a previous
+            # generation.
+            if parsed.scheme and parsed.netloc:
+                original_url = image
+            else:
+                original_url = (
+                    f"{base}/api/view?filename={image}&type=temp"
+                )
+
+            slider = self._build_compare_slider(
+                original_url, edit_url, gallery=True, prompt=edit_prompt
+            )
             return HTMLResponse(
-                content=viewer, headers={"Content-Disposition": "inline"}
+                content=slider, headers={"Content-Disposition": "inline"}
             ), {"image": edit_url}
 
         except asyncio.CancelledError:

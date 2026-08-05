@@ -2,12 +2,17 @@
 Shared embed builders for the Rich UI migration (see DESIGN.md).
 
 Central source of truth for the image-viewer embed HTML used by the image
-tools (smart_generate_image, edit_image, virtual_try_on).
+tools (smart_generate_image, virtual_try_on).
 
-Note (2026-08-05): enhance_image was renamed to upscale_image and migrated
+Notes (2026-08-05): enhance_image was renamed to upscale_image and migrated
 from the image viewer to the before/after comparison slider (original vs
-upscaled, the compare_images embed). It no longer consumes the viewer — its
-reference embed lives in compare_images/tool.py (_build_slider_html).
+upscaled, the compare_images embed). edit_image followed the same migration
+but keeps the image-viewer features — its slider is an EXTENDED variant
+(gallery + prompt caption + download on top of the compare slider), so its
+reference embed lives in its own tool.py (_build_compare_slider), NOT in
+compare_images. upscale_image uses the plain slider (no caption, no gallery)
+and edit_image the extended one; smart_generate_image and virtual_try_on
+still use the image viewer.
 
 IMPORTANT: Open WebUI runs each tool as a single self-contained module (the
 script pasted in Workspace → Tools) and cannot import repo modules like this
