@@ -12,10 +12,10 @@
 
 ---
 
-## 1. smart_generate_image / virtual_try_on
+## 1. smart_generate_image
 
-(Formerly also enhance_image and edit_image, which were renamed/migrated to
-the compare slider — see the phase notes.)
+(Formerly also enhance_image, edit_image and virtual_try_on, which were
+renamed/migrated to the compare slider — see the phase notes.)
 *(Image tools with viewer)*
 
 - **`context`**: `{ "image": <url> }` — a single actionable value (the **URL**), ready for the `image` parameter of the downstream tools. The LLM needs nothing more.
@@ -223,13 +223,13 @@ To try to replicate the appearance of the Open WebUI lightbox, the frontend was 
 | Tool | `context` | Chains | Embed width |
 |------|-----------|--------|-------------|
 | `smart_generate_image` | `{ "image": url }` | Yes | Fit (70vh max) |
-| `edit_image` | `{ "image": url }` | Yes | Extended slider (gallery+caption) |
+| `edit_image` | `{ "image": url }` | Yes | Slider + markers + caption |
 | `upscale_image` (ex-enhance_image) | `{ "image": url }` | Yes | Compare slider |
 
 *(`enhance_image` renamed to `upscale_image`; it now renders the compare
-slider instead of the viewer — see §10.)* *(`edit_image` also migrated to
-the extended slider — gallery + prompt caption.)*
-| `virtual_try_on` | `{ "image": url, "prompt": text }` | Yes | Fit (70vh max) |
+slider instead of the viewer — see §10.)* *(`edit_image` and `virtual_try_on`
+also migrated to the slider — with the gallery markers + prompt caption.)*
+| `virtual_try_on` | `{ "image": url, "prompt": text }` | Yes | Slider + markers + caption |
 | `compare_images` | empty | No | Maximum available |
 | `generate_video` | empty | No | Maximum available |
 
@@ -428,11 +428,11 @@ logic lives in JS inside the embed.
 - The viewer builder accepts `gallery: bool = False`. When True it adds
   `data-gallery="1"` to the `.viewer` div — the ONLY contribution of the tool.
 - The image tool (`smart_generate_image`) builds its viewer with
-  `gallery=True`; `virtual_try_on` too. `edit_image` builds the extended
-  slider with the same `data-gallery` markers (its edited image appears in
-  the gallery with its prompt). `compare_images`, `generate_video` and
-  `upscale_image` (plain slider) never use `.viewer`, so they are naturally
-  excluded.
+  `gallery=True`. `edit_image` and `virtual_try_on` build the slider with
+  the same `data-gallery` markers (their results appear in the gallery of
+  the smart_generate_image viewer with their prompt). `compare_images`,
+  `generate_video` and `upscale_image` (plain slider) never use `.viewer`,
+  so they are naturally excluded.
 - When a gallery lightbox opens, `collectGallery()` runs before showing the
   overlay: it walks the parent chat DOM (`parent.document.querySelectorAll('iframe')`
   → `contentDocument` → `.viewer[data-gallery]` → **`#thumb.src`**) and
@@ -533,13 +533,13 @@ top to darker at the bottom.
 |------|--------------|-----|
 | `smart_generate_image` | `prompt` (the LLM prompt) | input prompt |
 | `edit_image` | `edit_prompt` (the LLM edit prompt) | input prompt; shown in the slider's fullscreen overlay |
-| `virtual_try_on` | `prompt` (workflow-generated, `_extract_text`) | workflow prompt |
+| `virtual_try_on` | `prompt` (workflow-generated, `_extract_text`) | workflow prompt; shown in the slider's fullscreen overlay |
 | `upscale_image` (ex-enhance_image) | **none** | only receives `image` (no prompt input); now uses the compare slider, not the viewer |
 
 So `upscale_image` (ex-`enhance_image`) builds no viewer with `prompt` and its
-images show no caption. `edit_image` shows the caption in its slider
-fullscreen (the extended slider variant keeps the image-viewer caption +
-gallery). `compare_images`/`generate_video` are excluded as always.
+images show no caption. `edit_image` and `virtual_try_on` show the caption in
+their slider fullscreen (the slider variant keeps the image-viewer caption +
+gallery markers). `compare_images`/`generate_video` are excluded as always.
 
 ### How it works
 
@@ -622,7 +622,7 @@ The assumptions in this document were verified against `open-webui/open-webui` (
 ## Appendix B — Implementation notes / considerations
 
 - **Shared viewer HTML**: each tool in this repo is a standalone script pasted into Open WebUI (no shared package at runtime), so the image-viewer HTML will be **duplicated** inside each tool that needs it. Keep the markup/JS byte-identical across tools and update all copies together to avoid drift.
-- **Aspect ratio known a priori**: `smart_generate_image` computes `reduced_w:reduced_h` and can reserve the aspect ratio to avoid the load "jump". `virtual_try_on` does **not** know the output dimensions in advance (they depend on the input image), so its viewer must rely on `reportHeight()` after the image loads instead of aspect reservation. (`upscale_image`, ex-`enhance_image`, uses the plain compare slider; `edit_image` uses the extended slider variant — both size from the original image's aspect ratio.)
+- **Aspect ratio known a priori**: `smart_generate_image` computes `reduced_w:reduced_h` and can reserve the aspect ratio to avoid the load "jump". The slider tools (`upscale_image`, `edit_image`, `virtual_try_on`) size from the original image's aspect ratio, so they need no reservation. (`virtual_try_on` does not know the output dimensions in advance, but the slider fits the original's ratio, which the workflow preserves.)
 - **`reportHeight()` contract**: report on `window.load`, on image/video `load` events, on `resize`, and via a `ResizeObserver` on the body — the parent iframe starts at ~150px and only grows when a message arrives.
 - **URL escaping**: image/video URLs contain query strings (`?filename=...&type=...`); they must be HTML-escaped before being injected into `src` attributes (already the practice in `compare_images`).
 - **`generate_caption` is out of scope**: it returns plain text (a caption), not an image; it is not part of this migration.
