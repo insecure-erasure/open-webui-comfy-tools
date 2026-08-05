@@ -247,34 +247,29 @@ class Tools:
         """
         Build the before/after comparison slider as a standalone HTML document.
 
-        This is the compare_images slider (DESIGN.md §10) extended for edit
-        results: the embed shows the ORIGINAL image vs the EDITED one with an
-        interactive divider, and the fullscreen overlay carries the same
-        interactive slider PLUS the image-viewer features the lightbox has
-        (DESIGN.md §11/§12): the prompt caption (only in fullscreen, over a
-        bottom gradient), the download button, and the conversation gallery
-        (prev/next/counter) when gallery=True.
+        The same embed as compare_images/upscale_image (DESIGN.md §10): the
+        preview IS the interactive divider slider (original vs edited), and a
+        floating maximize button (bottom-right) opens the fullscreen overlay
+        with its OWN interactive slider. NO gallery navigation: the fullscreen
+        only shows the comparison (plus the prompt caption, a plain text
+        overlay, and the exit button).
 
         The two image URLs are injected into the <img> tags. They are
         HTML-escaped so query strings (e.g. &filename=...&type=...) cannot
         break the markup.
 
-        Gallery: when gallery=True the container carries `class="viewer"`
-        + `data-gallery="1"` and the edited <img> gets `id="thumb"` — the
-        SAME markers the image viewer uses — so the gallery logic (in every
-        viewer embed AND in this slider) collects the edited image with its
-        prompt (data-prompt, HTML-escaped) exactly like any generated image.
-        In the fullscreen overlay the gallery works in two modes: while on
-        the embed's own image it shows the original-vs-edited slider; when
-        navigating to another conversation image it shows that image alone
-        (there is no original to compare it with). ArrowLeft/ArrowRight
-        navigate, Escape/X/backdrop close, and the chat scroll is preserved
-        around the fullscreen (saveScroll/restoreScroll, same-origin ON,
-        guarded for OFF; DESIGN.md §10.8).
+        Gallery collection markers (maintainer request, 2026-08-05): when
+        gallery=True the container carries `class="viewer"` +
+        `data-gallery="1"` and the edited <img> gets `id="thumb"` with a
+        `data-prompt` — the SAME markers the image viewer uses. This makes the
+        edited image collectible by the conversation gallery that the OTHER
+        viewer embeds (smart_generate_image, virtual_try_on) open — it appears
+        there with its edit prompt. This slider itself does NOT navigate the
+        gallery: it only shows the before/after comparison.
 
-        Sizing: same as the compare_images slider — portrait full width no
-        cap, landscape capped at 80% of the available screen height; both
-        images share the aspect ratio (the edit keeps the input size).
+        Sizing: same as compare_images — portrait full width no cap, landscape
+        capped at 80% of the available screen height; both images share the
+        aspect ratio (the edit keeps the input size).
         """
         a = html.escape(image_a, quote=True)
         b = html.escape(image_b, quote=True)
@@ -290,46 +285,39 @@ class Tools:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body{{{{margin:0;background:#222}}}}
-html,body{{{{height:100%;overflow:hidden;margin:0;padding:0}}}}
-#c{{{{position:relative;width:100%;margin:0 auto;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}}}}
-#c img{{{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}}}
-.top{{{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}}}
-#d{{{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}}}
-#h{{{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}}}
-#h span{{{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}}}
-#h span:last-child{{{{transform:rotate(-135deg)}}}}
-.btn{{{{position:absolute;display:flex;align-items:center;justify-content:center;background:rgba(28,28,28,.75);border:none;border-radius:8px;color:#f5f5f5;cursor:pointer;padding:6px;z-index:5}}}}
-.btn svg{{{{display:block}}}}
-#fs{{{{bottom:8px;right:8px}}}}
-@media (prefers-color-scheme: light){{{{
-  .btn{{{{background:rgba(235,235,235,.82);color:#1a1a1a}}}}
-}}}}
-.overlay{{{{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:999}}}}
-.overlay.open{{{{display:flex}}}}
-#c2{{{{position:relative;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 4px 30px rgba(0,0,0,.5);border-radius:4px}}}}
-#c2 img{{{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}}}
-#top2{{{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}}}
-#d2{{{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}}}
-#h2{{{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}}}
-#h2 span{{{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}}}
-#h2 span:last-child{{{{transform:rotate(-135deg)}}}}
-#nav{{{{max-width:100vw;max-height:100vh;object-fit:contain;display:none;box-shadow:0 4px 30px rgba(0,0,0,.5);border-radius:4px}}}}
-.btn.nav{{{{display:none}}}}
-#close{{{{top:14px;left:14px}}}}
-#dl{{{{top:14px;right:14px}}}}
-#prev{{{{top:50%;left:14px;transform:translateY(-50%)}}}}
-#next{{{{top:50%;right:14px;transform:translateY(-50%)}}}}
-#fs2{{{{bottom:14px;right:14px;z-index:1001}}}}
-.counter{{{{position:fixed;bottom:14px;right:14px;z-index:1000;display:none;align-items:center;justify-content:center;background:rgba(28,28,28,.75);color:#f5f5f5;border-radius:8px;padding:5px 12px;font:600 13px system-ui,sans-serif;pointer-events:none}}}}
-.caption{{{{position:absolute;left:0;right:0;bottom:0;display:none;padding:56px 24px 18px;color:#fff;text-align:center;font:500 15px/1.5 system-ui,sans-serif;text-shadow:0 1px 4px rgba(0,0,0,.75);white-space:pre-wrap;overflow:hidden;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.3) 30%,rgba(0,0,0,.65) 65%,rgba(0,0,0,.88) 100%)}}}}
-.caption.show{{{{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}}}}
+body{{margin:0;background:#222}}
+html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
+#c{{position:relative;width:100%;margin:0 auto;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}}
+#c img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}
+#thumb{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
+#d{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}
+#h{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
+#h span{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}
+#h span:last-child{{transform:rotate(-135deg)}}
+.btn{{position:absolute;display:flex;align-items:center;justify-content:center;background:rgba(28,28,28,.75);border:none;border-radius:8px;color:#f5f5f5;cursor:pointer;padding:6px;z-index:5}}
+.btn svg{{display:block}}
+#fs{{bottom:8px;right:8px}}
+@media (prefers-color-scheme: light){{
+  .btn{{background:rgba(235,235,235,.82);color:#1a1a1a}}
+}}
+.overlay{{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:999}}
+.overlay.open{{display:flex}}
+#c2{{position:relative;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 4px 30px rgba(0,0,0,.5);border-radius:4px}}
+#c2 img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}
+#top2{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
+#d2{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}
+#h2{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
+#h2 span{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}
+#h2 span:last-child{{transform:rotate(-135deg)}}
+#fs2{{bottom:14px;right:14px;z-index:1001}}
+.caption{{position:absolute;left:0;right:0;bottom:0;display:none;padding:56px 24px 18px;color:#fff;text-align:center;font:500 15px/1.5 system-ui,sans-serif;text-shadow:0 1px 4px rgba(0,0,0,.75);white-space:pre-wrap;overflow:hidden;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.3) 30%,rgba(0,0,0,.65) 65%,rgba(0,0,0,.88) 100%)}}
+.caption.show{{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}}
 </style>
 </head>
 <body>
 <div id="c"{gallery_attr}{prompt_attr}>
 <img src="{a}" draggable="false">
-<img id="thumb" class="top" src="{b}" draggable="false">
+<img id="thumb" src="{b}" draggable="false">
 <div id="d"></div>
 <div id="h"><span></span><span></span></div>
 <button id="fs" class="btn" title="Fullscreen" aria-label="Fullscreen">
@@ -343,219 +331,125 @@ html,body{{{{height:100%;overflow:hidden;margin:0;padding:0}}}}
 <div id="d2"></div>
 <div id="h2"><span></span><span></span></div>
 </div>
-<img id="nav" src="{b}" draggable="false">
 <div id="caption" class="caption"></div>
-<button id="close" class="btn" title="Close" aria-label="Close">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-</button>
-<button id="dl" class="btn" title="Download" aria-label="Download">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-</button>
-<button id="prev" class="btn nav" title="Previous image" aria-label="Previous image">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-</button>
-<button id="next" class="btn nav" title="Next image" aria-label="Next image">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-</button>
 <button id="fs2" class="btn" title="Exit fullscreen" aria-label="Exit fullscreen">
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
 </button>
-<div id="counter" class="counter"></div>
 </div>
 <script>
-const c=document.getElementById('c'),topImg=document.querySelector('.top'),
+const c=document.getElementById('c'),topImg=document.getElementById('thumb'),
       im=document.querySelector('#c img'),
       c2=document.getElementById('c2'),top2=document.getElementById('top2'),
       im2=document.querySelector('#c2 img'),
       overlay=document.getElementById('overlay'),
       fsBtn=document.getElementById('fs'),fs2Btn=document.getElementById('fs2'),
-      closeBtn=document.getElementById('close'),dlBtn=document.getElementById('dl'),
-      prevBtn=document.getElementById('prev'),nextBtn=document.getElementById('next'),
-      counter=document.getElementById('counter'),caption=document.getElementById('caption'),
-      nav=document.getElementById('nav');
-const ownSrc=document.getElementById('thumb').src,origSrc=document.querySelector('#c img').src;
-const ownPrompt=c.getAttribute('data-prompt')||'';
-function reportHeight(){{{{parent.postMessage({{{{type:'iframe:height',height:document.documentElement.scrollHeight}}}},'*')}}}}
-function isLandscape(){{{{
+      caption=document.getElementById('caption');
+function reportHeight(){{parent.postMessage({{type:'iframe:height',height:document.documentElement.scrollHeight}},'*')}}
+function isLandscape(){{
   if(screen.orientation&&screen.orientation.type)return screen.orientation.type.indexOf('landscape')===0;
   if(typeof window.orientation==='number')return Math.abs(window.orientation)===90;
   const sw=screen.width||0,sh=screen.height||0;
   return sw>sh&&sh>0;
-}}}}
-function fit(){{{{
+}}
+function fit(){{
   // Same sizing as the compare slider (§10): portrait full width no cap,
   // landscape capped at 80% of screen.availHeight. Skip while in browser
   // fullscreen (§10.8); re-fit on fullscreenchange.
   if(document.fullscreenElement||document.webkitFullscreenElement)return;
-  if(!(im.naturalWidth>0&&im.naturalHeight>0)){{{{reportHeight();return;}}}}
+  if(!(im.naturalWidth>0&&im.naturalHeight>0)){{reportHeight();return;}}
   const r=im.naturalWidth/im.naturalHeight;
   const maxH=isLandscape()?(screen.availHeight||screen.height||0)*0.8:0;
   let w=document.documentElement.clientWidth;
-  if(maxH>0){{{{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}}}
+  if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
   c.style.width=w+'px';
   c.style.height=(w/r)+'px';
   reportHeight();
-}}}}
-function fitOverlay(){{{{
+}}
+function fitOverlay(){{
   // Size the overlay slider to the REAL viewport (in fullscreen the iframe
   // viewport IS the screen); wait for real dimensions (§10.4).
-  if(c2.style.display==='none')return;
   if(!(im2.naturalWidth>0&&im2.naturalHeight>0))return;
   const r=im2.naturalWidth/im2.naturalHeight;
   const vw=document.documentElement.clientWidth||0,vh=document.documentElement.clientHeight||0;
   let w=vw,h=vw/r;
-  if(h>vh){{{{h=vh;w=h*r;}}}}
+  if(h>vh){{h=vh;w=h*r;}}
   c2.style.width=w+'px';
   c2.style.height=h+'px';
-}}}}
-function fitNav(){{{{
-  // Size the single-image view (#nav) used when the gallery navigates away
-  // from this embed's own image (no original to compare it with).
-  if(nav.style.display==='none'||!(nav.naturalWidth>0&&nav.naturalHeight>0))return;
-  const r=nav.naturalWidth/nav.naturalHeight;
-  const vw=document.documentElement.clientWidth||0,vh=document.documentElement.clientHeight||0;
-  let w=vw,h=vw/r;
-  if(h>vh){{{{h=vh;w=h*r;}}}}
-  nav.style.width=w+'px';
-  nav.style.height=h+'px';
-}}}}
+}}
 im.addEventListener('load',fit);
 topImg.addEventListener('load',fit);
 im2.addEventListener('load',fitOverlay);
 top2.addEventListener('load',fitOverlay);
-nav.addEventListener('load',fitNav);
-window.addEventListener('load',()=>{{{{fit();fitOverlay();fitNav();}}}});
+window.addEventListener('load',()=>{{fit();fitOverlay();}});
 addEventListener('resize',fit);
-addEventListener('resize',()=>{{{{if(document.fullscreenElement||document.webkitFullscreenElement){{{{fitOverlay();fitNav();}}}}}}}});
+addEventListener('resize',()=>{{if(document.fullscreenElement||document.webkitFullscreenElement)fitOverlay();}});
 new ResizeObserver(fit).observe(document.body);
 // Interactive slider — shared by the embed (#c) and the fullscreen overlay
 // (#c2). Pointer Events unify mouse + touch (§10.5); touch-action:none keeps
 // the browser from hijacking the gesture; the handle is purely visual
 // (pointer-events:none). Ignore events on .btn (fullscreen button).
-function setupSlider(el){{{{
+function setupSlider(el){{
   let dragging=false;
-  function setP(x){{{{const rect=el.getBoundingClientRect(),p=Math.min(100,Math.max(0,(x-rect.left)/rect.width*100));el.style.setProperty('--p',p+'%');}}}}
+  function setP(x){{const rect=el.getBoundingClientRect(),p=Math.min(100,Math.max(0,(x-rect.left)/rect.width*100));el.style.setProperty('--p',p+'%');}}
   const onBtn=e=>e.target.closest&&e.target.closest('.btn');
-  el.addEventListener('pointerdown',e=>{{{{if(onBtn(e))return;dragging=true;try{{{{el.setPointerCapture(e.pointerId)}}}}catch{{{{}}}}setP(e.clientX);e.preventDefault();}}}});
-  el.addEventListener('pointermove',e=>{{{{if((dragging||e.pointerType==='mouse')&&!onBtn(e))setP(e.clientX);}}}});
-  el.addEventListener('pointerup',()=>{{{{dragging=false;}}}});
-  el.addEventListener('pointercancel',()=>{{{{dragging=false;}}}});
-}}}}
+  el.addEventListener('pointerdown',e=>{{if(onBtn(e))return;dragging=true;try{{el.setPointerCapture(e.pointerId)}}catch{{}}setP(e.clientX);e.preventDefault();}});
+  el.addEventListener('pointermove',e=>{{if((dragging||e.pointerType==='mouse')&&!onBtn(e))setP(e.clientX);}});
+  el.addEventListener('pointerup',()=>{{dragging=false;}});
+  el.addEventListener('pointercancel',()=>{{dragging=false;}});
+}}
 setupSlider(c);
 setupSlider(c2);
-// Gallery (DESIGN.md §11): collect every image in the chat whose embed
-// carries the viewer data-gallery marker — this slider uses the SAME
-// markers as the image viewer (class="viewer" + data-gallery on #c, the
-// edited <img> as #thumb), so viewers AND sliders all appear together, each
-// with its data-prompt caption. Requires same-origin ON; guarded for OFF.
-let gallery=[],galleryIdx=-1;
-function updateCaption(){{{{
-  const p=(gallery[galleryIdx]&&gallery[galleryIdx].prompt)||'';
-  if(p){{{{caption.textContent=p;caption.classList.add('show');}}}}
-  else{{{{caption.classList.remove('show');caption.textContent='';}}}}
-}}}}
-function collectGallery(){{{{
-  gallery=[];galleryIdx=-1;
-  try{{{{
-    const frames=parent.document.querySelectorAll('iframe');
-    for(let i=0;i<frames.length;i++){{{{
-      let cd=null;
-      try{{{{cd=frames[i].contentDocument;}}}}catch(e){{{{}}}}
-      if(!cd)continue;
-      const v=cd.querySelector('.viewer[data-gallery]');
-      if(!v)continue;
-      const im=cd.getElementById('thumb');
-      const pr=v.getAttribute('data-prompt')||'';
-      if(im&&im.src&&!gallery.some(g=>g.src===im.src))gallery.push({{{{src:im.src,prompt:pr}}}});
-    }}}}
-  }}}}catch(e){{{{}}}}
-  if(!gallery.some(g=>g.src===ownSrc))gallery.unshift({{{{src:ownSrc,prompt:ownPrompt}}}});
-  galleryIdx=gallery.findIndex(g=>g.src===ownSrc);
-  const multi=gallery.length>1;
-  prevBtn.style.display=nextBtn.style.display=counter.style.display=multi?'flex':'none';
-  if(multi&&galleryIdx>=0)counter.textContent=(galleryIdx+1)+'/'+gallery.length;
-  updateCaption();
-}}}}
-function showImage(i){{{{
-  if(gallery.length<2)return;
-  galleryIdx=((i%gallery.length)+gallery.length)%gallery.length;
-  const g=gallery[galleryIdx];
-  counter.textContent=(galleryIdx+1)+'/'+gallery.length;
-  if(g.src===ownSrc){{{{
-    // Own image: back to the original-vs-edited comparison slider.
-    nav.style.display='none';
-    c2.style.display='block';
-    im2.src=origSrc;top2.src=ownSrc;
-    fitOverlay();
-  }}}}else{{{{
-    // Another conversation image: no original to compare, show it alone.
-    c2.style.display='none';
-    nav.style.display='block';
-    nav.src=g.src;
-    fitNav();
-  }}}}
-  updateCaption();
-}}}}
+// Prompt caption (DESIGN.md §12): shown in the fullscreen only, as plain
+// text over a bottom gradient (textContent, never innerHTML).
+function showCaption(){{
+  const p=c.getAttribute('data-prompt')||'';
+  if(p){{caption.textContent=p;caption.classList.add('show');}}
+  else{{caption.classList.remove('show');caption.textContent='';}}
+}}
 // Chat scroll preservation around the fullscreen (§10.8): the scroll is NOT
 // on the parent window; it lives in an inner container in Open WebUI's DOM.
 // Save the parent window AND all inner scrolled containers before opening,
 // restore them after closing (same-origin ON; guarded for OFF).
 let savedScrolls=[];
-function saveScroll(){{{{
+function saveScroll(){{
   savedScrolls=[];
-  try{{{{savedScrolls.push({{{{el:parent,top:parent.scrollY||0}}}});}}}}catch(e){{{{}}}}
-  try{{{{
+  try{{savedScrolls.push({{el:parent,top:parent.scrollY||0}});}}catch(e){{}}
+  try{{
     const doc=parent.document||document;
     const all=doc.querySelectorAll&&doc.querySelectorAll('*');
-    if(all)for(let i=0;i<all.length;i++){{{{
+    if(all)for(let i=0;i<all.length;i++){{
       const el=all[i];
-      if(el.scrollTop>0&&el.scrollHeight>el.clientHeight)savedScrolls.push({{{{el:el,top:el.scrollTop}}}});
-    }}}}
-  }}}}catch(e){{{{}}}}
-}}}}
-function restoreScroll(){{{{requestAnimationFrame(()=>{{{{requestAnimationFrame(()=>{{{{
-  try{{{{parent.scrollTo(0,savedScrolls[0]&&savedScrolls[0].top||0);}}}}catch(e){{{{}}}}
-  for(let i=0;i<savedScrolls.length;i++){{{{try{{{{savedScrolls[i].el.scrollTop=savedScrolls[i].top;}}}}catch(e){{{{}}}}}}}}
+      if(el.scrollTop>0&&el.scrollHeight>el.clientHeight)savedScrolls.push({{el:el,top:el.scrollTop}});
+    }}
+  }}catch(e){{}}
+}}
+function restoreScroll(){{requestAnimationFrame(()=>{{requestAnimationFrame(()=>{{
+  try{{parent.scrollTo(0,savedScrolls[0]&&savedScrolls[0].top||0);}}catch(e){{}}
+  for(let i=0;i<savedScrolls.length;i++){{try{{savedScrolls[i].el.scrollTop=savedScrolls[i].top;}}catch(e){{}}}}
   document.documentElement.scrollTop=0;document.body.scrollTop=0;
-}}}});}}}});}}}}
-function resetView(){{{{
-  // Always reopen on the embed's own comparison (gallery may have navigated).
-  nav.style.display='none';
-  c2.style.display='block';
-  im2.src=origSrc;top2.src=ownSrc;
-}}}}
-function openFullscreen(){{{{
-  resetView();
-  collectGallery();
+}});}});}}
+function openFullscreen(){{
   overlay.classList.add('open');
   fitOverlay();
+  showCaption();
   saveScroll();
-  try{{{{overlay.requestFullscreen&&overlay.requestFullscreen();}}}}catch(e){{{{}}}}
-  try{{{{overlay.webkitRequestFullscreen&&overlay.webkitRequestFullscreen();}}}}catch(e){{{{}}}}
-}}}}
-function closeLightbox(){{{{
-  if(document.fullscreenElement||document.webkitFullscreenElement){{{{
-    try{{{{document.exitFullscreen&&document.exitFullscreen();}}}}catch(e){{{{}}}}
-    try{{{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}}}catch(e){{{{}}}}
-  }}}}else{{{{
+  try{{overlay.requestFullscreen&&overlay.requestFullscreen();}}catch(e){{}}
+  try{{overlay.webkitRequestFullscreen&&overlay.webkitRequestFullscreen();}}catch(e){{}}
+}}
+function closeFullscreen(){{
+  if(document.fullscreenElement||document.webkitFullscreenElement){{
+    try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{}}
+    try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{}}
+  }}else{{
     overlay.classList.remove('open');
     restoreScroll();
-  }}}}
-}}}}
-fsBtn.addEventListener('pointerup',e=>{{{{if(e.pointerType==='mouse'&&e.button!==0)return;openFullscreen();}}}});
-fs2Btn.addEventListener('pointerup',e=>{{{{if(e.pointerType==='mouse'&&e.button!==0)return;closeLightbox();restoreScroll();}}}});
-closeBtn.addEventListener('pointerup',()=>{{{{closeLightbox();restoreScroll();}}}});
-overlay.addEventListener('pointerup',e=>{{{{if(e.target===overlay){{{{closeLightbox();restoreScroll();}}}}}}}});
-prevBtn.addEventListener('pointerup',e=>{{{{e.stopPropagation();showImage(galleryIdx-1);}}}});
-nextBtn.addEventListener('pointerup',e=>{{{{e.stopPropagation();showImage(galleryIdx+1);}}}});
-document.addEventListener('keydown',e=>{{{{
-  if(e.key==='Escape'){{{{closeLightbox();restoreScroll();}}}}
-  else if(e.key==='ArrowLeft'){{{{if(overlay.classList.contains('open'))showImage(galleryIdx-1);}}}}
-  else if(e.key==='ArrowRight'){{{{if(overlay.classList.contains('open'))showImage(galleryIdx+1);}}}}
-}}}});
-document.addEventListener('fullscreenchange',()=>{{{{if(!(document.fullscreenElement||document.webkitFullscreenElement)){{{{overlay.classList.remove('open');restoreScroll();fit();}}}}}}}});
-async function download(){{{{try{{{{const r=await fetch((gallery[galleryIdx]&&gallery[galleryIdx].src)||ownSrc);if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}}}}catch(err){{{{const w=window.open((gallery[galleryIdx]&&gallery[galleryIdx].src)||ownSrc,'_blank');if(w)w.focus();}}}}}}}}
-dlBtn.addEventListener('pointerup',download);
+  }}
+}}
+fsBtn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;openFullscreen();}});
+fs2Btn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;closeFullscreen();restoreScroll();}});
+overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeFullscreen();restoreScroll();}}}});
+document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{closeFullscreen();restoreScroll();}}}});
+document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');restoreScroll();fit();}}}});
 fit();
 </script>
 </body>

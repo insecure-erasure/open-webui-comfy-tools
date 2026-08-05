@@ -31,8 +31,9 @@ The tool returns an `HTMLResponse` with `Content-Disposition: inline` plus a con
 
 - The embed shows the **original image vs the edited one** with an interactive divider (drag / tap / desktop hover), so the edit can be inspected side by side. Both images share the same aspect ratio (the edit workflow keeps the input size), so the slider fits both with `object-fit: cover`.
 - The slider fills the chat container width; on portrait devices it is full width with no height cap, on landscape devices the height is capped at **80% of the available screen height** and the slider is centered.
-- A floating **maximize button** (bottom-right) opens the comparison in a **fullscreen overlay with its own interactive slider** (same drag/tap/hover behavior) via the **Fullscreen API**. Escape, the restore button, or clicking the dark backdrop close it.
-- The fullscreen overlay also keeps the image-viewer features: the **prompt caption** (the edit prompt, shown at the bottom over a gradient), a **download** button (top-right), and the **conversation gallery** (prev/next arrows and a n/N counter) when other generated images are present — the edited image appears in the gallery with its edit prompt.
+- A floating **maximize button** (bottom-right) opens the comparison in a **fullscreen overlay with its own interactive slider** (same drag/tap/hover behavior) via the **Fullscreen API**. The fullscreen shows only the comparison (plus the prompt caption and the exit button); Escape, the restore button, or clicking the dark backdrop close it.
+- The **prompt caption** (the edit prompt) is shown at the bottom of the fullscreen over a gradient, exactly like the image viewer's lightbox.
+- The edited image still appears in the **conversation gallery** of the other image tools (smart_generate_image, virtual_try_on) with its edit prompt — it uses the same gallery markers as the viewer. The edit slider itself does not navigate the gallery.
 - On open/close, the chat scroll position is preserved (no jump to the top).
 
 The **LLM only receives the context** `{ "image": <url> }` (the edited image URL) — never the HTML. The URL is the actionable value for chained tool calls.
