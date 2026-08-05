@@ -1,8 +1,8 @@
 """
-title: Enhance Image
+title: Upscale Image
 author: Insecure Erasure
-description: Enhance / upscale a previously generated image using SeedVR2
-version: 1.0
+description: Upscale a previously generated image using SeedVR2
+version: 1.1
 """
 
 import asyncio
@@ -175,9 +175,9 @@ def _extract_image_filename(outputs: dict, output_node_id: str) -> tuple[str, st
 
 class Tools:
     """
-    Enhance / upscale a previously generated image.
+    Upscale a previously generated image.
 
-    Only call when the user explicitly asks to enhance or upscale
+    Only call when the user explicitly asks to upscale
     an image. Pass an image filename or an URL.
 
     image: The filename previously generated from the smart_generate_image
@@ -494,7 +494,7 @@ dlBtn.addEventListener('pointerup',download);
 """
         )
 
-    async def enhance_image(
+    async def upscale(
         self,
         image: str,
         __request__=None,
@@ -505,20 +505,20 @@ dlBtn.addEventListener('pointerup',download);
         __id__: str = "",
     ):
         """
-        Enhance / upscale a previously generated image.
+        Upscale a previously generated image.
 
-        Only call when the user explicitly asks to enhance or upscale
+        Only call when the user explicitly asks to upscale
         an image. Pass an image filename or an URL.
 
-        The enhanced image is displayed in the chat as a Rich UI embed
+        The upscaled image is displayed in the chat as a Rich UI embed
         (image viewer with zoom and download). The tool returns the image
         URL as context ({'image': <url>}); use it for chained tool calls
-        or to refer to the enhanced image.
+        or to refer to the upscaled image.
 
         :param image: The filename previously generated from the smart_generate_image response, or a direct URL to an external image.
         """
         if __request__ is None:
-            log.error("enhance_image called without request context")
+            log.error("upscale called without request context")
             return "Error: The tool could not be initialized."
 
         try:
@@ -527,7 +527,7 @@ dlBtn.addEventListener('pointerup',download);
                     {
                         "type": "status",
                         "data": {
-                            "description": "\U0001f52e Enhancing image...",
+                            "description": "\U0001f52e Upscaling image...",
                             "done": False,
                             "hidden": False,
                         },
@@ -557,7 +557,7 @@ dlBtn.addEventListener('pointerup',download);
             # =================================================================
             # Build the workflow: load from cache and parse
             # =================================================================
-            raw_workflow = _load_workflow(__id__, "enhance_image.json")
+            raw_workflow = _load_workflow(__id__, "upscale_image.json")
             workflow = json.loads(raw_workflow)
 
             # Configure image source — auto-detect URL vs filename
@@ -575,7 +575,7 @@ dlBtn.addEventListener('pointerup',download);
                 node_img["url"] = ""
 
             log.info(
-                "Dispatching enhance workflow to ComfyUI (%s) - %s=%s",
+                "Dispatching upscale workflow to ComfyUI (%s) - %s=%s",
                 image_config.COMFYUI_BASE_URL,
                 "url" if parsed.scheme and parsed.netloc else "file",
                 image,
@@ -595,31 +595,31 @@ dlBtn.addEventListener('pointerup',download);
                     client, comfy_base, api_key, workflow
                 )
 
-                log.info("Enhance workflow queued - prompt_id=%s", prompt_id)
+                log.info("Upscale workflow queued - prompt_id=%s", prompt_id)
 
                 try:
                     outputs = await _comfyui_wait_for_output(
                         client, comfy_base, api_key, prompt_id
                     )
                 except asyncio.CancelledError:
-                    log.info("Enhance cancelled by user - interrupting ComfyUI")
+                    log.info("Upscale cancelled by user - interrupting ComfyUI")
                     await _comfyui_interrupt(comfy_base, api_key)
                     raise
 
             # =================================================================
             # Extract image filename and build URL
             # =================================================================
-            enhanced_filename, image_type = _extract_image_filename(outputs, preview_image_id)
+            upscaled_filename, image_type = _extract_image_filename(outputs, preview_image_id)
 
             base = resolved_image_base_url.rstrip("/")
-            enhanced_url = f"{base}/api/view?filename={enhanced_filename}&type={image_type}"
+            upscaled_url = f"{base}/api/view?filename={upscaled_filename}&type={image_type}"
 
             if __event_emitter__:
                 await __event_emitter__(
                     {
                         "type": "status",
                         "data": {
-                            "description": "\u2705 Image enhanced.",
+                            "description": "\u2705 Image upscaled.",
                             "done": True,
                             "hidden": False,
                         },
@@ -632,28 +632,28 @@ dlBtn.addEventListener('pointerup',download);
             # input image), so the viewer sizes itself after the image loads
             # (no aspect reservation). The URL (not the filename) is emitted
             # so downstream tools and compare_images can use it directly.
-            viewer = self._build_image_viewer(enhanced_url, gallery=True)
+            viewer = self._build_image_viewer(upscaled_url, gallery=True)
             return HTMLResponse(
                 content=viewer, headers={"Content-Disposition": "inline"}
-            ), {"image": enhanced_url}
+            ), {"image": upscaled_url}
 
         except asyncio.CancelledError:
-            log.info("enhance_image cancelled by user")
+            log.info("upscale cancelled by user")
             if __event_emitter__:
                 await __event_emitter__(
                     {
                         "type": "status",
                         "data": {
-                            "description": "\u2753 Image enhancement cancelled.",
+                            "description": "\u2753 Image upscaling cancelled.",
                             "done": True,
                             "hidden": False,
                         },
                     }
                 )
             return (
-                "The image enhancement was cancelled by the user. "
+                "The image upscaling was cancelled by the user. "
                 "Do not retry. Acknowledge the cancellation and wait for their next request."
             )
         except Exception as e:
-            log.exception("enhance_image failed: %s", e)
-            return f"Error enhancing image: {e}"
+            log.exception("upscale failed: %s", e)
+            return f"Error upscaling image: {e}"

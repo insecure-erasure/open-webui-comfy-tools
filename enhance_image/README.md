@@ -1,6 +1,6 @@
-# Enhance Image
+# Upscale Image
 
-Upscales or enhances a previously generated image using SeedVR2. Loads images via URL or temporary file, auto-detecting the source type. Requires the ComfyUI-LoadImageURL custom node.
+Upscales a previously generated image using SeedVR2. Loads images via URL or temporary file, auto-detecting the source type. Requires the ComfyUI-LoadImageURL custom node.
 
 ## Valves
 
@@ -18,7 +18,7 @@ Upscales or enhances a previously generated image using SeedVR2. Loads images vi
 
 ## Usage
 
-The LLM calls this tool when the user explicitly asks to enhance or upscale an image. Pass a filename from a previous generation or a direct URL to an external image.
+The LLM calls this tool when the user explicitly asks to upscale an image. Pass a filename from a previous generation or a direct URL to an external image.
 
 ## How it renders
 
@@ -28,7 +28,7 @@ The tool returns an `HTMLResponse` with `Content-Disposition: inline` plus a con
 - Clicking the image opens a **lightbox** that fills the browser window via the **Fullscreen API** (image fit to screen, no scroll), with an X to close (top-left) and a **download** button (top-right) that forces the download.
 - On close, the chat scroll position is preserved (no jump to the top).
 
-The **LLM only receives the context** `{ "image": <url> }` (the enhanced image URL) — never the HTML. The URL is the actionable value for chained tool calls.
+The **LLM only receives the context** `{ "image": <url> }` (the upscaled image URL) — never the HTML. The URL is the actionable value for chained tool calls.
 
 ## Models
 
@@ -43,10 +43,10 @@ The workflow uses two models that are downloaded automatically on first run:
 
 ## Workflow file
 
-Place `enhance_image.json` in the tool's cache directory:
+Place `upscale_image.json` in the tool's cache directory:
 
 ```
-/app/backend/data/cache/tools/enhance_image/enhance_image.json
+/app/backend/data/cache/tools/enhance_image/upscale_image.json
 ```
 
 The workflow JSON can be edited freely. You can replace the SeedVR2 model or configuration with any compatible upscaling setup. The tool injects parameters from both the LLM call argument (image) and the valves. Everything else uses whatever the workflow defines.
