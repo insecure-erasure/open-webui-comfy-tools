@@ -124,7 +124,7 @@ const c=document.getElementById('c'),topImg=document.getElementById('top'),
       im2=document.querySelector('#c2 img'),
       overlay=document.getElementById('overlay'),
       fsBtn=document.getElementById('fs'),fs2Btn=document.getElementById('fs2');
-function reportHeight(){{parent.postMessage({{type:'iframe:height',height:document.documentElement.scrollHeight}},'*')}}
+function reportHeight(){{parent.postMessage({{type:'iframe:height',height:c.offsetHeight||document.documentElement.scrollHeight}},'*')}}
 function isLandscape(){{
   if(screen.orientation&&screen.orientation.type)return screen.orientation.type.indexOf('landscape')===0;
   if(typeof window.orientation==='number')return Math.abs(window.orientation)===90;
