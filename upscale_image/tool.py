@@ -111,7 +111,7 @@ async def _comfyui_queue_prompt(
 async def _comfyui_wait_for_output(
     client: httpx.AsyncClient, base_url: str, api_key: str, prompt_id: str
 ) -> dict:
-    """Poll /history/{prompt_id} until the workflow completes. Returns the output dict."""
+    """Poll /history/{prompt_id} until the workflow completes."""
     headers = {}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -189,7 +189,10 @@ class Tools:
 
         comfyui_image_base_url: str = Field(
             default="",
-            description="Public base URL for image links (overrides COMFYUI_BASE_URL). Leave empty to use COMFYUI_BASE_URL.",
+            description=(
+                "Public base URL for image links (overrides "
+                "COMFYUI_BASE_URL). Leave empty to use COMFYUI_BASE_URL."
+            ),
         )
 
     class UserValves(BaseModel):
@@ -197,7 +200,10 @@ class Tools:
 
         comfyui_image_base_url: str = Field(
             default="",
-            description="Public base URL for image links. Overrides the admin valve and COMFYUI_BASE_URL.",
+            description=(
+                "Public base URL for image links. "
+                "Overrides the admin valve and COMFYUI_BASE_URL."
+            ),
         )
 
     def __init__(self):
@@ -445,7 +451,8 @@ fit();
         URL as context ({'image': <url>}); use it for chained tool calls
         or to refer to the upscaled image.
 
-        :param image: The filename previously generated from the smart_generate_image response, or a direct URL to an external image.
+        :param image: The filename previously generated from the
+            smart_generate_image response, or a direct URL to an external image.
         """
         if __request__ is None:
             log.error("upscale called without request context")
@@ -539,10 +546,14 @@ fit();
             # =================================================================
             # Extract image filename and build URL
             # =================================================================
-            upscaled_filename, image_type = _extract_image_filename(outputs, preview_image_id)
+            upscaled_filename, image_type = _extract_image_filename(
+                outputs, preview_image_id
+            )
 
             base = resolved_image_base_url.rstrip("/")
-            upscaled_url = f"{base}/api/view?filename={upscaled_filename}&type={image_type}"
+            upscaled_url = (
+                f"{base}/api/view?filename={upscaled_filename}&type={image_type}"
+            )
 
             if __event_emitter__:
                 await __event_emitter__(
@@ -595,7 +606,8 @@ fit();
                 )
             return (
                 "The image upscaling was cancelled by the user. "
-                "Do not retry. Acknowledge the cancellation and wait for their next request."
+                "Do not retry. Acknowledge the cancellation and wait "
+                "for their next request."
             )
         except Exception as e:
             log.exception("upscale failed: %s", e)
