@@ -1,8 +1,8 @@
 """
 title: Edit Image
 author: Insecure Erasure
-description: Edit a previously generated image using Flux 2 inpainting/editing
-version: 1.3
+description: Edit a previously generated image using inpainting/editing
+version: 1.4
 """
 
 import asyncio
@@ -31,8 +31,9 @@ _STEPS_OPTIONS = [
 ]
 
 # Restoration mode (mode="restore"): the runtime LoRA appended AFTER any
-# admin/user LoRAs (strength 1.0) and the prompt prefix prepended to the
-# agent's edit_prompt.
+# admin/user LoRAs (strength 1.0) and the restoration prompt. The agent's
+# edit_prompt is optional in restore mode; when provided, it is appended
+# after the restoration prefix.
 _RESTORE_LORA_NAME: str = "Flux2-Klein-Image-RestoreV1.safetensors"
 _RESTORE_PROMPT_PREFIX: str = (
     "restore the image quality, remove any compression artefacts, remove any "
@@ -206,9 +207,9 @@ class Tools:
     mode="edit" (default) applies the edit normally. Pass mode="restore"
     when the user wants to restore or enhance the quality of a degraded
     image (compression artefacts, haze, soft edges, low detail): the tool
-    appends the Flux2-Klein-Image-RestoreV1 LoRA at strength 1.0 and
-    prepends a restoration prompt to edit_prompt. edit_prompt is still
-    required in restore mode (e.g. "Restore this image to full quality").
+    appends a restoration LoRA at strength 1.0 and uses the restoration
+    prompt on its own — edit_prompt is optional in restore mode (omit it
+    or pass an empty string).
     """
 
     class Valves(BaseModel):
@@ -476,7 +477,7 @@ fit();
     async def edit_image(
         self,
         image: str,
-        edit_prompt: str,
+        edit_prompt: str = "",
         mode: str = "edit",
         __request__=None,
         __user__=None,
@@ -502,13 +503,15 @@ fit();
             external image.
         :param edit_prompt: Natural language description of the edit to apply
             (e.g., "Change the cat's fur to orange", "Add a sunset
-            background"). Be specific and descriptive.
+            background"). Be specific and descriptive. In "restore" mode
+            it is optional (omit it or pass ""): the restoration prompt is
+            used on its own.
         :param mode: "edit" (default) applies the edit normally. "restore"
-            restores/enhances the quality of a degraded image: appends the
-            Flux2-Klein-Image-RestoreV1 LoRA (strength 1.0) and prepends a
-            restoration prompt to edit_prompt. Use it when the user asks to
-            restore, deblur, denoise, de-haze or improve the quality of an
-            image.
+            restores/enhances the quality of a degraded image: appends a
+            restoration LoRA at strength 1.0 and uses the
+            restoration prompt, appending edit_prompt only when provided.
+            Use it when the user asks to restore, deblur, denoise, de-haze
+            or improve the quality of an image.
         """
         if __request__ is None:
             log.error("edit_image called without request context")
@@ -770,11 +773,16 @@ fit();
             # =================================================================
             _, edit_node = _resolve_node(workflow, "Prompt")
             if restore:
-                # Restoration mode prepends the restoration prompt to the
-                # agent's edit_prompt (the prefix ends with a comma; join
-                # with a space so the agent's description flows naturally).
+                # Restoration mode uses the restoration prompt. The agent's
+                # edit_prompt is optional here (defaults to ""); append it
+                # only when actually provided — the prefix already ends with
+                # a comma, so the agent's description flows naturally after
+                # a space.
+                stripped = edit_prompt.strip() if edit_prompt else ""
                 edit_node["inputs"]["value"] = (
-                    _RESTORE_PROMPT_PREFIX + " " + edit_prompt.strip()
+                    _RESTORE_PROMPT_PREFIX + " " + stripped
+                    if stripped
+                    else _RESTORE_PROMPT_PREFIX
                 )
             else:
                 edit_node["inputs"]["value"] = edit_prompt

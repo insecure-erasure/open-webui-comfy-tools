@@ -30,9 +30,9 @@ The LLM calls this tool when the user explicitly asks to edit or modify an exist
 The `mode` argument (default `"edit"`) switches the tool to restoration:
 
 - `mode="edit"` (default): normal edits, exactly as described above.
-- `mode="restore"`: appends the `Flux2-Klein-Image-RestoreV1.safetensors` LoRA at strength 1.0 (after any admin/user LoRAs) and prepends a restoration prompt to the agent's `edit_prompt`. Use it for degraded images (compression artefacts, haze, soft edges, lack of detail).
+- `mode="restore"`: appends the `Flux2-Klein-Image-RestoreV1.safetensors` LoRA at strength 1.0 (after any admin/user LoRAs) and uses a restoration prompt. Use it for degraded images (compression artefacts, haze, soft edges, lack of detail).
 
-The restore LoRA is validated against the server's `/models/loras` like any other LoRA, so it must be installed on the ComfyUI server. The agent still passes an `edit_prompt` describing what to restore (e.g. "Restore this image to full quality").
+The restore LoRA is validated against the server's `/models/loras` like any other LoRA, so it must be installed on the ComfyUI server. In restore mode `edit_prompt` is **optional**: omit it (or pass an empty string `""`) and the restoration prompt is used on its own; a non-empty `edit_prompt` is appended after the restoration prompt for extra guidance (e.g. "Restore this image to full quality").
 
 ## How it renders
 
