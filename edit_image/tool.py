@@ -2,7 +2,7 @@
 title: Edit Image
 author: Insecure Erasure
 description: Edit a previously generated image using Flux 2 inpainting/editing
-version: 1.2
+version: 1.3
 """
 
 import asyncio
@@ -29,6 +29,17 @@ _COMFY_QUEUE_TIMEOUT = 60           # seconds
 _STEPS_OPTIONS = [
     {"value": str(v), "label": str(v)} for v in range(1, 16)
 ]
+
+# Restoration mode (mode="restore"): the runtime LoRA appended AFTER any
+# admin/user LoRAs (strength 1.0) and the prompt prefix prepended to the
+# agent's edit_prompt.
+_RESTORE_LORA_NAME: str = "Flux2-Klein-Image-RestoreV1.safetensors"
+_RESTORE_PROMPT_PREFIX: str = (
+    "restore the image quality, remove any compression artefacts, remove any "
+    "haze and soft edges, enrich the original with new intricate detail in "
+    "all textures and surfaces creating a professional photorealistic "
+    "photograph with natural lighting and skin texture,"
+)
 
 
 # =============================================================================
@@ -191,6 +202,13 @@ class Tools:
     The edit_prompt describes the desired change in natural language
     (e.g. "Make the cat wear a top hat" or "Change the background to
     a beach at sunset").
+
+    mode="edit" (default) applies the edit normally. Pass mode="restore"
+    when the user wants to restore or enhance the quality of a degraded
+    image (compression artefacts, haze, soft edges, low detail): the tool
+    appends the Flux2-Klein-Image-RestoreV1 LoRA at strength 1.0 and
+    prepends a restoration prompt to edit_prompt. edit_prompt is still
+    required in restore mode (e.g. "Restore this image to full quality").
     """
 
     class Valves(BaseModel):
@@ -459,6 +477,7 @@ fit();
         self,
         image: str,
         edit_prompt: str,
+        mode: str = "edit",
         __request__=None,
         __user__=None,
         __event_emitter__=None,
@@ -484,10 +503,27 @@ fit();
         :param edit_prompt: Natural language description of the edit to apply
             (e.g., "Change the cat's fur to orange", "Add a sunset
             background"). Be specific and descriptive.
+        :param mode: "edit" (default) applies the edit normally. "restore"
+            restores/enhances the quality of a degraded image: appends the
+            Flux2-Klein-Image-RestoreV1 LoRA (strength 1.0) and prepends a
+            restoration prompt to edit_prompt. Use it when the user asks to
+            restore, deblur, denoise, de-haze or improve the quality of an
+            image.
         """
         if __request__ is None:
             log.error("edit_image called without request context")
             return "Error: The tool could not be initialized."
+
+        # mode: "edit" (default) or "restore"
+        mode = (mode or "edit").strip().lower()
+        if mode not in ("edit", "restore"):
+            return (
+                f"Error: invalid mode {mode!r}. mode must be 'edit' (default) "
+                "or 'restore'."
+            )
+        restore = mode == "restore"
+        verb = "Restoring" if restore else "Editing"
+        done_label = "Image restored." if restore else "Image edited."
 
         try:
             # Immediate feedback: let the user know editing has started
@@ -496,7 +532,7 @@ fit();
                     {
                         "type": "status",
                         "data": {
-                            "description": "\U0001f3a8 Editing image...",
+                            "description": f"\U0001f3a8 {verb} image...",
                             "done": False,
                             "hidden": False,
                         },
@@ -641,6 +677,10 @@ fit();
                     if _lora_name(item) not in system_names:
                         combined.append(item)
 
+            if restore:
+                # Runtime restoration LoRA — appended last, strength 1.0
+                combined.append({"name": _RESTORE_LORA_NAME, "strength": 1.0})
+
             # Validate LoRAs exist on the ComfyUI server
             missing = await _check_loras_exist(
                 combined,
@@ -689,7 +729,7 @@ fit();
 
             # Progress update: show resolved LoRAs if any
             if __event_emitter__ and lora_desc_lines:
-                status_desc = "\U0001f3a8 Editing image with LoRAs..."
+                status_desc = f"\U0001f3a8 {verb} image with LoRAs..."
                 for line in lora_desc_lines:
                     status_desc += f"\n    \u2022 {line}"
                 await __event_emitter__(
@@ -729,7 +769,15 @@ fit();
             # 2. Set the edit prompt (the user-facing description)
             # =================================================================
             _, edit_node = _resolve_node(workflow, "Prompt")
-            edit_node["inputs"]["value"] = edit_prompt
+            if restore:
+                # Restoration mode prepends the restoration prompt to the
+                # agent's edit_prompt (the prefix ends with a comma; join
+                # with a space so the agent's description flows naturally).
+                edit_node["inputs"]["value"] = (
+                    _RESTORE_PROMPT_PREFIX + " " + edit_prompt.strip()
+                )
+            else:
+                edit_node["inputs"]["value"] = edit_prompt
 
             # =================================================================
             # 3. Generate a random seed and inject it
@@ -750,8 +798,17 @@ fit();
             _, lora_node = _resolve_node(workflow, "Power Lora Loader (rgthree)")
             preview_image_id, _ = _resolve_node(workflow, "Random Preview Image")
 
+            # The rgthree Power Lora Loader accepts any number of lora_N
+            # inputs (FlexibleOptionalInputType), so grow the workflow when
+            # there are more LoRAs than it defines instead of truncating.
             max_slots = sum(1 for k in lora_node["inputs"] if k.startswith("lora_"))
-            lora_config = combined[:max_slots]
+            for i in range(max_slots + 1, len(combined) + 1):
+                lora_node["inputs"][f"lora_{i}"] = {
+                    "on": False,
+                    "lora": "",
+                    "strength": 0,
+                }
+            lora_config = combined
 
             log.info("LoRA injection: admin_raw=%s user_raw=%s combined=%s",
                       self.valves.lora_config,
@@ -781,8 +838,9 @@ fit();
                     lora_node["inputs"][slot]["strength"] = 0
 
             log.info(
-                "Dispatching edit workflow to ComfyUI (%s) - %s=%s, seed=%d, steps=%s, loras=%s",
+                "Dispatching edit workflow to ComfyUI (%s) - mode=%s, %s=%s, seed=%d, steps=%s, loras=%s",
                 image_config.COMFYUI_BASE_URL,
+                mode,
                 "url" if parsed.scheme and parsed.netloc else "file",
                 image,
                 seed_arg,
@@ -825,7 +883,7 @@ fit();
                     {
                         "type": "status",
                         "data": {
-                            "description": "\u2705 Image edited.",
+                            "description": f"\u2705 {done_label}",
                             "done": True,
                             "hidden": False,
                         },

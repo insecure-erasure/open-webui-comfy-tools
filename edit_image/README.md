@@ -25,6 +25,15 @@ Edits a previously generated image using Flux 2 inpainting. Accepts either a too
 
 The LLM calls this tool when the user explicitly asks to edit or modify an existing image. The edit_prompt describes the desired change in natural language (e.g., "change the background to a beach at sunset"). A random seed is generated for each edit.
 
+## Restore mode
+
+The `mode` argument (default `"edit"`) switches the tool to restoration:
+
+- `mode="edit"` (default): normal edits, exactly as described above.
+- `mode="restore"`: appends the `Flux2-Klein-Image-RestoreV1.safetensors` LoRA at strength 1.0 (after any admin/user LoRAs) and prepends a restoration prompt to the agent's `edit_prompt`. Use it for degraded images (compression artefacts, haze, soft edges, lack of detail).
+
+The restore LoRA is validated against the server's `/models/loras` like any other LoRA, so it must be installed on the ComfyUI server. The agent still passes an `edit_prompt` describing what to restore (e.g. "Restore this image to full quality").
+
 ## How it renders
 
 The tool returns an `HTMLResponse` with `Content-Disposition: inline` plus a context tuple, so Open WebUI renders it as a **Rich UI embed**: a self-contained **before/after comparison slider** in a sandboxed iframe right in the chat (the same embed as Compare Images).
