@@ -43,10 +43,10 @@ The workflow uses two models that are downloaded automatically on first run:
 
 ## Workflow file
 
-Place `upscale_image.json` in the tool's cache directory:
+Place `seedvr2_upscale.json` in the tool's cache directory:
 
 ```
-/app/backend/data/cache/tools/enhance_image/upscale_image.json
+/app/backend/data/cache/tools/upscale_image/seedvr2_upscale.json
 ```
 
 The workflow JSON can be edited freely. You can replace the SeedVR2 model or configuration with any compatible upscaling setup. The tool injects parameters from both the LLM call argument (image) and the valves. Everything else uses whatever the workflow defines.

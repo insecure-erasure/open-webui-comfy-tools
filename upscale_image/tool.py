@@ -557,7 +557,7 @@ dlBtn.addEventListener('pointerup',download);
             # =================================================================
             # Build the workflow: load from cache and parse
             # =================================================================
-            raw_workflow = _load_workflow(__id__, "upscale_image.json")
+            raw_workflow = _load_workflow(__id__, "seedvr2_upscale.json")
             workflow = json.loads(raw_workflow)
 
             # Configure image source — auto-detect URL vs filename
