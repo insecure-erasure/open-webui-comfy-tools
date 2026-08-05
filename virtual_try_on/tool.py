@@ -299,28 +299,36 @@ class Tools:
         Build the before/after comparison slider as a standalone HTML document.
 
         The same embed as compare_images/upscale_image (DESIGN.md §10): the
-        preview IS the interactive divider slider (original vs edited), and a
-        floating maximize button (bottom-right) opens the fullscreen overlay
-        with its OWN interactive slider. NO gallery navigation: the fullscreen
-        only shows the comparison (plus the prompt caption, a plain text
-        overlay, and the exit button).
+        preview IS the interactive divider slider (original model photo vs
+        try-on result), and a floating maximize button (bottom-right) opens
+        the fullscreen overlay with its OWN interactive slider. NO gallery
+        navigation: the fullscreen only shows the comparison (plus the prompt
+        caption, a plain text overlay, and the exit button).
 
         The two image URLs are injected into the <img> tags. They are
         HTML-escaped so query strings (e.g. &filename=...&type=...) cannot
         break the markup.
 
+        Download buttons (maintainer request, 2026-08-05): a download button
+        sits at the top-right of the embed (vertically above the fullscreen
+        button) and another at the top-right of the fullscreen overlay. Both
+        fetch the result image as a blob and force a download (fetch -> blob
+        -> object URL -> anchor); on failure (e.g. iOS sandboxed iframe) they
+        open the image in a new tab.
+
         Gallery collection markers (maintainer request, 2026-08-05): when
         gallery=True the container carries `class="viewer"` +
-        `data-gallery="1"` and the edited <img> gets `id="thumb"` with a
+        `data-gallery="1"` and the result <img> gets `id="thumb"` with a
         `data-prompt` — the SAME markers the image viewer uses. This makes the
-        edited image collectible by the conversation gallery that the OTHER
-        viewer embeds (smart_generate_image, virtual_try_on) open — it appears
-        there with its edit prompt. This slider itself does NOT navigate the
-        gallery: it only shows the before/after comparison.
+        result collectible by the conversation gallery that the OTHER viewer
+        embed (smart_generate_image) opens — it appears there with its
+        generated prompt. This slider itself does NOT navigate the gallery: it
+        only shows the before/after comparison.
 
         Sizing: same as compare_images — portrait full width no cap, landscape
         capped at 80% of the available screen height; both images share the
-        aspect ratio (the edit keeps the input size).
+        aspect ratio (the workflow derives the latent size from the model
+        photo).
         """
         a = html.escape(image_a, quote=True)
         b = html.escape(image_b, quote=True)
@@ -348,6 +356,7 @@ html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
 .btn{{position:absolute;display:flex;align-items:center;justify-content:center;background:rgba(28,28,28,.75);border:none;border-radius:8px;color:#f5f5f5;cursor:pointer;padding:6px;z-index:5}}
 .btn svg{{display:block}}
 #fs{{bottom:8px;right:8px}}
+#dl{{top:8px;right:8px}}
 @media (prefers-color-scheme: light){{
   .btn{{background:rgba(235,235,235,.82);color:#1a1a1a}}
 }}
@@ -361,6 +370,7 @@ html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
 #h2 span{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}
 #h2 span:last-child{{transform:rotate(-135deg)}}
 #fs2{{bottom:14px;right:14px;z-index:1001}}
+#dl2{{top:14px;right:14px;z-index:1001}}
 .caption{{position:absolute;left:0;right:0;bottom:0;display:none;padding:56px 24px 18px;color:#fff;text-align:center;font:500 15px/1.5 system-ui,sans-serif;text-shadow:0 1px 4px rgba(0,0,0,.75);white-space:pre-wrap;overflow:hidden;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.3) 30%,rgba(0,0,0,.65) 65%,rgba(0,0,0,.88) 100%)}}
 .caption.show{{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}}
 </style>
@@ -374,6 +384,9 @@ html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
 <button id="fs" class="btn" title="Fullscreen" aria-label="Fullscreen">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
 </button>
+<button id="dl" class="btn" title="Download" aria-label="Download">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+</button>
 </div>
 <div class="overlay" id="overlay">
 <div id="c2">
@@ -386,6 +399,9 @@ html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
 <button id="fs2" class="btn" title="Exit fullscreen" aria-label="Exit fullscreen">
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
 </button>
+<button id="dl2" class="btn" title="Download" aria-label="Download">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+</button>
 </div>
 <script>
 const c=document.getElementById('c'),topImg=document.getElementById('thumb'),
@@ -394,6 +410,7 @@ const c=document.getElementById('c'),topImg=document.getElementById('thumb'),
       im2=document.querySelector('#c2 img'),
       overlay=document.getElementById('overlay'),
       fsBtn=document.getElementById('fs'),fs2Btn=document.getElementById('fs2'),
+      dlBtn=document.getElementById('dl'),dl2Btn=document.getElementById('dl2'),
       caption=document.getElementById('caption');
 function reportHeight(){{parent.postMessage({{type:'iframe:height',height:document.documentElement.scrollHeight}},'*')}}
 function isLandscape(){{
@@ -498,6 +515,16 @@ function closeFullscreen(){{
 }}
 fsBtn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;openFullscreen();}});
 fs2Btn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;closeFullscreen();restoreScroll();}});
+// Download (embed and fullscreen): fetch the result image as a blob and
+// force a download; on failure (e.g. iOS sandboxed iframe) open it in a
+// new tab as a fallback. The result image is the top layer of the slider
+// (topImg in the embed, top2 in the overlay — same URL).
+async function download(){{
+  const src=topImg.src||top2.src||'';
+  try{{const r=await fetch(src);if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}}catch(err){{const w=window.open(src,'_blank');if(w)w.focus();}}
+}}
+dlBtn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;download();}});
+dl2Btn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;download();}});
 overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeFullscreen();restoreScroll();}}}});
 document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{closeFullscreen();restoreScroll();}}}});
 document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');restoreScroll();fit();}}}});
