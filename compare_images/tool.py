@@ -2,7 +2,7 @@
 title: Compare Images
 author: Insecure Erasure
 description: Compare two images side by side with an interactive before/after slider
-version: 2.7
+version: 2.8
 """
 
 import html

@@ -2,7 +2,7 @@
 title: Upscale Image
 author: Insecure Erasure
 description: Upscale an image by its name or URL
-version: 1.2
+version: 1.3
 """
 
 import asyncio

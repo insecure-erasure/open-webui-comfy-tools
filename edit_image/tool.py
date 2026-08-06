@@ -2,7 +2,7 @@
 title: Edit Image
 author: Insecure Erasure
 description: Edit a previously generated image using inpainting/editing
-version: 1.4
+version: 1.5
 """
 
 import asyncio

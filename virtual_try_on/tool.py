@@ -2,7 +2,7 @@
 title: Virtual Try-On
 author: Insecure Erasure
 description: Try on an upper and a lower garment on a person photo. Each image argument accepts a filename from a previous generation or a direct external image URL. model_image is required; upper_image and lower_image are optional.
-version: 1.1
+version: 1.2
 """
 
 import asyncio
