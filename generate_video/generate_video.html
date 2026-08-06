@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  color-scheme:light dark;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;margin:0;padding:0}
+body{display:flex;align-items:center;justify-content:center;background:transparent}
+.player{max-width:100%;overflow:hidden;border-radius:12px;background:#000}
+.player video{display:block;width:100%;height:100%;object-fit:contain;border-radius:12px}
+</style>
+</head>
+<body>
+<div class="player" id="player">
+  <video id="video" src="{src}" autoplay muted loop playsinline controls preload="metadata"></video>
+</div>
+<script>
+const player=document.getElementById('player'),video=document.getElementById('video');
+function reportHeight(){parent.postMessage({type:'iframe:height',height:player.offsetHeight||document.documentElement.scrollHeight},'*')}
+function fit(){
+  // The video's aspect ratio is not known a priori (unlike
+  // smart_generate_image, which reserves reduced_w:reduced_h): wait for the
+  // real dimensions before sizing — never fall back to a made-up ratio
+  // (DESIGN.md §10.4). Until then, report the current height and let the
+  // media events correct it.
+  if(!(video.videoWidth>0&&video.videoHeight>0)){reportHeight();return;}
+  const r=video.videoWidth/video.videoHeight;
+  // Sizing decision (DESIGN.md §6, 2026-08-04): 65vh cap. vh/vw units are
+  // useless inside the sandboxed iframe (§10.7), so the cap is 65% of the
+  // available screen height (screen.availHeight); the width derives from
+  // the container width + aspect ratio and the height never overflows the
+  // available screen space.
+  const maxH=(screen.availHeight||screen.height||0)*0.65;
+  let w=document.documentElement.clientWidth;
+  if(maxH>0){const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}
+  player.style.width=w+'px';
+  player.style.height=(w/r)+'px';
+  reportHeight();
+}
+video.addEventListener('loadedmetadata',fit);
+video.addEventListener('loadeddata',fit);
+video.addEventListener('canplay',fit);
+window.addEventListener('load',fit);
+addEventListener('resize',fit);
+new ResizeObserver(fit).observe(document.body);
+fit();
+</script>
+</body>
+</html>

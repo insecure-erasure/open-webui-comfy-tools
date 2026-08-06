@@ -174,6 +174,39 @@ def _load_workflow(tool_id: str, filename: str) -> str:
 
 
 # =============================================================================
+# Embed template loader — cache/tools/<tool_id>/<tool>.html
+# =============================================================================
+
+def _load_embed(tool_id: str, filename: str) -> str:
+    """
+    Load the embed HTML template from the tool's cache directory.
+
+    Resolves CACHE_DIR / 'tools' / <tool_id> / <filename>. Returns the raw
+    HTML string; the _build_* methods inject their values into it.
+
+    Raises RuntimeError if the tool_id is empty or the file is not found.
+    """
+    if not tool_id:
+        raise RuntimeError(
+            "No tool_id provided. The tool must run inside Open WebUI "
+            "to resolve the embed template from cache."
+        )
+
+    from open_webui.config import CACHE_DIR
+
+    embed_path = CACHE_DIR / 'tools' / tool_id / filename
+
+    if not embed_path.exists():
+        raise FileNotFoundError(
+            f"Embed template not found at {embed_path}. "
+            f"Copy {filename} from the tool's directory to that path."
+        )
+
+    log.info("Loading embed template from %s", embed_path)
+    return embed_path.read_text(encoding='utf-8')
+
+
+# =============================================================================
 # ComfyUI constants
 # =============================================================================
 _COMFY_SEED_MAX: int = 1125899906842624
@@ -581,7 +614,7 @@ class Tools:
         self.valves = self.Valves()
         self.citation = False
 
-    def _build_video_player(self, video_url: str) -> str:
+    def _build_video_player(self, video_url: str, tool_id: str = "") -> str:
         """
         Build the self-contained video player embed for a single video URL.
 
@@ -606,64 +639,14 @@ class Tools:
         The native fullscreen of the <video> (via its controls) does NOT cause
         the chat scroll jump, so no saveScroll/restoreScroll is needed here
         (unlike the image lightbox, DESIGN.md §10.8).
+
+        The markup lives in generate_video.html (same name as the tool, next
+        to its workflow JSON); it is loaded from the tool's cache directory
+        and the URL is injected into the {src} placeholder.
         """
         src = html.escape(video_url, quote=True)
-        return (
-f"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-:root{{
-  color-scheme:light dark;
-}}
-*{{margin:0;padding:0;box-sizing:border-box}}
-html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
-body{{display:flex;align-items:center;justify-content:center;background:transparent}}
-.player{{max-width:100%;overflow:hidden;border-radius:12px;background:#000}}
-.player video{{display:block;width:100%;height:100%;object-fit:contain;border-radius:12px}}
-</style>
-</head>
-<body>
-<div class="player" id="player">
-  <video id="video" src="{src}" autoplay muted loop playsinline controls preload="metadata"></video>
-</div>
-<script>
-const player=document.getElementById('player'),video=document.getElementById('video');
-function reportHeight(){{parent.postMessage({{type:'iframe:height',height:player.offsetHeight||document.documentElement.scrollHeight}},'*')}}
-function fit(){{
-  // The video's aspect ratio is not known a priori (unlike
-  // smart_generate_image, which reserves reduced_w:reduced_h): wait for the
-  // real dimensions before sizing — never fall back to a made-up ratio
-  // (DESIGN.md §10.4). Until then, report the current height and let the
-  // media events correct it.
-  if(!(video.videoWidth>0&&video.videoHeight>0)){{reportHeight();return;}}
-  const r=video.videoWidth/video.videoHeight;
-  // Sizing decision (DESIGN.md §6, 2026-08-04): 65vh cap. vh/vw units are
-  // useless inside the sandboxed iframe (§10.7), so the cap is 65% of the
-  // available screen height (screen.availHeight); the width derives from
-  // the container width + aspect ratio and the height never overflows the
-  // available screen space.
-  const maxH=(screen.availHeight||screen.height||0)*0.65;
-  let w=document.documentElement.clientWidth;
-  if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
-  player.style.width=w+'px';
-  player.style.height=(w/r)+'px';
-  reportHeight();
-}}
-video.addEventListener('loadedmetadata',fit);
-video.addEventListener('loadeddata',fit);
-video.addEventListener('canplay',fit);
-window.addEventListener('load',fit);
-addEventListener('resize',fit);
-new ResizeObserver(fit).observe(document.body);
-fit();
-</script>
-</body>
-</html>
-"""
-        )
+        template = _load_embed(tool_id, "generate_video.html")
+        return template.replace("{src}", src)
 
     async def generate_video(
         self,
@@ -1151,7 +1134,7 @@ fit();
             # the user."). The player is self-contained and sizes itself
             # (65vh cap) after the video metadata loads; no download button
             # (maintainer decision, 2026-08-04).
-            player = self._build_video_player(video_url)
+            player = self._build_video_player(video_url, tool_id=__id__)
             return HTMLResponse(
                 content=player, headers={"Content-Disposition": "inline"}
             )

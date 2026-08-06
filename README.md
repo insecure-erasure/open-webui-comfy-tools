@@ -86,7 +86,10 @@ cp virtual_try_on/virtual_try_on.json             /app/backend/data/cache/tools/
 cp generate_caption/generate_caption.json         /app/backend/data/cache/tools/generate_caption/generate_caption.json
 cp generate_video/generate_video.json             /app/backend/data/cache/tools/generate_video/generate_video.json
 cp generate_video/generate_video_wan22.json       /app/backend/data/cache/tools/generate_video/generate_video_wan22.json
+cp generate_video/generate_video.html             /app/backend/data/cache/tools/generate_video/generate_video.html
 ```
+
+Each tool that renders a Rich UI embed also needs its embed template (an HTML file with the same name as the tool) copied the same way. The example above covers Generate Video; the other tools follow once migrated (see REFACTOR_EMBEDS.md).
 
 The cache/tools/<name>/ directory is created automatically when you save the tool script.
 
