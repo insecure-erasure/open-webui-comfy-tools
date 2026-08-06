@@ -2,7 +2,7 @@
 title: Edit Image
 author: Insecure Erasure
 description: Edit a previously generated image using inpainting/editing
-version: 1.5
+version: 1.6
 """
 
 import asyncio
@@ -270,6 +270,10 @@ class Tools:
             description="Inference steps (1-15). 0 = use workflow default (6).",
             enum=[o["value"] for o in _STEPS_OPTIONS],
         )
+        seed: int = Field(
+            default=-1,
+            description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
+        )
         lora_config: str = Field(
             default="[]",
             description='JSON array of LoRAs. String=only name (strength 1.0), object={"name"|"model", "strength"}. Empty name or strength 0 disables it. Applied positionally to lora_1..lora_N. Ex: ["lora1.sft", {"name": "lora2.sft", "strength": 0.5}]',
@@ -399,6 +403,9 @@ class Tools:
                 resolved_steps = user_valve_steps
             elif admin_valve_steps > 0:
                 resolved_steps = admin_valve_steps
+
+            # Seed: UserValve. -1 = random, >=0 = fixed.
+            user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
 
             # LoRA: validate and combine admin + user. User wins on name collision.
             def _lora_name(item):
@@ -627,9 +634,9 @@ class Tools:
                 edit_node["inputs"]["value"] = prompt
 
             # =================================================================
-            # 3. Generate a random seed and inject it
+            # 3. Resolve seed and inject it
             # =================================================================
-            seed_arg = _random.randint(0, _COMFY_SEED_MAX)
+            seed_arg = user_seed if user_seed >= 0 else _random.randint(0, _COMFY_SEED_MAX)
             _, ksampler = _resolve_node(workflow, "KSampler")
             ksampler["inputs"]["seed"] = seed_arg
 

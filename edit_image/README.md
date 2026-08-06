@@ -17,6 +17,7 @@ Edits a previously generated image using Flux 2 inpainting. Accepts either a too
 | Valve | Description |
 |---|---|
 | steps | Inference steps. 0 = use workflow default. |
+| seed | -1 = random, >=0 = fixed seed. |
 | lora_config | JSON array. Merged with admin LoRAs; user wins on name collision. |
 | override_system_loras | When enabled, user LoRAs replace admin LoRAs entirely. |
 | comfyui_image_base_url | Overrides admin valve and COMFYUI_BASE_URL. |

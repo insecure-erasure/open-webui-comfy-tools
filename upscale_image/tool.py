@@ -2,13 +2,14 @@
 title: Upscale Image
 author: Insecure Erasure
 description: Upscale an image by its name or URL
-version: 1.3
+version: 1.4
 """
 
 import asyncio
 import html
 import json
 import logging
+import random as _random
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse
@@ -20,6 +21,9 @@ from pydantic import BaseModel, Field
 from fastapi.responses import HTMLResponse
 
 log = logging.getLogger(__name__)
+
+# ComfyUI seed max (consistent with smart_generate_image / edit_image)
+_COMFY_SEED_MAX: int = 1125899906842624
 
 
 # =============================================================================
@@ -232,6 +236,10 @@ class Tools:
     class UserValves(BaseModel):
         """User-level configuration (overrides admin valve)."""
 
+        seed: int = Field(
+            default=-1,
+            description="Seed. -1 = random, >=0 = fixed seed for reproducibility.",
+        )
         comfyui_image_base_url: str = Field(
             default="",
             description=(
@@ -343,11 +351,19 @@ class Tools:
                 node_img["image"] = image
                 node_img["url"] = ""
 
+            # Seed: UserValve. -1 = random, >=0 = fixed. Inject into the
+            # SeedVR2 Video Upscaler node.
+            user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
+            seed_arg = user_seed if user_seed >= 0 else _random.randint(0, _COMFY_SEED_MAX)
+            _, seedvr2_node = _resolve_node(workflow, "SeedVR2 Video Upscaler (v2.5.24)")
+            seedvr2_node["inputs"]["seed"] = seed_arg
+
             log.info(
-                "Dispatching upscale workflow to ComfyUI (%s) - %s=%s",
+                "Dispatching upscale workflow to ComfyUI (%s) - %s=%s, seed=%d",
                 image_config.COMFYUI_BASE_URL,
                 "url" if parsed.scheme and parsed.netloc else "file",
                 image,
+                seed_arg,
             )
 
             # Resolve the preview node for output extraction
