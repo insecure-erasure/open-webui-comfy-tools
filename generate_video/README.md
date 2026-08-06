@@ -42,7 +42,7 @@ Dual-path pipeline with high and low resolution passes.
 | model_version | wan21 or wan22. |
 | diffusion_model | JSON override for model files. Object for Wan 2.1, array for Wan 2.2. |
 | lora_config | JSON array. Supports per-path LoRAs via the "path" field. |
-| length | Maximum frame count (ceiling for user). -1 = no ceiling. Must be 4n+1. |
+| length | Maximum frame count (ceiling for user). Default 161 (real maximum). Must be 4n+1. |
 | negative_prompt | Default negative prompt. |
 | comfyui_image_base_url | Override the video link base URL. |
 
@@ -53,7 +53,7 @@ Dual-path pipeline with high and low resolution passes.
 | model_version | Overrides the admin valve. |
 | diffusion_model | Overrides the admin valve and defaults. |
 | lora_config | Overrides the admin valve. |
-| length | Frame count. 0 = use admin value. Must be 4n+1. |
+| length | Frame count. Default 81. Must be 4n+1. |
 | negative_prompt | Overrides the admin valve or built-in default. |
 | seed | -1 = random, >=0 = fixed seed. |
 | steps | 4-10. Wan 2.2 rounds odd values up to the nearest even. |
