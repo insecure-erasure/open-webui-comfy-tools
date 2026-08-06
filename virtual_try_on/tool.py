@@ -14,6 +14,7 @@ import uuid
 from urllib.parse import urlparse
 
 import httpx
+import re
 from pydantic import BaseModel, Field
 
 from fastapi.responses import HTMLResponse
@@ -89,6 +90,39 @@ def _load_workflow(tool_id: str, filename: str) -> str:
 
     log.info("Loading workflow from %s", workflow_path)
     return workflow_path.read_text(encoding='utf-8')
+
+# =============================================================================
+# Embed template loader — cache/tools/<tool_id>/<tool>.html
+# =============================================================================
+
+def _load_embed(tool_id: str, filename: str) -> str:
+    """
+    Load the embed HTML template from the tool's cache directory.
+
+    Resolves CACHE_DIR / 'tools' / <tool_id> / <filename>. Returns the raw
+    HTML string; the _build_* methods inject their values into it.
+
+    Raises RuntimeError if the tool_id is empty or the file is not found.
+    """
+    if not tool_id:
+        raise RuntimeError(
+            "No tool_id provided. The tool must run inside Open WebUI "
+            "to resolve the embed template from cache."
+        )
+
+    from open_webui.config import CACHE_DIR
+
+    embed_path = CACHE_DIR / 'tools' / tool_id / filename
+
+    if not embed_path.exists():
+        raise FileNotFoundError(
+            f"Embed template not found at {embed_path}. "
+            f"Copy {filename} from the tool's directory to that path."
+        )
+
+    log.info("Loading embed template from %s", embed_path)
+    return embed_path.read_text(encoding='utf-8')
+
 
 
 # =============================================================================
@@ -294,245 +328,25 @@ class Tools:
         image_b: str,
         gallery: bool = False,
         prompt: str | None = None,
+        tool_id: str = "",
     ) -> str:
         """
-        Build the before/after comparison slider as a standalone HTML document.
+        Build the before/after comparison slider embed.
 
-        The same embed as compare_images/upscale_image (DESIGN.md §10): the
-        preview IS the interactive divider slider (original model photo vs
-        try-on result), and a floating maximize button (bottom-right) opens
-        the fullscreen overlay with its OWN interactive slider. NO gallery
-        navigation: the fullscreen only shows the comparison (plus the prompt
-        caption, a plain text overlay, and the exit button).
-
-        The two image URLs are injected into the <img> tags. They are
-        HTML-escaped so query strings (e.g. &filename=...&type=...) cannot
-        break the markup.
-
-        Download buttons (maintainer request, 2026-08-05): a download button
-        sits at the top-right of the embed (vertically above the fullscreen
-        button) and another at the top-right of the fullscreen overlay. Both
-        fetch the result image as a blob and force a download (fetch -> blob
-        -> object URL -> anchor); on failure (e.g. iOS sandboxed iframe) they
-        open the image in a new tab.
-
-        Gallery collection markers (maintainer request, 2026-08-05): when
-        gallery=True the container carries `class="viewer"` +
-        `data-gallery="1"` and the result <img> gets `id="thumb"` with a
-        `data-prompt` — the SAME markers the image viewer uses. This makes the
-        result collectible by the conversation gallery that the OTHER viewer
-        embed (smart_generate_image) opens — it appears there with its
-        generated prompt. This slider itself does NOT navigate the gallery: it
-        only shows the before/after comparison.
-
-        Sizing: same as compare_images — portrait full width no cap, landscape
-        capped at 80% of the available screen height; both images share the
-        aspect ratio (the workflow derives the latent size from the model
-        photo).
+        The markup lives in virtual_try_on.html (loaded from the tool's cache
+        directory); gallery markers/caption behavior is documented in
+        DESIGN.md §10–12.
         """
         a = html.escape(image_a, quote=True)
         b = html.escape(image_b, quote=True)
         gallery_attr = ' class="viewer" data-gallery="1"' if gallery else ''
-        prompt_attr = (
-            f' data-prompt="{html.escape(prompt, quote=True)}"'
-            if prompt
-            else ''
+        prompt_attr = f' data-prompt="{html.escape(prompt, quote=True)}"' if prompt else ''
+        template = _load_embed(tool_id, "virtual_try_on.html")
+        return re.sub(
+            r"\{(\w+)\}",
+            lambda m: {"a": a, "b": b, "gallery_attr": gallery_attr, "prompt_attr": prompt_attr}[m.group(1)],
+            template,
         )
-        return f"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body{{margin:0;background:#222}}
-html,body{{height:100%;overflow:hidden;margin:0;padding:0}}
-#c{{position:relative;width:100%;margin:0 auto;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}}
-#c img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}
-#thumb{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
-#d{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}
-#h{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
-#h span{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}
-#h span:last-child{{transform:rotate(-135deg)}}
-.btn{{position:absolute;display:flex;align-items:center;justify-content:center;background:rgba(28,28,28,.75);border:none;border-radius:8px;color:#f5f5f5;cursor:pointer;padding:6px;z-index:5}}
-.btn svg{{display:block}}
-#fs{{bottom:8px;right:8px}}
-#dl{{top:8px;right:8px}}
-@media (prefers-color-scheme: light){{
-  .btn{{background:rgba(235,235,235,.82);color:#1a1a1a}}
-}}
-.overlay{{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:999}}
-.overlay.open{{display:flex}}
-#c2{{position:relative;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 4px 30px rgba(0,0,0,.5);border-radius:4px}}
-#c2 img{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}}
-#top2{{clip-path:inset(0 calc(100% - var(--p,50%)) 0 0)}}
-#d2{{position:absolute;top:0;bottom:0;left:var(--p,50%);width:2px;background:rgba(255,255,255,.75);transform:translateX(-50%);pointer-events:none;mix-blend-mode:difference}}
-#h2{{position:absolute;top:50%;left:var(--p,50%);transform:translate(-50%,-50%);width:13px;height:18px;border-radius:4px;background:#fff;border:1px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;pointer-events:none}}
-#h2 span{{width:3px;height:3px;border-left:1px solid #444;border-bottom:1px solid #444;transform:rotate(45deg)}}
-#h2 span:last-child{{transform:rotate(-135deg)}}
-#fs2{{bottom:14px;right:14px;z-index:1001}}
-#dl2{{top:14px;right:14px;z-index:1001}}
-.caption{{position:absolute;left:0;right:0;bottom:0;display:none;padding:56px 24px 18px;color:#fff;text-align:center;font:500 15px/1.5 system-ui,sans-serif;text-shadow:0 1px 4px rgba(0,0,0,.75);white-space:pre-wrap;overflow:hidden;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.3) 30%,rgba(0,0,0,.65) 65%,rgba(0,0,0,.88) 100%)}}
-.caption.show{{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}}
-</style>
-</head>
-<body>
-<div id="c"{gallery_attr}{prompt_attr}>
-<img src="{a}" draggable="false">
-<img id="thumb" src="{b}" draggable="false">
-<div id="d"></div>
-<div id="h"><span></span><span></span></div>
-<button id="fs" class="btn" title="Fullscreen" aria-label="Fullscreen">
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-</button>
-<button id="dl" class="btn" title="Download" aria-label="Download">
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-</button>
-</div>
-<div class="overlay" id="overlay">
-<div id="c2">
-<img src="{a}" draggable="false">
-<img id="top2" src="{b}" draggable="false">
-<div id="d2"></div>
-<div id="h2"><span></span><span></span></div>
-</div>
-<div id="caption" class="caption"></div>
-<button id="fs2" class="btn" title="Exit fullscreen" aria-label="Exit fullscreen">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
-</button>
-<button id="dl2" class="btn" title="Download" aria-label="Download">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-</button>
-</div>
-<script>
-const c=document.getElementById('c'),topImg=document.getElementById('thumb'),
-      im=document.querySelector('#c img'),
-      c2=document.getElementById('c2'),top2=document.getElementById('top2'),
-      im2=document.querySelector('#c2 img'),
-      overlay=document.getElementById('overlay'),
-      fsBtn=document.getElementById('fs'),fs2Btn=document.getElementById('fs2'),
-      dlBtn=document.getElementById('dl'),dl2Btn=document.getElementById('dl2'),
-      caption=document.getElementById('caption');
-function reportHeight(){{parent.postMessage({{type:'iframe:height',height:c.offsetHeight||document.documentElement.scrollHeight}},'*')}}
-function isLandscape(){{
-  if(screen.orientation&&screen.orientation.type)return screen.orientation.type.indexOf('landscape')===0;
-  if(typeof window.orientation==='number')return Math.abs(window.orientation)===90;
-  const sw=screen.width||0,sh=screen.height||0;
-  return sw>sh&&sh>0;
-}}
-function fit(){{
-  // Same sizing as the compare slider (§10): portrait full width no cap,
-  // landscape capped at 80% of screen.availHeight. Skip while in browser
-  // fullscreen (§10.8); re-fit on fullscreenchange.
-  if(document.fullscreenElement||document.webkitFullscreenElement)return;
-  if(!(im.naturalWidth>0&&im.naturalHeight>0)){{reportHeight();return;}}
-  const r=im.naturalWidth/im.naturalHeight;
-  const maxH=isLandscape()?(screen.availHeight||screen.height||0)*0.8:0;
-  let w=document.documentElement.clientWidth;
-  if(maxH>0){{const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}}
-  c.style.width=w+'px';
-  c.style.height=(w/r)+'px';
-  reportHeight();
-}}
-function fitOverlay(){{
-  // Size the overlay slider to the REAL viewport (in fullscreen the iframe
-  // viewport IS the screen); wait for real dimensions (§10.4).
-  if(!(im2.naturalWidth>0&&im2.naturalHeight>0))return;
-  const r=im2.naturalWidth/im2.naturalHeight;
-  const vw=document.documentElement.clientWidth||0,vh=document.documentElement.clientHeight||0;
-  let w=vw,h=vw/r;
-  if(h>vh){{h=vh;w=h*r;}}
-  c2.style.width=w+'px';
-  c2.style.height=h+'px';
-}}
-im.addEventListener('load',fit);
-topImg.addEventListener('load',fit);
-im2.addEventListener('load',fitOverlay);
-top2.addEventListener('load',fitOverlay);
-window.addEventListener('load',()=>{{fit();fitOverlay();}});
-addEventListener('resize',fit);
-addEventListener('resize',()=>{{if(document.fullscreenElement||document.webkitFullscreenElement)fitOverlay();}});
-new ResizeObserver(fit).observe(document.body);
-// Interactive slider — shared by the embed (#c) and the fullscreen overlay
-// (#c2). Pointer Events unify mouse + touch (§10.5); touch-action:none keeps
-// the browser from hijacking the gesture; the handle is purely visual
-// (pointer-events:none). Ignore events on .btn (fullscreen button).
-function setupSlider(el){{
-  let dragging=false;
-  function setP(x){{const rect=el.getBoundingClientRect(),p=Math.min(100,Math.max(0,(x-rect.left)/rect.width*100));el.style.setProperty('--p',p+'%');}}
-  const onBtn=e=>e.target.closest&&e.target.closest('.btn');
-  el.addEventListener('pointerdown',e=>{{if(onBtn(e))return;dragging=true;try{{el.setPointerCapture(e.pointerId)}}catch{{}}setP(e.clientX);e.preventDefault();}});
-  el.addEventListener('pointermove',e=>{{if((dragging||e.pointerType==='mouse')&&!onBtn(e))setP(e.clientX);}});
-  el.addEventListener('pointerup',()=>{{dragging=false;}});
-  el.addEventListener('pointercancel',()=>{{dragging=false;}});
-}}
-setupSlider(c);
-setupSlider(c2);
-// Prompt caption (DESIGN.md §12): shown in the fullscreen only, as plain
-// text over a bottom gradient (textContent, never innerHTML).
-function showCaption(){{
-  const p=c.getAttribute('data-prompt')||'';
-  if(p){{caption.textContent=p;caption.classList.add('show');}}
-  else{{caption.classList.remove('show');caption.textContent='';}}
-}}
-// Chat scroll preservation around the fullscreen (§10.8): the scroll is NOT
-// on the parent window; it lives in an inner container in Open WebUI's DOM.
-// Save the parent window AND all inner scrolled containers before opening,
-// restore them after closing (same-origin ON; guarded for OFF).
-let savedScrolls=[];
-function saveScroll(){{
-  savedScrolls=[];
-  try{{savedScrolls.push({{el:parent,top:parent.scrollY||0}});}}catch(e){{}}
-  try{{
-    const doc=parent.document||document;
-    const all=doc.querySelectorAll&&doc.querySelectorAll('*');
-    if(all)for(let i=0;i<all.length;i++){{
-      const el=all[i];
-      if(el.scrollTop>0&&el.scrollHeight>el.clientHeight)savedScrolls.push({{el:el,top:el.scrollTop}});
-    }}
-  }}catch(e){{}}
-}}
-function restoreScroll(){{requestAnimationFrame(()=>{{requestAnimationFrame(()=>{{
-  try{{parent.scrollTo(0,savedScrolls[0]&&savedScrolls[0].top||0);}}catch(e){{}}
-  for(let i=0;i<savedScrolls.length;i++){{try{{savedScrolls[i].el.scrollTop=savedScrolls[i].top;}}catch(e){{}}}}
-  document.documentElement.scrollTop=0;document.body.scrollTop=0;
-}});}});}}
-function openFullscreen(){{
-  overlay.classList.add('open');
-  fitOverlay();
-  showCaption();
-  saveScroll();
-  try{{overlay.requestFullscreen&&overlay.requestFullscreen();}}catch(e){{}}
-  try{{overlay.webkitRequestFullscreen&&overlay.webkitRequestFullscreen();}}catch(e){{}}
-}}
-function closeFullscreen(){{
-  if(document.fullscreenElement||document.webkitFullscreenElement){{
-    try{{document.exitFullscreen&&document.exitFullscreen();}}catch(e){{}}
-    try{{document.webkitExitFullscreen&&document.webkitExitFullscreen();}}catch(e){{}}
-  }}else{{
-    overlay.classList.remove('open');
-    restoreScroll();
-  }}
-}}
-fsBtn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;openFullscreen();}});
-fs2Btn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;closeFullscreen();restoreScroll();}});
-// Download (embed and fullscreen): fetch the result image as a blob and
-// force a download; on failure (e.g. iOS sandboxed iframe) open it in a
-// new tab as a fallback. The result image is the top layer of the slider
-// (topImg in the embed, top2 in the overlay — same URL).
-async function download(){{
-  const src=topImg.src||top2.src||'';
-  try{{const r=await fetch(src);if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}}catch(err){{const w=window.open(src,'_blank');if(w)w.focus();}}
-}}
-dlBtn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;download();}});
-dl2Btn.addEventListener('pointerup',e=>{{if(e.pointerType==='mouse'&&e.button!==0)return;download();}});
-overlay.addEventListener('pointerup',e=>{{if(e.target===overlay){{closeFullscreen();restoreScroll();}}}});
-document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{closeFullscreen();restoreScroll();}}}});
-document.addEventListener('fullscreenchange',()=>{{if(!(document.fullscreenElement||document.webkitFullscreenElement)){{overlay.classList.remove('open');restoreScroll();fit();}}}});
-fit();
-</script>
-</body>
-</html>
-"""
     async def virtual_try_on(
         self,
         model_image: str,
@@ -959,7 +773,7 @@ fit();
                 )
 
             slider = self._build_compare_slider(
-                original_url, image_url, gallery=True, prompt=prompt
+                original_url, image_url, gallery=True, prompt=prompt, tool_id=__id__
             )
             return HTMLResponse(
                 content=slider, headers={"Content-Disposition": "inline"}
