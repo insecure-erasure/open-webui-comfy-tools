@@ -1,8 +1,8 @@
 """
 title: Edit Image
 author: Insecure Erasure
-description: Edit a previously generated image using Flux 2 inpainting/editing
-version: 1.3
+description: Edit a previously generated image using inpainting/editing
+version: 1.4
 """
 
 import asyncio
@@ -31,11 +31,12 @@ _STEPS_OPTIONS = [
 ]
 
 # Restoration mode (mode="restore"): the runtime LoRA appended AFTER any
-# admin/user LoRAs (strength 1.0) and the prompt prefix prepended to the
-# agent's prompt.
+# admin/user LoRAs (strength 1.0) and the restoration prompt. The agent's
+# prompt is optional in restore mode; when provided, it is appended
+# after the restoration prefix.
 _RESTORE_LORA_NAME: str = "Flux2-Klein-Image-RestoreV1.safetensors"
 _RESTORE_PROMPT_PREFIX: str = (
-    "restore the image quality, remove any compression artefacts, remove any "
+    "restore the image quality, remove any compression artifacts, remove any "
     "haze and soft edges, enrich the original with new intricate detail in "
     "all textures and surfaces creating a professional photorealistic "
     "photograph with natural lighting and skin texture,"
@@ -205,7 +206,9 @@ class Tools:
 
     mode="edit" (default) applies the edit normally. Pass mode="restore"
     when the user wants to restore or enhance the quality of a degraded
-    image (compression artefacts, haze, soft edges, low detail).
+    image (compression artifacts, haze, soft edges, low detail). In restore
+    mode prompt is optional (omit it or pass an empty string): the
+    restoration prompt is used on its own.
     """
 
     class Valves(BaseModel):
@@ -473,7 +476,7 @@ fit();
     async def edit_image(
         self,
         image: str,
-        prompt: str,
+        prompt: str = "",
         mode: str = "edit",
         __request__=None,
         __user__=None,
@@ -500,7 +503,9 @@ fit();
         :param prompt: Natural language description of the process to
             apply (e.g., "Change the cat's fur to orange", "Add a sunset
             background", or "Restore this image to full quality"). Be
-            specific and descriptive.
+            specific and descriptive. In "restore" mode it is optional
+            (omit it or pass ""): the restoration prompt is used on its
+            own.
         :param mode: "edit" (default) applies the edit normally.
             "restore" restores/enhances the quality of a degraded image.
             Use it when the user asks to restore, deblur, denoise,
@@ -766,11 +771,16 @@ fit();
             # =================================================================
             _, edit_node = _resolve_node(workflow, "Prompt")
             if restore:
-                # Restoration mode prepends the restoration prompt to the
-                # agent's prompt (the prefix ends with a comma; join
-                # with a space so the agent's description flows naturally).
+                # Restoration mode uses the restoration prompt. The agent's
+                # prompt is optional here (defaults to ""); append it only
+                # when actually provided — the prefix already ends with a
+                # comma, so the agent's description flows naturally after a
+                # space.
+                stripped = prompt.strip() if prompt else ""
                 edit_node["inputs"]["value"] = (
-                    _RESTORE_PROMPT_PREFIX + " " + prompt.strip()
+                    _RESTORE_PROMPT_PREFIX + " " + stripped
+                    if stripped
+                    else _RESTORE_PROMPT_PREFIX
                 )
             else:
                 edit_node["inputs"]["value"] = prompt
