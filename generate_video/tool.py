@@ -2,7 +2,7 @@
 title: Generate Video
 author: Insecure Erasure
 description: Generate videos through ComfyUI (WAN2.1 / WAN2.2 image-to-video)
-version: 3.1
+version: 3.2
 """
 
 import asyncio
@@ -536,14 +536,12 @@ class Tools:
             description='JSON array of LoRAs. String=only name (strength 1.0), object={"model": "...", "strength": 1.0, "path": "high"|"low"}. strength=0 disables the LoRA and frees the slot. Omit "path" for all ramas.',
         )
         length: str = Field(
-            default="81",
-            description="Maximum number of frames / video length. Acts as a ceiling for user values. -1 = no ceiling. Must be 4n+1.",
+            default="161",
+            description="Maximum number of frames / video length. Acts as a ceiling for user values. Default is the real maximum (161). Must be 4n+1.",
             json_schema_extra={
                 "input": {
                     "type": "select",
-                    "options": [
-                        {"value": "-1", "label": "User decides (no ceiling)"},
-                    ] + [o for o in _FRAMES_OPTIONS if o["value"] != "0"],
+                    "options": [o for o in _FRAMES_OPTIONS if o["value"] != "0"],
                 }
             },
         )
@@ -578,8 +576,8 @@ class Tools:
             description='JSON array of LoRAs. Overrides the admin valve.',
         )
         length: str = Field(
-            default="0",
-            description="Number of frames / video length. 0 = use admin value. Must be 4n+1.",
+            default="81",
+            description="Number of frames / video length. Default 81. Must be 4n+1.",
             json_schema_extra={
                 "input": {
                     "type": "select",
@@ -749,43 +747,45 @@ class Tools:
                     )
                 return f"Error: {msg}"
 
-            # Length: UserValves > AdminValves. Admin valve acts as ceiling.
-            # Valves are dropdown strings — parse as int.
-            admin_raw = int(self.valves.length) if self.valves.length and self.valves.length != "-1" else -1
-            user_raw = int(user_valves.length) if user_valves and user_valves.length and user_valves.length != "0" else 0
+            # Length: the user valve selects frames directly (default 81).
+            # The admin valve is a hard ceiling (default 161). Both dropdowns
+            # only offer valid 4n+1 values, so no snap is needed; legacy
+            # values ("0" = use admin, "-1", unparseable) fall back to the
+            # defaults.
+            try:
+                admin_raw = int(self.valves.length)
+            except (TypeError, ValueError):
+                admin_raw = _MAX_FRAMES
+            if admin_raw <= 0:
+                admin_raw = _MAX_FRAMES  # legacy "-1"/"0" → no real ceiling
 
-            if admin_raw == -1:
-                # No admin ceiling — user decides freely (but still snap to valid)
-                if user_raw > 0:
-                    resolved_length = user_raw
-                else:
-                    resolved_length = 81
-            else:
-                # Admin ceiling applies
-                if user_raw > 0:
-                    resolved_length = min(user_raw, admin_raw)
-                    if resolved_length < user_raw:
-                        if __event_emitter__:
-                            await __event_emitter__(
-                                {
-                                    "type": "notification",
-                                    "data": {
-                                        "type": "warning",
-                                        "content": f"\u26a0\ufe0f Video length clamped to {admin_raw} frames (system limit).",
-                                    },
-                                }
-                            )
-                else:
-                    resolved_length = admin_raw
+            try:
+                user_raw = int(user_valves.length) if user_valves and user_valves.length else 81
+            except (TypeError, ValueError):
+                user_raw = 81
+            if user_raw <= 0:
+                user_raw = 81  # legacy "0" (use admin) → default
 
-            # Snap to valid 4n+1 and apply guardrails
-            snapped = _snap_to_valid_frames(resolved_length)
-            if snapped != resolved_length:
-                log.warning(
-                    "Video length %d snapped to %d (must be 4n+1 in [%d, %d])",
-                    resolved_length, snapped, _MIN_FRAMES, _MAX_FRAMES
+            resolved_length = min(user_raw, admin_raw)
+            clamped = resolved_length < user_raw  # cut by admin ceiling
+
+            # Notify the user (toast) when the admin ceiling cuts their choice.
+            if clamped:
+                note = (
+                    f"Video length clamped from {user_raw} to {resolved_length} frames "
+                    "(system limit)."
                 )
-                resolved_length = snapped
+                log.warning(note)
+                if __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "warning",
+                                "content": f"\u26a0\ufe0f {note}",
+                            },
+                        }
+                    )
 
             # Negative prompt: UserValves > AdminValves > leave empty (= use version default)
             resolved_neg = (
