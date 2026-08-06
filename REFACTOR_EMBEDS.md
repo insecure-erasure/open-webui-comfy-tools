@@ -8,8 +8,9 @@ store them in a standalone HTML file with the same name as the tool
 convention). The Python builders become thin wrappers: escape values, load
 the template from the cache dir, inject placeholders.
 
-Out of scope for now: `embeds.py` stays untouched (maintainer request), and
-`generate_caption` (returns plain text, no embed).
+Out of scope for now: `generate_caption` (returns plain text, no embed).
+`embeds.py` was removed after the migration (its content now lives in the
+`.html` templates, which are the single source of truth).
 
 ---
 
@@ -106,21 +107,21 @@ class Tools:
 
 ## 6. Risks and open decisions
 
-- **`embeds.py` / byte-identical drift invariant (DESIGN.md Appendix B, NOTES.md
-  §"How to regenerate a tool copy")**: the image-viewer f-string in
-  `smart_generate_image` is currently kept byte-identical to `embeds.py`.
-  Extracting it to `smart_generate_image.html` breaks that byte-identical
-  link. Per the maintainer's "don't use embeds.py for now", this refactor makes
-  the `.html` files the source of truth and leaves `embeds.py` as-is; a later
-  decision can retire or regenerate it. Flagged, not resolved.
+- **`embeds.py` removed / drift invariant (DESIGN.md Appendix B, NOTES.md)**: the
+  image-viewer markup in `smart_generate_image.html` is no longer kept
+  byte-identical to a Python reference — the `.html` templates are the source
+  of truth. Keep the shared markup/JS in sync across the slider/viewer
+  variants when the shared behavior changes (they differ legitimately: plain /
+  marker-bearing / marker+caption). Flagged, resolved by removal.
 - **Slider duplication remains**: `compare_images`, `upscale_image`,
   `edit_image`, `virtual_try_on` each keep their own slider `.html` (they are
   genuinely different variants — plain / marker-bearing / marker+caption).
   The refactor moves that duplication from un-editable f-strings into real
   HTML files, which is the point; it does not deduplicate.
 - **`_build_*` tests that call builders directly** (NOTES.md pattern) now need
-  `tool_id` or a template argument; only `smart_generate_image` has a documented
-  cross-check (vs `embeds.py`), which is already parked per the decision above.
+  `tool_id` or a template argument; only `smart_generate_image` had a documented
+  cross-check (vs `embeds.py`), which is now moot — verify against the
+  `.html` template instead.
 - **Pre-existing README staleness** (tool renamed `enhance_image` →
   `upscale_image`, deploy table still lists `enhance_image`) is out of scope;
   the new HTML lines should use the real directory names.
