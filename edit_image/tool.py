@@ -32,7 +32,7 @@ _STEPS_OPTIONS = [
 
 # Restoration mode (mode="restore"): the runtime LoRA appended AFTER any
 # admin/user LoRAs (strength 1.0) and the prompt prefix prepended to the
-# agent's edit_prompt.
+# agent's prompt.
 _RESTORE_LORA_NAME: str = "Flux2-Klein-Image-RestoreV1.safetensors"
 _RESTORE_PROMPT_PREFIX: str = (
     "restore the image quality, remove any compression artefacts, remove any "
@@ -199,16 +199,13 @@ class Tools:
     image that was generated in this conversation. Pass an image filename
     or a direct URL.
 
-    The edit_prompt describes the desired change in natural language
-    (e.g. "Make the cat wear a top hat" or "Change the background to
-    a beach at sunset").
+    The prompt describes the process to apply in natural language
+    (e.g. "Make the cat wear a top hat", "Change the background to a
+    beach at sunset", or "Restore this image to full quality").
 
     mode="edit" (default) applies the edit normally. Pass mode="restore"
     when the user wants to restore or enhance the quality of a degraded
-    image (compression artefacts, haze, soft edges, low detail): the tool
-    appends the Flux2-Klein-Image-RestoreV1 LoRA at strength 1.0 and
-    prepends a restoration prompt to edit_prompt. edit_prompt is still
-    required in restore mode (e.g. "Restore this image to full quality").
+    image (compression artefacts, haze, soft edges, low detail).
     """
 
     class Valves(BaseModel):
@@ -476,7 +473,7 @@ fit();
     async def edit_image(
         self,
         image: str,
-        edit_prompt: str,
+        prompt: str,
         mode: str = "edit",
         __request__=None,
         __user__=None,
@@ -500,15 +497,14 @@ fit();
         :param image: The filename previously generated from
             smart_generate_image or upscale_image, or a direct URL to an
             external image.
-        :param edit_prompt: Natural language description of the edit to apply
-            (e.g., "Change the cat's fur to orange", "Add a sunset
-            background"). Be specific and descriptive.
-        :param mode: "edit" (default) applies the edit normally. "restore"
-            restores/enhances the quality of a degraded image: appends the
-            Flux2-Klein-Image-RestoreV1 LoRA (strength 1.0) and prepends a
-            restoration prompt to edit_prompt. Use it when the user asks to
-            restore, deblur, denoise, de-haze or improve the quality of an
-            image.
+        :param prompt: Natural language description of the process to
+            apply (e.g., "Change the cat's fur to orange", "Add a sunset
+            background", or "Restore this image to full quality"). Be
+            specific and descriptive.
+        :param mode: "edit" (default) applies the edit normally.
+            "restore" restores/enhances the quality of a degraded image.
+            Use it when the user asks to restore, deblur, denoise,
+            de-haze or improve the quality of an image.
         """
         if __request__ is None:
             log.error("edit_image called without request context")
@@ -771,13 +767,13 @@ fit();
             _, edit_node = _resolve_node(workflow, "Prompt")
             if restore:
                 # Restoration mode prepends the restoration prompt to the
-                # agent's edit_prompt (the prefix ends with a comma; join
+                # agent's prompt (the prefix ends with a comma; join
                 # with a space so the agent's description flows naturally).
                 edit_node["inputs"]["value"] = (
-                    _RESTORE_PROMPT_PREFIX + " " + edit_prompt.strip()
+                    _RESTORE_PROMPT_PREFIX + " " + prompt.strip()
                 )
             else:
-                edit_node["inputs"]["value"] = edit_prompt
+                edit_node["inputs"]["value"] = prompt
 
             # =================================================================
             # 3. Generate a random seed and inject it
@@ -910,7 +906,7 @@ fit();
                 )
 
             slider = self._build_compare_slider(
-                original_url, edit_url, gallery=True, prompt=edit_prompt
+                original_url, edit_url, gallery=True, prompt=prompt
             )
             return HTMLResponse(
                 content=slider, headers={"Content-Disposition": "inline"}
