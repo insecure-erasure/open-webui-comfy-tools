@@ -1,4 +1,49 @@
 <!DOCTYPE html>
+<!--
+    Build the before/after comparison slider as a standalone HTML document.
+
+    The two image URLs are injected into the <img> tags. They are HTML-escaped
+    so query strings (e.g. &filename=...&type=...) cannot break the markup.
+
+    The slider fills the full width of the chat container and its height
+    follows the aspect ratio of the base image (image_a), with an adaptive
+    sizing strategy:
+
+    - Vertical (portrait) devices: full width, no height cap.
+    - Horizontal (landscape) devices: height capped at 80%% of the available
+      vertical space; the width is scaled proportionally and the slider is
+      centered.
+
+    Device orientation is detected inside the sandboxed iframe (it cannot
+    read the parent viewport, and its own viewport aspect is misleading):
+    screen.orientation when available, then window.orientation, then a
+    width/height comparison. Detection is conservative: degenerate screen
+    values (e.g. 0-height in some webviews) or any ambiguity are treated as
+    portrait so the cap can never fire on a portrait device. The available
+    height for the cap is approximated with the device screen
+    (screen.availHeight).
+
+    A reportHeight() postMessage keeps the sandboxed iframe height in sync
+    with the slider (required by Open WebUI: without it the iframe stays at
+    ~150px and the content is cut off). The divider starts at 50%% so both
+    images are visible on load.
+
+    A fullscreen mode is available via a floating button at the bottom-right
+    of the slider (the standard maximize icon): it opens the comparison in a
+    fullscreen overlay with its OWN interactive slider (same
+    drag/tap/hover/divider behavior — the embed behavior is unchanged). The
+    overlay is fullscreened via the browser Fullscreen API (the Open WebUI
+    iframe has allowfullscreen; the click is the required user gesture) —
+    the same mechanism the image viewer's lightbox uses (DESIGN.md §10.7) —
+    so it fills the browser window; browsers that reject it (e.g. some
+    mobile/iOS) fall back to the embed area. The overlay slider is sized to
+    the real viewport (in fullscreen the iframe viewport IS the screen),
+    waiting for real image dimensions (§10.4). Escape, the restore
+    (minimize) button, or clicking the dark backdrop close it. The chat
+    scroll is preserved around the fullscreen via saveScroll/restoreScroll
+    (DESIGN.md §10.8); the embed's fit() skips sizing while in fullscreen
+    and re-fits on fullscreenchange.
+-->
 <html>
 <head>
 <meta charset="utf-8">

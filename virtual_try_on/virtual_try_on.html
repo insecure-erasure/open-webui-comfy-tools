@@ -1,4 +1,39 @@
 <!DOCTYPE html>
+<!--
+        Build the before/after comparison slider as a standalone HTML document.
+
+        The same embed as compare_images/upscale_image (DESIGN.md §10): the
+        preview IS the interactive divider slider (original model photo vs
+        try-on result), and a floating maximize button (bottom-right) opens
+        the fullscreen overlay with its OWN interactive slider. NO gallery
+        navigation: the fullscreen only shows the comparison (plus the prompt
+        caption, a plain text overlay, and the exit button).
+
+        The two image URLs are injected into the <img> tags. They are
+        HTML-escaped so query strings (e.g. &filename=...&type=...) cannot
+        break the markup.
+
+        Download buttons (maintainer request, 2026-08-05): a download button
+        sits at the top-right of the embed (vertically above the fullscreen
+        button) and another at the top-right of the fullscreen overlay. Both
+        fetch the result image as a blob and force a download (fetch -> blob
+        -> object URL -> anchor); on failure (e.g. iOS sandboxed iframe) they
+        open the image in a new tab.
+
+        Gallery collection markers (maintainer request, 2026-08-05): when
+        gallery=True the container carries `class="viewer"` +
+        `data-gallery="1"` and the result <img> gets `id="thumb"` with a
+        `data-prompt` — the SAME markers the image viewer uses. This makes the
+        result collectible by the conversation gallery that the OTHER viewer
+        embed (smart_generate_image) opens — it appears there with its
+        generated prompt. This slider itself does NOT navigate the gallery: it
+        only shows the before/after comparison.
+
+        Sizing: same as compare_images — portrait full width no cap, landscape
+        capped at 80% of the available screen height; both images share the
+        aspect ratio (the workflow derives the latent size from the model
+        photo).
+-->
 <html>
 <head>
 <meta charset="utf-8">

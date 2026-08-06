@@ -248,9 +248,10 @@ class Tools:
     def _build_compare_slider(self, image_a: str, image_b: str, tool_id: str = "") -> str:
         """
         Build the before/after comparison slider embed.
-
+        
         The markup lives in upscale_image.html (loaded from the tool's cache
-        directory); sizing behavior is documented in DESIGN.md §10.
+        directory); sizing behavior is documented in the header comment of
+        that file and in DESIGN.md §10.
         """
         a = html.escape(image_a, quote=True)
         b = html.escape(image_b, quote=True)

@@ -24,8 +24,14 @@ Out of scope for now: `embeds.py` stays untouched (maintainer request), and
 | `virtual_try_on/tool.py` | `_build_compare_slider(a, b, gallery, prompt)` | 341–535 (195) | `{a}` ×2, `{b}` ×2, `{gallery_attr}`, `{prompt_attr}` |
 | `generate_video/tool.py` | `_build_video_player(url)` | 612–665 (54) | `{src}` |
 
-~1,034 lines of HTML would leave the Python. The builders' docstrings stay in
-the .py (they document sizing/gallery behavior); only the markup moves.
+~1,034 lines of HTML would leave the Python. The embed-behavior docstrings
+(the ones that documented the markup, not the code) move into **HTML header
+comments** in the `.html` files, so the knowledge stays next to the code it
+describes; the `.py` builders keep a short reference instead.
+
+Each `.html` starts with a `<!-- -->` header comment containing the original
+`_build_*` docstring (behavior documentation), then the markup with the
+injection tokens. The builders only compute the escaped values and inject.
 
 ## 2. Why it is viable
 

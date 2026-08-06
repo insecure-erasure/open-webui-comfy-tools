@@ -617,32 +617,10 @@ class Tools:
     def _build_video_player(self, video_url: str, tool_id: str = "") -> str:
         """
         Build the self-contained video player embed for a single video URL.
-
-        The URL is HTML-escaped so query strings (e.g. &filename=...&type=...)
-        cannot break the markup.
-
-        Layout: the player fits the chat container width and its height is capped
-        at 65% of the available screen height (screen.availHeight) — the sizing
-        decision recorded in DESIGN.md §6 (2026-08-04): 65vh. `vh` units inside
-        the sandboxed iframe are useless (they refer to the iframe box, ~150px),
-        so the cap is expressed via the device screen, exactly like the image
-        viewer. The video's aspect ratio is NOT known a priori (unlike
-        smart_generate_image, which reserves reduced_w:reduced_h), so the embed
-        waits for the `loadedmetadata` event (videoWidth/videoHeight) before
-        sizing — never a made-up fallback ratio (DESIGN.md §10.4) — and reports
-        the player's own height via reportHeight() so the iframe hugs the video
-        (no empty frame on wide desktop screens).
-
-        The player uses the native controls (play/seek/volume/fullscreen); there
-        is no lightbox and no download button (maintainer decision, 2026-08-04).
-        `muted` is kept so autoplay works (browsers block autoplay with sound).
-        The native fullscreen of the <video> (via its controls) does NOT cause
-        the chat scroll jump, so no saveScroll/restoreScroll is needed here
-        (unlike the image lightbox, DESIGN.md §10.8).
-
-        The markup lives in generate_video.html (same name as the tool, next
-        to its workflow JSON); it is loaded from the tool's cache directory
-        and the URL is injected into the {src} placeholder.
+        
+        The markup lives in generate_video.html (loaded from the tool's cache
+        directory); behavior is documented in the header comment of that file
+        and in DESIGN.md §6.
         """
         src = html.escape(video_url, quote=True)
         template = _load_embed(tool_id, "generate_video.html")

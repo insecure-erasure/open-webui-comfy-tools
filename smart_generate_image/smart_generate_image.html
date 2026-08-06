@@ -1,4 +1,47 @@
 <!DOCTYPE html>
+<!--
+        Build the self-contained image viewer embed for a single image URL.
+
+        The URL is HTML-escaped so query strings (e.g. &filename=...&type=...)
+        cannot break the markup.
+
+        Layout: the image is centered, fits the chat container width, and its
+        height is capped at 70% of the available screen height (approximation of
+        70vh of the real browser viewport, since the iframe's own vh is useless —
+        see DESIGN.md §10). If aspect_ratio (reduced_w, reduced_h) is provided,
+        the embed reserves that aspect before the image loads to avoid the
+        "jump"; otherwise it sizes after the image has real dimensions.
+
+        Clicking the image opens a lightbox that fills the browser window via the
+        Fullscreen API (X top-left closes it, download button top-right forces a
+        download via fetch blob -> object URL -> anchor). The theme follows
+        prefers-color-scheme.
+
+        Gallery: when gallery=True the viewer adds a `data-gallery="1"` marker
+        attribute. Opening the lightbox then walks the parent chat DOM
+        (same-origin ON — guarded, so same-origin OFF just yields an empty
+        gallery) and collects every image in the conversation whose viewer
+        carries the marker. The lightbox shows ‹ › buttons (vertically
+        centered), a "n/N" counter (bottom-right) and ArrowLeft/ArrowRight
+        keyboard navigation with wrap-around (DESIGN.md §11). The download
+        button keeps using `big.src`, so it always downloads the image
+        currently shown. All gallery logic is JS inside the embed — the marker
+        is the only contribution of the tool.
+
+        Prompt caption: when prompt is provided it is added as a `data-prompt`
+        attribute (HTML-escaped) — another HTML identifier, never backend
+        logic. In the lightbox only (never the thumbnail), a gradient overlay
+        at the bottom shows the prompt in white: the gradient goes from
+        transparent at the top to dark at the bottom so the white text (in the
+        darkest zone) stays readable over any image content; a subtle
+        text-shadow reinforces it. When the gallery navigates, the caption
+        follows the shown image's prompt.
+
+        A failed image load is retried once (no watchdog): on `error` the img
+        src is cleared and re-set a single time per URL (flaky/slow fetches),
+        after which a second failure is left alone (the browser shows the alt
+        text).
+-->
 <html>
 <head>
 <meta charset="utf-8">

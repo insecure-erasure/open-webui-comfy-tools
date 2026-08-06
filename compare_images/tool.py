@@ -51,9 +51,10 @@ def _load_embed(tool_id: str, filename: str) -> str:
 def _build_slider_html(image_a: str, image_b: str, tool_id: str = "") -> str:
     """
     Build the before/after comparison slider embed.
-
+    
     The markup lives in compare_images.html (loaded from the tool's cache
-    directory); sizing/fullscreen behavior is documented in DESIGN.md §10.
+    directory); sizing/fullscreen behavior is documented in the header
+    comment of that file and in DESIGN.md §10.
     """
     a = html.escape(image_a, quote=True)
     b = html.escape(image_b, quote=True)

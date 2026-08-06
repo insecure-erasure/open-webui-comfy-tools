@@ -1,4 +1,29 @@
 <!DOCTYPE html>
+<!--
+        Build the before/after comparison slider as a standalone HTML document
+        (the same embed as compare_images, DESIGN.md §10).
+
+        The two image URLs are injected into the <img> tags. They are
+        HTML-escaped so query strings (e.g. &filename=...&type=...) cannot
+        break the markup.
+
+        The slider fills the full width of the chat container and its height
+        follows the aspect ratio of the base image (image_a), with an adaptive
+        sizing strategy (portrait: full width, no cap; landscape: height capped
+        at 80% of the available vertical space, width scaled proportionally and
+        centered). The original and the upscaled image share the same aspect
+        ratio (SeedVR2 preserves it), so a single box fits both with
+        object-fit:cover.
+
+        A fullscreen mode is available via a floating button at the bottom-right
+        (standard maximize icon): it opens the comparison in a fullscreen
+        overlay with its OWN interactive slider (same drag/tap/hover/divider
+        behavior). The overlay is fullscreened via the browser Fullscreen API
+        on the overlay element (not documentElement, DESIGN.md §10.8) so the
+        chat scroll is preserved (saveScroll/restoreScroll, same-origin ON,
+        guarded for OFF); the embed's fit() skips sizing while in fullscreen
+        and re-fits on fullscreenchange (§10.8).
+-->
 <html>
 <head>
 <meta charset="utf-8">

@@ -420,10 +420,10 @@ class Tools:
     def _build_image_viewer(self, image_url: str, aspect_ratio: tuple[int, int] | None = None, gallery: bool = False, prompt: str | None = None, tool_id: str = "") -> str:
         """
         Build the image viewer embed.
-
+        
         The markup lives in smart_generate_image.html (loaded from the tool's
         cache directory); lightbox/gallery/caption behavior is documented in
-        DESIGN.md §10–12.
+        the header comment of that file and in DESIGN.md §10–12.
         """
         src = html.escape(image_url, quote=True)
         gallery_attr = ' data-gallery="1"' if gallery else ''

@@ -1,4 +1,31 @@
 <!DOCTYPE html>
+<!--
+        Build the before/after comparison slider as a standalone HTML document.
+
+        The same embed as compare_images/upscale_image (DESIGN.md §10): the
+        preview IS the interactive divider slider (original vs edited), and a
+        floating maximize button (bottom-right) opens the fullscreen overlay
+        with its OWN interactive slider. NO gallery navigation: the fullscreen
+        only shows the comparison (plus the prompt caption, a plain text
+        overlay, and the exit button).
+
+        The two image URLs are injected into the <img> tags. They are
+        HTML-escaped so query strings (e.g. &filename=...&type=...) cannot
+        break the markup.
+
+        Gallery collection markers (maintainer request, 2026-08-05): when
+        gallery=True the container carries `class="viewer"` +
+        `data-gallery="1"` and the edited <img> gets `id="thumb"` with a
+        `data-prompt` — the SAME markers the image viewer uses. This makes the
+        edited image collectible by the conversation gallery that the OTHER
+        viewer embeds (smart_generate_image, virtual_try_on) open — it appears
+        there with its edit prompt. This slider itself does NOT navigate the
+        gallery: it only shows the before/after comparison.
+
+        Sizing: same as compare_images — portrait full width no cap, landscape
+        capped at 80% of the available screen height; both images share the
+        aspect ratio (the edit keeps the input size).
+-->
 <html>
 <head>
 <meta charset="utf-8">

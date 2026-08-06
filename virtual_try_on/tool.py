@@ -332,10 +332,10 @@ class Tools:
     ) -> str:
         """
         Build the before/after comparison slider embed.
-
+        
         The markup lives in virtual_try_on.html (loaded from the tool's cache
-        directory); gallery markers/caption behavior is documented in
-        DESIGN.md §10–12.
+        directory); gallery markers/caption behavior is documented in the
+        header comment of that file and in DESIGN.md §10–12.
         """
         a = html.escape(image_a, quote=True)
         b = html.escape(image_b, quote=True)
