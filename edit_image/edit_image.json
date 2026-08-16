@@ -276,7 +276,7 @@
   "246": {
     "inputs": {
       "clip_name": "qwen_3_8b_nvfp4.safetensors",
-      "type": "stable_diffusion",
+      "type": "flux2",
       "device": "default"
     },
     "class_type": "CLIPLoader",
