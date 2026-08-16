@@ -127,7 +127,7 @@ class Tools:
                     f"(got {url!r}). Pass the URLs returned by the other tools."
                 )
 
-        html_block = _build_slider_html(image_a, image_b)
+        html_block = _build_slider_html(image_a, image_b, tool_id=__id__)
 
         if __event_emitter__:
             await __event_emitter__(
