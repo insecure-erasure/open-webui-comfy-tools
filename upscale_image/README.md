@@ -14,6 +14,7 @@ Upscales a previously generated image using SeedVR2. Loads images via URL or tem
 
 | Valve | Description |
 |---|---|
+| seed | -1 = random, >=0 = fixed seed. |
 | comfyui_image_base_url | Overrides admin valve and COMFYUI_BASE_URL. |
 
 ## Usage

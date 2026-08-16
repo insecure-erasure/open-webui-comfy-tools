@@ -86,7 +86,15 @@ cp virtual_try_on/virtual_try_on.json             /app/backend/data/cache/tools/
 cp generate_caption/generate_caption.json         /app/backend/data/cache/tools/generate_caption/generate_caption.json
 cp generate_video/generate_video.json             /app/backend/data/cache/tools/generate_video/generate_video.json
 cp generate_video/generate_video_wan22.json       /app/backend/data/cache/tools/generate_video/generate_video_wan22.json
+cp generate_video/generate_video.html             /app/backend/data/cache/tools/generate_video/generate_video.html
+cp compare_images/compare_images.html           /app/backend/data/cache/tools/compare_images/compare_images.html
+cp smart_generate_image/smart_generate_image.html /app/backend/data/cache/tools/smart_generate_image/smart_generate_image.html
+cp edit_image/edit_image.html                   /app/backend/data/cache/tools/edit_image/edit_image.html
+cp upscale_image/upscale_image.html             /app/backend/data/cache/tools/upscale_image/upscale_image.html
+cp virtual_try_on/virtual_try_on.html           /app/backend/data/cache/tools/virtual_try_on/virtual_try_on.html
 ```
+
+Each tool that renders a Rich UI embed also needs its embed template (an HTML file with the same name as the tool) copied the same way, as shown above.
 
 The cache/tools/<name>/ directory is created automatically when you save the tool script.
 

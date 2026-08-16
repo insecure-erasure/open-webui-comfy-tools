@@ -113,8 +113,8 @@ Unlike the image, the **video has no zoom viewer** (there is no "click to see bi
 > button**: the player relies on the native video
 > controls (play/seek/volume/fullscreen). A forced download was considered
 > (CORS allow-all is in place, §7) but dropped by decision. Implemented in
-> Phase 6 via `embeds.build_video_player` (reference) / the tool's local
-> `_build_video_player` copy.
+> Phase 6 via the `generate_video.html` template (header comment + player
+> markup, loaded at runtime; see REFACTOR_EMBEDS.md).
 
 ### Implementation notes for the video embed (from Phases 1-5)
 
@@ -495,15 +495,17 @@ DOM-walk pattern (Inline Visualizer v2).
 ### Implementation notes
 
 - `gallery_attr = ' data-gallery="1"' if gallery else ''` interpolated into
-  the `.viewer` div. The f-string is otherwise unchanged, so the four tool
-  copies remain byte-identical to `embeds.py` (verified: 10560 chars, same
-  sha256; 13 JS cases pass in node).
-- The `collectGallery`/`showImage` JS is part of the same f-string, so it ships
+  the `.viewer` div. The template is otherwise unchanged.
+- The `collectGallery`/`showImage` JS is part of the same template, so it ships
   inside every image embed (even `gallery=False` ones — harmless, the marker
   gates participation).
 - The four tools call `self._build_image_viewer(url, aspect_ratio=..., gallery=True)`.
-- The NOTES.md regeneration script now produces the `gallery` parameter in the
-  method signature (and its docstring).
+
+> Storage note (2026-08-05 refactor): the viewer markup now lives in
+> `smart_generate_image/smart_generate_image.html` (header comment + template)
+> and is loaded at runtime from `CACHE_DIR/tools/<tool_id>/`, exactly like the
+> workflow JSONs. `embeds.py` was removed — the `.html` templates are the single
+> source of truth. See REFACTOR_EMBEDS.md.
 
 ### Failed-load retry (cheap fix, no watchdog) — 2026-08-04
 
@@ -515,8 +517,8 @@ re-calls `fit()` cannot fix a missing download (and a persistent timer is
 hacky). The cheap, non-hacky fix is the standard one: on the `error` event,
 clear and re-set the img `src` a single time per URL (`retryOnce`). If the
 retry also fails, leave it alone (the browser shows the alt text). It ships in
-the same f-string (verified: 8 node cases for retryOnce + the 13 gallery cases
-still pass; f-strings byte-identical, 11255 chars).
+the same template (verified: 8 node cases for retryOnce + the 13 gallery cases
+still pass).
 
 ---
 
@@ -586,8 +588,7 @@ block. The gradient is `pointer-events:none` and confined to the lightbox
 18 node cases pass (gallery order with prompts, caption shown/hidden per
 image, prompt follows navigation incl. wrap-around, dedupe first-prompt-wins,
 unshift with own prompt, openLightbox reset, same-origin OFF degradation
-still shows the own caption). F-strings byte-identical to `embeds.py`
-(13310 chars, same sha256).
+still shows the own caption).
 
 ---
 
@@ -621,7 +622,7 @@ The assumptions in this document were verified against `open-webui/open-webui` (
 
 ## Appendix B — Implementation notes / considerations
 
-- **Shared viewer HTML**: each tool in this repo is a standalone script pasted into Open WebUI (no shared package at runtime), so the image-viewer HTML will be **duplicated** inside each tool that needs it. Keep the markup/JS byte-identical across tools and update all copies together to avoid drift.
+- **Shared viewer HTML**: each tool in this repo is a standalone script pasted into Open WebUI (no shared package at runtime), so the embed HTML is stored per-tool as a `<tool>/<tool>.html` template loaded at runtime from `CACHE_DIR/tools/<tool_id>/` (same convention as the workflow JSONs; see REFACTOR_EMBEDS.md). The viewer/slider variants differ legitimately (plain slider / marker-bearing slider / marker+caption); keep markup/JS in sync across variants when the shared behavior changes.
 - **Aspect ratio known a priori**: `smart_generate_image` computes `reduced_w:reduced_h` and can reserve the aspect ratio to avoid the load "jump". The slider tools (`upscale_image`, `edit_image`, `virtual_try_on`) size from the original image's aspect ratio, so they need no reservation. (`virtual_try_on` does not know the output dimensions in advance, but the slider fits the original's ratio, which the workflow preserves.)
 - **`reportHeight()` contract**: report on `window.load`, on image/video `load` events, on `resize`, and via a `ResizeObserver` on the body — the parent iframe starts at ~150px and only grows when a message arrives.
 - **URL escaping**: image/video URLs contain query strings (`?filename=...&type=...`); they must be HTML-escaped before being injected into `src` attributes (already the practice in `compare_images`).
