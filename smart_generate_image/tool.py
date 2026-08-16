@@ -460,7 +460,7 @@ class Tools:
         The image is displayed in the chat as a Rich UI embed (image viewer
         with zoom and download). The tool returns the image URL as context
         ({'image': <url>}); use it for chained tool calls (edit_image,
-        enhance_image, virtual_try_on, generate_video) or to refer to the
+        upscale_image, virtual_try_on, generate_video) or to refer to the
         generated image.
 
         :param prompt: Image generation prompt. Translate the user's request into English internally, then enrich with visual details without changing the subject or scene. Do not add superfluous details. Write the final prompt in English.

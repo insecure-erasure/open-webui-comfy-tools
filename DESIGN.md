@@ -114,7 +114,7 @@ Unlike the image, the **video has no zoom viewer** (there is no "click to see bi
 > controls (play/seek/volume/fullscreen). A forced download was considered
 > (CORS allow-all is in place, §7) but dropped by decision. Implemented in
 > Phase 6 via the `generate_video.html` template (header comment + player
-> markup, loaded at runtime; see REFACTOR_EMBEDS.md).
+> markup, loaded at runtime from `CACHE_DIR/tools/<tool_id>/`).
 
 ### Implementation notes for the video embed (from Phases 1-5)
 
@@ -150,8 +150,8 @@ video player — a future agent must read §10 before implementing this phase.
    **download button** (if added) needs `fetch(blob)` → CORS on the ComfyUI
    proxy (allow-all already decided, §7); without CORS, fall back to opening
    the video in a new tab.
-8. **The environment runs with `allowSameOrigin` ON** (PLAN.md environment
-   note): the embed can access `parent.document`, so scroll restore works by
+8. **The environment runs with `allowSameOrigin` ON** (environment note in
+   the migration notes): the embed can access `parent.document`, so scroll restore works by
    walking parent scrolled containers. Design the code to also work with
    same-origin OFF (guard parent access in try/catch).
 9. **Instrumentation method** if sizing/scroll misbehaves: add `[viewer]`
@@ -377,7 +377,7 @@ chat). Real and necessary, but the jump persisted.
 instrumentation logs). It lives in an **inner overflow container** inside
 Open WebUI's DOM.
 - With `allowSameOrigin` **ON** (the user's install has it enabled — see
-PLAN.md environment note), the embed can walk the parent document:
+environment note in the migration notes), the embed can walk the parent document:
   - `saveScroll()`: before opening, records `parent.scrollY` AND walks
   `parent.document.querySelectorAll('*')`, saving `scrollTop` of every
   element with `scrollTop>0 && scrollHeight>clientHeight`.
@@ -505,7 +505,7 @@ DOM-walk pattern (Inline Visualizer v2).
 > `smart_generate_image/smart_generate_image.html` (header comment + template)
 > and is loaded at runtime from `CACHE_DIR/tools/<tool_id>/`, exactly like the
 > workflow JSONs. `embeds.py` was removed — the `.html` templates are the single
-> source of truth. See REFACTOR_EMBEDS.md.
+> source of truth (Appendix B).
 
 ### Failed-load retry (cheap fix, no watchdog) — 2026-08-04
 
@@ -622,8 +622,17 @@ The assumptions in this document were verified against `open-webui/open-webui` (
 
 ## Appendix B — Implementation notes / considerations
 
-- **Shared viewer HTML**: each tool in this repo is a standalone script pasted into Open WebUI (no shared package at runtime), so the embed HTML is stored per-tool as a `<tool>/<tool>.html` template loaded at runtime from `CACHE_DIR/tools/<tool_id>/` (same convention as the workflow JSONs; see REFACTOR_EMBEDS.md). The viewer/slider variants differ legitimately (plain slider / marker-bearing slider / marker+caption); keep markup/JS in sync across variants when the shared behavior changes.
+- **Shared viewer HTML**: each tool in this repo is a standalone script pasted into Open WebUI (no shared package at runtime), so the embed HTML is stored per-tool as a `<tool>/<tool>.html` template loaded at runtime from `CACHE_DIR/tools/<tool_id>/` (same convention as the workflow JSONs). The viewer/slider variants differ legitimately (plain slider / marker-bearing slider / marker+caption); keep markup/JS in sync across variants when the shared behavior changes.
 - **Aspect ratio known a priori**: `smart_generate_image` computes `reduced_w:reduced_h` and can reserve the aspect ratio to avoid the load "jump". The slider tools (`upscale_image`, `edit_image`, `virtual_try_on`) size from the original image's aspect ratio, so they need no reservation. (`virtual_try_on` does not know the output dimensions in advance, but the slider fits the original's ratio, which the workflow preserves.)
 - **`reportHeight()` contract**: report on `window.load`, on image/video `load` events, on `resize`, and via a `ResizeObserver` on the body — the parent iframe starts at ~150px and only grows when a message arrives.
 - **URL escaping**: image/video URLs contain query strings (`?filename=...&type=...`); they must be HTML-escaped before being injected into `src` attributes (already the practice in `compare_images`).
 - **`generate_caption` is out of scope**: it returns plain text (a caption), not an image; it is not part of this migration.
+
+### B.1 Operational gotchas (from the migration — do not repeat)
+
+- **`context` must be a plain dict** `{"image": url}`. Double braces `{{"image": url}}` (left over from an f-string) become a **set containing a dict** → `unhashable type: 'dict'` at runtime. Watch for this whenever editing returns that came from `image_md` f-strings.
+- **The old "regenerate from `embeds.py`" flow is dead**: `embeds.py` was removed; the `.html` templates are the single source of truth — edit those directly.
+
+### B.2 Verifying a builder without Open WebUI
+
+Each tool is self-contained (cannot import repo modules at runtime), so builders are verified with a stub harness: load the module with `fastapi`/`httpx`/`pydantic` stubbed, write the `.html` template into a fake `CACHE_DIR/tools/<tool_id>/`, call the builder, and assert the render (or diff against a known-good render). This is how the embed refactor was verified (normal + HTML-special URLs).

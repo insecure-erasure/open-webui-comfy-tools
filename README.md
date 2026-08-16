@@ -8,7 +8,7 @@ There is no wrapper library, no abstraction layer, and no handholding. Each tool
 
 All tools render their results as **Rich UI embeds**: the tool returns an `HTMLResponse` with `Content-Disposition: inline` (plus a context tuple for the LLM) and Open WebUI's middleware emits an `embeds` event, so the frontend displays a self-contained, sandboxed iframe inline in the chat — no HTML block ever reaches the LLM's context. See the official [Rich UI Embedding](https://docs.openwebui.com/features/extensibility/plugin/development/rich-ui/) documentation for how this works (height reporting via `postMessage`, sandbox flags, context tuples, prompt submission, `window.args` injection).
 
-Image tools additionally share an **image gallery**: opening any image's lightbox (fullscreen) shows ‹ › buttons, a "n/N" counter (bottom-right) and arrow-key navigation to walk every image generated in the conversation by the four image tools (Smart Generate Image, Edit Image, Enhance Image, Virtual Try-On), with wrap-around. Like the chat itself, only the most recent messages stay mounted in the DOM, so older images leave the gallery until you scroll up. In fullscreen, images generated from a **prompt** also show the prompt overlaid at the bottom in white over a dark gradient (Smart Generate Image, Edit Image and Virtual Try-On; Enhance Image has no prompt input, so no overlay). See DESIGN.md §11–12.
+Image tools additionally share an **image gallery**: opening any image's lightbox (fullscreen) shows ‹ › buttons, a "n/N" counter (bottom-right) and arrow-key navigation to walk every image generated in the conversation by the four image tools (Smart Generate Image, Edit Image, Upscale Image, Virtual Try-On), with wrap-around. Like the chat itself, only the most recent messages stay mounted in the DOM, so older images leave the gallery until you scroll up. In fullscreen, images generated from a **prompt** also show the prompt overlaid at the bottom in white over a dark gradient (Smart Generate Image, Edit Image and Virtual Try-On; Upscale Image has no prompt input, so no overlay). See DESIGN.md §11–12.
 
 ## Tools
 
@@ -24,7 +24,7 @@ Edits a previously generated image using Flux 2 inpainting. Accepts either a too
 
 Generates a caption for an image using Florence-2 via ComfyUI. The LLM calls this tool automatically when it needs to interpret image content before editing or answering questions. The caption is always returned in English for accuracy; the LLM translates it when replying. See its README for valve documentation.
 
-### Enhance Image
+### Upscale Image
 
 Upscales or enhances an image using SeedVR2. Loads images via URL using the ComfyUI-LoadImageURL custom node. See its README for valve documentation.
 
@@ -68,7 +68,7 @@ Navigate to Workspace > Tools, click "+", paste the script content, and save.
 | Script | Suggested name |
 |---|---|
 | smart_generate_image/tool.py | Smart Generate Image |
-| enhance_image/tool.py | Enhance Image |
+| upscale_image/tool.py | Upscale Image |
 | virtual_try_on/tool.py | Virtual Try-On |
 | edit_image/tool.py | Edit Image |
 | generate_caption/tool.py | Generate Caption |
@@ -81,7 +81,7 @@ Each tool requires its corresponding workflow JSON file. Copy it from the tool's
 ```
 cp smart_generate_image/smart_generate_image.json /app/backend/data/cache/tools/smart_generate_image/smart_generate_image.json
 cp edit_image/edit_image.json                     /app/backend/data/cache/tools/edit_image/edit_image.json
-cp enhance_image/enhance_image.json               /app/backend/data/cache/tools/enhance_image/enhance_image.json
+cp upscale_image/seedvr2_upscale.json            /app/backend/data/cache/tools/upscale_image/seedvr2_upscale.json
 cp virtual_try_on/virtual_try_on.json             /app/backend/data/cache/tools/virtual_try_on/virtual_try_on.json
 cp generate_caption/generate_caption.json         /app/backend/data/cache/tools/generate_caption/generate_caption.json
 cp generate_video/generate_video.json             /app/backend/data/cache/tools/generate_video/generate_video.json
