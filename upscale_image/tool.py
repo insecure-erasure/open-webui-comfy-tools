@@ -291,8 +291,7 @@ class Tools:
         URL as context ({'image': <url>}); use it for chained tool calls
         or to refer to the upscaled image.
 
-        :param image: The filename previously generated from the
-            smart_generate_image response, or a direct URL to an external image.
+        :param image: The filename previously generated from the smart_generate_image response, or a direct URL to an external image.
         """
         if __request__ is None:
             log.error("upscale called without request context")

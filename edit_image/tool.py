@@ -342,19 +342,9 @@ class Tools:
         ({'image': <url>}); use it for chained tool calls (upscale_image,
         virtual_try_on, generate_video) or to refer to the edited image.
 
-        :param image: The filename previously generated from
-            smart_generate_image or upscale_image, or a direct URL to an
-            external image.
-        :param prompt: Natural language description of the process to
-            apply (e.g., "Change the cat's fur to orange", "Add a sunset
-            background", or "Restore this image to full quality"). Be
-            specific and descriptive. In "restore" mode it is optional
-            (omit it or pass ""): the restoration prompt is used on its
-            own.
-        :param mode: "edit" (default) applies the edit normally.
-            "restore" restores/enhances the quality of a degraded image.
-            Use it when the user asks to restore, deblur, denoise,
-            de-haze or improve the quality of an image.
+        :param image: The filename previously generated from smart_generate_image or upscale_image, or a direct URL to an external image.
+        :param prompt: Natural language description of the process to apply (e.g., "Change the cat's fur to orange", "Add a sunset background", or "Restore this image to full quality"). Be specific and descriptive. In "restore" mode it is optional (omit it or pass ""): the restoration prompt is used on its own.
+        :param mode: "edit" (default) applies the edit normally. "restore" restores/enhances the quality of a degraded image. Use it when the user asks to restore, deblur, denoise, de-haze or improve the quality of an image.
         """
         if __request__ is None:
             log.error("edit_image called without request context")

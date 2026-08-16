@@ -375,12 +375,9 @@ class Tools:
         The tool returns the image URL and the generated prompt as context
         ({'image': url, 'prompt': text}).
 
-        :param model_image: Filename or URL of the person photo to dress.
-            Required.
-        :param upper_image: Filename or URL of the upper garment photo
-            (top, jacket, shirt...). Optional.
-        :param lower_image: Filename or URL of the lower garment photo
-            (trousers, skirt, shorts...). Optional.
+        :param model_image: Filename or URL of the person photo to dress. Required.
+        :param upper_image: Filename or URL of the upper garment photo. Optional.
+        :param lower_image: Filename or URL of the lower garment photo. Optional.
         """
         if __request__ is None:
             log.error("virtual_try_on called without request context")
