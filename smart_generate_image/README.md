@@ -47,7 +47,7 @@ The **LLM only receives the context** `{ "image": <url> }` (the image URL) — n
 | model_name | Specific .safetensors file. Overrides the model family default. |
 | default_aspect_ratio | Fallback when the LLM does not specify one. Format W:H. |
 | megapixel | Target resolution independent of aspect ratio. |
-| max_steps | Steps policy. 0 = user decides, -1 = force model default, 1-15 = clamp user steps. |
+| max_steps | Steps policy (default -1). -1 = force model default, 0 = user decides, 1-15 = clamp user steps. |
 | lora_config | JSON array of LoRAs applied positionally. |
 | comfyui_image_base_url | Override the image link base URL. |
 
@@ -57,7 +57,7 @@ The **LLM only receives the context** `{ "image": <url> }` (the image URL) — n
 |---|---|
 | model_family | Overrides the admin valve. |
 | model_name | Overrides the admin valve or workflow default. |
-| steps | Inference steps. 0 = use model family default. May be clamped by admin max_steps. |
+| steps | Inference steps. 0 = use model family default. May be overridden by admin max_steps (default -1 = force model default). |
 | seed | -1 = random, >=0 = fixed seed. |
 | lora_config | JSON array. Merged with admin LoRAs; user wins on name collision. |
 | override_system_loras | When enabled, user LoRAs replace admin LoRAs entirely. |

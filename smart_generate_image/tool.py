@@ -360,8 +360,8 @@ class Tools:
             description=f"Target megapixel value for the generated image. Controls total resolution independent of aspect ratio. Default: {_DEFAULT_MEGAPIXEL}.",
         )
         max_steps: str = Field(
-            default="0",
-            description="Steps policy. 0 = user decides (no clamp). -1 = force model default (ignore user). 1-15 = clamp user steps to this ceiling.",
+            default="-1",
+            description="Steps policy. -1 = force model default (ignore user). 0 = user decides (no clamp). 1-15 = clamp user steps to this ceiling. Default: -1.",
             json_schema_extra={
                 "input": {
                     "type": "select",
@@ -403,7 +403,7 @@ class Tools:
         )
         steps: str = Field(
             default="0",
-            description="Inference steps. 0 = use the model family's default (zit 10, krea2 8, flux.2 8). May be clamped by the admin max_steps policy.",
+            description="Inference steps. 0 = use the model family's default (zit 10, krea2 8, flux.2 8). May be overridden by the admin max_steps policy (default -1 = force model default).",
             json_schema_extra={
                 "input": {
                     "type": "select",
@@ -513,6 +513,16 @@ class Tools:
             if max_steps == -1:
                 # Force model config default – ignore user steps
                 resolved_steps = model_default_steps
+                if _get_user_steps() > 0 and __event_emitter__:
+                    await __event_emitter__(
+                        {
+                            "type": "notification",
+                            "data": {
+                                "type": "warning",
+                                "content": f"\u26a0\ufe0f Steps overridden to {model_default_steps}",
+                            },
+                        }
+                    )
             elif max_steps == 0:
                 # User decides, no clamp
                 user_valve_steps = _get_user_steps()
