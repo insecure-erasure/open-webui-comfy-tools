@@ -637,14 +637,15 @@ class Tools:
             # 3. Resolve seed and inject it
             # =================================================================
             seed_arg = user_seed if user_seed >= 0 else _random.randint(0, _COMFY_SEED_MAX)
-            _, ksampler = _resolve_node(workflow, "KSampler")
-            ksampler["inputs"]["seed"] = seed_arg
+            _, noise_node = _resolve_node(workflow, "RandomNoise")
+            noise_node["inputs"]["noise_seed"] = seed_arg
 
             # =================================================================
             # 4. Apply steps override
             # =================================================================
             if resolved_steps is not None:
-                ksampler["inputs"]["steps"] = resolved_steps
+                _, scheduler_node = _resolve_node(workflow, "Flux2Scheduler")
+                scheduler_node["inputs"]["steps"] = resolved_steps
 
             # =================================================================
             # 5. Inject LoRAs into the Power Lora Loader

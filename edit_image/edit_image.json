@@ -2,7 +2,7 @@
   "217": {
     "inputs": {
       "images": [
-        "240",
+        "222",
         0
       ]
     },
@@ -30,7 +30,7 @@
   "222": {
     "inputs": {
       "samples": [
-        "227",
+        "250",
         0
       ],
       "vae": [
@@ -72,65 +72,19 @@
     },
     "class_type": "ReferenceLatent",
     "_meta": {
-      "title": "ReferenceLatent"
+      "title": "ReferenceLatent (positive)"
     }
   },
   "225": {
     "inputs": {
       "conditioning": [
-        "221",
+        "224",
         0
       ]
     },
     "class_type": "ConditioningZeroOut",
     "_meta": {
       "title": "ConditioningZeroOut"
-    }
-  },
-  "226": {
-    "inputs": {
-      "conditioning": [
-        "225",
-        0
-      ],
-      "latent": [
-        "223",
-        0
-      ]
-    },
-    "class_type": "ReferenceLatent",
-    "_meta": {
-      "title": "ReferenceLatent"
-    }
-  },
-  "227": {
-    "inputs": {
-      "seed": 963880637461774,
-      "steps": 6,
-      "cfg": 1,
-      "sampler_name": "euler",
-      "scheduler": "simple",
-      "denoise": 1,
-      "model": [
-        "234",
-        0
-      ],
-      "positive": [
-        "224",
-        0
-      ],
-      "negative": [
-        "226",
-        0
-      ],
-      "latent_image": [
-        "230",
-        0
-      ]
-    },
-    "class_type": "KSampler",
-    "_meta": {
-      "title": "KSampler"
     }
   },
   "228": {
@@ -236,31 +190,6 @@
       "title": "Power Lora Loader (rgthree)"
     }
   },
-  "240": {
-    "inputs": {
-      "upscale_model": [
-        "241",
-        0
-      ],
-      "image": [
-        "222",
-        0
-      ]
-    },
-    "class_type": "ImageUpscaleWithModel",
-    "_meta": {
-      "title": "Upscale Image (using Model)"
-    }
-  },
-  "241": {
-    "inputs": {
-      "model_name": "1xSkinContrast-SuperUltraCompact.safetensors"
-    },
-    "class_type": "UpscaleModelLoader",
-    "_meta": {
-      "title": "Load Upscale Model"
-    }
-  },
   "245": {
     "inputs": {
       "source": "temp",
@@ -319,6 +248,102 @@
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
       "title": "Prompt"
+    }
+  },
+  "250": {
+    "inputs": {
+      "noise": [
+        "254",
+        0
+      ],
+      "guider": [
+        "252",
+        0
+      ],
+      "sampler": [
+        "253",
+        0
+      ],
+      "sigmas": [
+        "251",
+        0
+      ],
+      "latent_image": [
+        "230",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "251": {
+    "inputs": {
+      "steps": 6,
+      "width": [
+        "255",
+        0
+      ],
+      "height": [
+        "255",
+        1
+      ]
+    },
+    "class_type": "Flux2Scheduler",
+    "_meta": {
+      "title": "Flux2Scheduler"
+    }
+  },
+  "252": {
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "234",
+        0
+      ],
+      "positive": [
+        "224",
+        0
+      ],
+      "negative": [
+        "225",
+        0
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFGGuider"
+    }
+  },
+  "253": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "254": {
+    "inputs": {
+      "noise_seed": 1100351992931438
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "255": {
+    "inputs": {
+      "image": [
+        "228",
+        0
+      ]
+    },
+    "class_type": "GetImage_(Width&Height) _O",
+    "_meta": {
+      "title": "GetImage_(Width&Height) _O"
     }
   }
 }
