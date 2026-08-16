@@ -57,7 +57,7 @@ The **LLM only receives the context** `{ "image": <url> }` (the image URL) — n
 |---|---|
 | model_family | Overrides the admin valve. |
 | model_name | Overrides the admin valve or workflow default. |
-| steps | Inference steps. 0 = use model family default. |
+| steps | Inference steps. 0 = use model family default. May be clamped by admin max_steps. |
 | seed | -1 = random, >=0 = fixed seed. |
 | lora_config | JSON array. Merged with admin LoRAs; user wins on name collision. |
 | override_system_loras | When enabled, user LoRAs replace admin LoRAs entirely. |

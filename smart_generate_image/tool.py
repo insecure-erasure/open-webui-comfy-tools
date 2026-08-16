@@ -22,8 +22,11 @@ from fastapi.responses import HTMLResponse
 
 log = logging.getLogger(__name__)
 
-# Shared dropdown options for the steps valve (15 down to 1).
-# Value "0" = use workflow default (handled by Field(default="0")).
+# Shared dropdown options for the user steps valve (15 down to 1).
+# Value "0" = use the model family's default steps (e.g. zit 10, krea2 8,
+# flux.2 8). The "0" is NOT an option in the dropdown: it is the Field
+# default, and Open WebUI's native Default/Custom toggle on each valve
+# reverts to it. Users pick a concrete number (1-15) to override.
 _STEPS_OPTIONS = [
     {"value": str(i), "label": str(i)}
     for i in range(15, 0, -1)
@@ -400,7 +403,7 @@ class Tools:
         )
         steps: str = Field(
             default="0",
-            description="Inference steps. 0 = use workflow default.",
+            description="Inference steps. 0 = use the model family's default (zit 10, krea2 8, flux.2 8). May be clamped by the admin max_steps policy.",
             json_schema_extra={
                 "input": {
                     "type": "select",
