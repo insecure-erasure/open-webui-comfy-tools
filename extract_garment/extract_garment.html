@@ -21,6 +21,12 @@
         name is passed as `data-prompt` and shown as a caption in the lightbox
         (fullscreen only, bottom gradient — DESIGN.md §12).
 
+        Source thumbnail: when `original` is provided, a small rounded box in
+        the bottom-left corner of the frame shows the original image the
+        garment was extracted from (context for where it came from). It is a
+        pure overlay (~20% of the frame area, sized in JS; pointer-events:none)
+        and never appears in the lightbox.
+
         A failed image load is retried once (no watchdog): on `error` the img
         src is cleared and re-set a single time per URL.
 -->
@@ -36,8 +42,10 @@
 html,body{height:100%;overflow:hidden;margin:0;padding:0}
 body{display:flex;align-items:center;justify-content:center;background:transparent}
 img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
-.viewer{max-width:100%;overflow:hidden;cursor:zoom-in;border-radius:12px}
+.viewer{position:relative;max-width:100%;overflow:hidden;cursor:zoom-in;border-radius:12px}
 .viewer img{display:block;width:100%;height:100%;object-fit:contain;border-radius:12px}
+.source{position:absolute;left:10px;bottom:10px;z-index:2;border-radius:8px;overflow:hidden;background:#000;box-shadow:0 2px 8px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.3);pointer-events:none}
+.source img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:999}
 .overlay.open{display:flex}
 .overlay img{max-width:100vw;max-height:100vh;object-fit:contain;box-shadow:0 4px 30px rgba(0,0,0,.5);border-radius:4px}
@@ -60,6 +68,7 @@ img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
 <body>
 <div class="viewer" id="viewer"{gallery_attr}{prompt_attr}>
   <img id="thumb" src="{src}" alt="Extracted garment">
+  {source_block}
 </div>
 <div class="overlay" id="overlay">
   <img id="big" src="{src}" alt="Extracted garment">
@@ -83,9 +92,20 @@ const viewer=document.getElementById('viewer'),thumb=document.getElementById('th
       overlay=document.getElementById('overlay'),big=document.getElementById('big'),
       closeBtn=document.getElementById('close'),dlBtn=document.getElementById('dl'),
       prevBtn=document.getElementById('prev'),nextBtn=document.getElementById('next'),
-      counter=document.getElementById('counter'),caption=document.getElementById('caption');
+      counter=document.getElementById('counter'),caption=document.getElementById('caption'),
+      srcBox=document.getElementById('source');
 const RESERVED_R={ratio_js};
 function reportHeight(){parent.postMessage({type:'iframe:height',height:viewer.offsetHeight||document.documentElement.scrollHeight},'*')}
+function sizeSource(w,h){
+  // Source thumbnail (~20% of the frame area, bottom-left): a square whose
+  // side is sqrt(0.2 * area), clamped so it stays visible on tiny frames and
+  // never exceeds 45% of the shorter side. Pure overlay, pointer-events none.
+  if(!srcBox)return;
+  let L=Math.sqrt(0.2*w*h);
+  L=Math.max(48,Math.min(L,Math.min(w,h)*0.45));
+  srcBox.style.width=L+'px';
+  srcBox.style.height=L+'px';
+}
 function fit(){
   // Sizing replicates the image viewer (DESIGN.md §10): the iframe starts at
   // ~150px and its own vh is useless, so derive from the container width and
@@ -105,6 +125,7 @@ function fit(){
   if(maxH>0){const wByH=maxH*r;if(wByH>0&&wByH<w)w=wByH;}
   viewer.style.width=w+'px';
   viewer.style.height=(w/r)+'px';
+  sizeSource(w,w/r);
   reportHeight();
 }
 thumb.addEventListener('load',fit);

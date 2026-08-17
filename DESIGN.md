@@ -230,7 +230,7 @@ To try to replicate the appearance of the Open WebUI lightbox, the frontend was 
 slider instead of the viewer — see §10.)* *(`edit_image` and `virtual_try_on`
 also migrated to the slider — with the gallery markers + prompt caption.)*
 | `virtual_try_on` | `{ "image": url, "prompt": text }` | Yes | Slider + markers + caption |
-| `extract_garment` | `{ "image": url }` | Yes | Fit (70vh max) |
+| `extract_garment` | `{ "image": url }` | Yes | Fit (70vh max) + source thumbnail |
 | `compare_images` | empty | No | Maximum available |
 | `generate_video` | empty | No | Maximum available |
 

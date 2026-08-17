@@ -300,6 +300,7 @@ class Tools:
         aspect_ratio: tuple[int, int] | None = None,
         gallery: bool = False,
         prompt: str | None = None,
+        original: str | None = None,
         tool_id: str = "",
     ) -> str:
         """
@@ -307,11 +308,21 @@ class Tools:
 
         The markup lives in extract_garment.html (loaded from the tool's cache
         directory); lightbox/gallery/caption behavior is documented in the
-        header comment of that file and in DESIGN.md §10–12.
+        header comment of that file and in DESIGN.md §10–12. `original` is the
+        URL of the source image the garment was extracted from, shown as a
+        small bottom-left thumbnail in the frame (never in the lightbox).
         """
         src = html.escape(image_url, quote=True)
         gallery_attr = ' data-gallery="1"' if gallery else ''
         prompt_attr = f' data-prompt="{html.escape(prompt, quote=True)}"' if prompt else ''
+        source_block = ""
+        if original:
+            o = html.escape(original, quote=True)
+            source_block = (
+                '<div class="source" id="source" title="Original image">'
+                f'<img id="source-img" src="{o}" alt="Original image" draggable="false">'
+                "</div>"
+            )
         if aspect_ratio:
             w, h = aspect_ratio
             ratio_js = f"{w}/{h}" if w > 0 and h > 0 else "null"
@@ -320,7 +331,7 @@ class Tools:
         template = _load_embed(tool_id, "extract_garment.html")
         return re.sub(
             r"\{(\w+)\}",
-            lambda m: {"src": src, "gallery_attr": gallery_attr, "prompt_attr": prompt_attr, "ratio_js": ratio_js}[m.group(1)],
+            lambda m: {"src": src, "gallery_attr": gallery_attr, "prompt_attr": prompt_attr, "ratio_js": ratio_js, "source_block": source_block}[m.group(1)],
             template,
         )
 
@@ -518,11 +529,21 @@ class Tools:
             # The result carries the image-viewer gallery markers + the
             # garment as prompt caption, so it is collectible by the
             # conversation gallery and reusable downstream (virtual_try_on).
+            # The original input image is shown as a small bottom-left
+            # thumbnail in the frame (context of where the garment came from);
+            # it is visual only and never part of the LLM context.
+            parsed_image = urlparse(image)
+            if parsed_image.scheme and parsed_image.netloc:
+                original_url = image
+            else:
+                original_url = f"{base}/api/view?filename={image}&type=temp"
+
             viewer = self._build_image_viewer(
                 image_url,
                 aspect_ratio=None,
                 gallery=True,
                 prompt=resolved_garment,
+                original=original_url,
                 tool_id=__id__,
             )
             return HTMLResponse(

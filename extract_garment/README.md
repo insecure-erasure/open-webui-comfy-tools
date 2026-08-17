@@ -29,7 +29,7 @@ The LLM calls this tool when the user wants to isolate a garment from an image (
 
 ## Outputs
 
-The tool returns the extracted garment image, displayed as a **Rich UI embed**: the standard image viewer (70vh cap, click to open the lightbox with zoom, download, and gallery navigation). The result carries the conversation-gallery markers, so it appears in the **conversation gallery** of the other image tools, with the garment name as caption (shown in the lightbox only).
+The tool returns the extracted garment image, displayed as a **Rich UI embed**: the standard image viewer (70vh cap, click to open the lightbox with zoom, download, and gallery navigation). A small **source thumbnail** in the bottom-left corner of the frame shows the original image the garment was extracted from (~20% of the frame area, visual only — it never appears in the lightbox nor in the LLM context). The result carries the conversation-gallery markers, so it appears in the **conversation gallery** of the other image tools, with the garment name as caption (shown in the lightbox only).
 
 In the tool result, the **LLM receives the context** `{ "image": <url> }` — the image URL, actionable for chained tool calls (e.g. `virtual_try_on` as `upper_image`/`lower_image`). The LLM never sees the HTML.
 
