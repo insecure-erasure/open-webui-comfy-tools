@@ -22,8 +22,10 @@ from fastapi.responses import HTMLResponse
 
 log = logging.getLogger(__name__)
 
-# ComfyUI seed max (consistent with smart_generate_image / edit_image)
-_COMFY_SEED_MAX: int = 1125899906842624
+# The SeedVR2 Video Upscaler node validates its seed input with a max of
+# 2^32-1 (uint32). ComfyUI rejects the whole prompt with 400 Bad Request if
+# the seed exceeds it, so cap both random and user seeds to this bound.
+_SEEDVR2_SEED_MAX: int = 4294967295
 
 
 # =============================================================================
@@ -351,9 +353,14 @@ class Tools:
                 node_img["url"] = ""
 
             # Seed: UserValve. -1 = random, >=0 = fixed. Inject into the
-            # SeedVR2 Video Upscaler node.
+            # SeedVR2 Video Upscaler node. The node only accepts seeds up to
+            # 2^32-1; larger values make ComfyUI reject the prompt, so clamp.
             user_seed = int(user_valves.seed) if user_valves and user_valves.seed != -1 else -1
-            seed_arg = user_seed if user_seed >= 0 else _random.randint(0, _COMFY_SEED_MAX)
+            seed_arg = (
+                min(user_seed, _SEEDVR2_SEED_MAX)
+                if user_seed >= 0
+                else _random.randint(0, _SEEDVR2_SEED_MAX)
+            )
             _, seedvr2_node = _resolve_node(workflow, "SeedVR2 Video Upscaler (v2.5.24)")
             seedvr2_node["inputs"]["seed"] = seed_arg
 
