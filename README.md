@@ -32,6 +32,10 @@ Upscales or enhances an image using SeedVR2. Loads images via URL using the Comf
 
 Dresses a person photo with an upper and a lower garment using the Flux.2 Klein try-on LoRA. Accepts three input images (model, top, bottom) via URL or filename and returns both the try-on result and the prompt generated internally by the workflow. See its README for valve documentation.
 
+### Extract Garment
+
+Isolates a garment from a photo (background removed, cropped to the garment) using BiRefNet + Florence-2 + SAM2. Accepts one input image via URL or filename and a garment type (upper garment, lower garment, shirt, t-shirt, jacket, sweater, pullover, pants, skirt, trousers). The result is an actionable image URL, ideal as input for Virtual Try-On. See its README for valve documentation.
+
 ### Generate Video
 
 Generates videos from text or images using Wan 2.1 (single-path) or Wan 2.2 (dual-path high/low resolution). Frames follow a 4n+1 constraint imposed by the WAN temporal VAE stride. The result renders as a Rich UI embed: a self-contained video player (autoplay muted loop, height capped at 65vh) shown inline in the chat. See its README for valve documentation.
@@ -68,6 +72,7 @@ Navigate to Workspace > Tools, click "+", paste the script content, and save.
 | Script | Suggested name |
 |---|---|
 | smart_generate_image/tool.py | Smart Generate Image |
+| extract_garment/tool.py | Extract Garment |
 | upscale_image/tool.py | Upscale Image |
 | virtual_try_on/tool.py | Virtual Try-On |
 | edit_image/tool.py | Edit Image |
@@ -92,6 +97,8 @@ cp smart_generate_image/smart_generate_image.html /app/backend/data/cache/tools/
 cp edit_image/edit_image.html                   /app/backend/data/cache/tools/edit_image/edit_image.html
 cp upscale_image/upscale_image.html             /app/backend/data/cache/tools/upscale_image/upscale_image.html
 cp virtual_try_on/virtual_try_on.html           /app/backend/data/cache/tools/virtual_try_on/virtual_try_on.html
+cp extract_garment/extract_garment.json          /app/backend/data/cache/tools/extract_garment/extract_garment.json
+cp extract_garment/extract_garment.html          /app/backend/data/cache/tools/extract_garment/extract_garment.html
 ```
 
 Each tool that renders a Rich UI embed also needs its embed template (an HTML file with the same name as the tool) copied the same way, as shown above.

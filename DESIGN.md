@@ -230,6 +230,7 @@ To try to replicate the appearance of the Open WebUI lightbox, the frontend was 
 slider instead of the viewer — see §10.)* *(`edit_image` and `virtual_try_on`
 also migrated to the slider — with the gallery markers + prompt caption.)*
 | `virtual_try_on` | `{ "image": url, "prompt": text }` | Yes | Slider + markers + caption |
+| `extract_garment` | `{ "image": url }` | Yes | Fit (70vh max) |
 | `compare_images` | empty | No | Maximum available |
 | `generate_video` | empty | No | Maximum available |
 
@@ -536,6 +537,7 @@ top to darker at the bottom.
 | `smart_generate_image` | `prompt` (the LLM prompt) | input prompt |
 | `edit_image` | `edit_prompt` (the LLM edit prompt) | input prompt; shown in the slider's fullscreen overlay |
 | `virtual_try_on` | `prompt` (workflow-generated, `_extract_text`) | workflow prompt; shown in the slider's fullscreen overlay |
+| `extract_garment` | `garment` (the requested garment type) | input garment; shown in the viewer's lightbox |
 | `upscale_image` (ex-enhance_image) | **none** | only receives `image` (no prompt input); now uses the compare slider, not the viewer |
 
 So `upscale_image` (ex-`enhance_image`) builds no viewer with `prompt` and its

@@ -1,0 +1,656 @@
+{
+  "48": {
+    "inputs": {
+      "source": "url",
+      "url": ""
+    },
+    "class_type": "LoadImageByUrlOrPath",
+    "_meta": {
+      "title": "Load Image (URL/Path)"
+    }
+  },
+  "97:7": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "upscale_method": "nearest-exact",
+      "keep_proportion": "resize",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 8,
+      "device": "cpu",
+      "image": [
+        "48",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "Downsize for BiRefNet"
+    }
+  },
+  "97:50": {
+    "inputs": {
+      "model": "BiRefNet-general",
+      "sensitivity": 1,
+      "mask_blur": 0,
+      "mask_offset": 0,
+      "invert_output": false,
+      "refine_foreground": false,
+      "background": "Alpha",
+      "background_color": "#222222",
+      "image": [
+        "97:7",
+        0
+      ]
+    },
+    "class_type": "BiRefNetRMBG",
+    "_meta": {
+      "title": "BiRefNet Remove Background (RMBG)"
+    }
+  },
+  "97:4": {
+    "inputs": {
+      "image": [
+        "48",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Input Size"
+    }
+  },
+  "97:82": {
+    "inputs": {
+      "width": [
+        "97:4",
+        0
+      ],
+      "height": [
+        "97:4",
+        1
+      ],
+      "keep_proportions": false,
+      "upscale_method": "lanczos",
+      "crop": "center",
+      "mask": [
+        "97:50",
+        1
+      ]
+    },
+    "class_type": "ResizeMask",
+    "_meta": {
+      "title": "Resize Mask (Original Size)"
+    }
+  },
+  "97:78": {
+    "inputs": {
+      "fill_background": true,
+      "background_color": "#c1ffff",
+      "RGBA_image": [
+        "48",
+        0
+      ],
+      "mask": [
+        "97:82",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: ImageRemoveAlpha",
+    "_meta": {
+      "title": "Segment Background Fill"
+    }
+  },
+  "97:92:89": {
+    "inputs": {
+      "int": [
+        "97:4",
+        0
+      ]
+    },
+    "class_type": "intToFloat _O",
+    "_meta": {
+      "title": "intToFloat (seg w)"
+    }
+  },
+  "97:92:90": {
+    "inputs": {
+      "int": [
+        "97:4",
+        1
+      ]
+    },
+    "class_type": "intToFloat _O",
+    "_meta": {
+      "title": "intToFloat (seg h)"
+    }
+  },
+  "97:92:85": {
+    "inputs": {
+      "a": [
+        "97:92:90",
+        0
+      ],
+      "b": [
+        "97:92:91",
+        0
+      ],
+      "operation": "multiply"
+    },
+    "class_type": "easy mathFloat",
+    "_meta": {
+      "title": "Math Float (seg h)"
+    }
+  },
+  "97:92:86": {
+    "inputs": {
+      "a": [
+        "97:92:89",
+        0
+      ],
+      "b": [
+        "97:92:91",
+        0
+      ],
+      "operation": "multiply"
+    },
+    "class_type": "easy mathFloat",
+    "_meta": {
+      "title": "Math Float (seg w)"
+    }
+  },
+  "97:92:83": {
+    "inputs": {
+      "float": [
+        "97:92:86",
+        0
+      ]
+    },
+    "class_type": "floatToInt _O",
+    "_meta": {
+      "title": "floatToInt (seg w)"
+    }
+  },
+  "97:92:84": {
+    "inputs": {
+      "float": [
+        "97:92:85",
+        0
+      ]
+    },
+    "class_type": "floatToInt _O",
+    "_meta": {
+      "title": "floatToInt (seg h)"
+    }
+  },
+  "97:92:91": {
+    "inputs": {
+      "value": 1
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "Scale Factor (segment)"
+    }
+  },
+  "97:92:87": {
+    "inputs": {
+      "mode": true,
+      "a": [
+        "97:92:83",
+        0
+      ],
+      "b": [
+        "97:92:84",
+        0
+      ]
+    },
+    "class_type": "ImpactMinMax",
+    "_meta": {
+      "title": "Min (segment)"
+    }
+  },
+  "97:92:88": {
+    "inputs": {
+      "mode": false,
+      "a": [
+        "97:92:83",
+        0
+      ],
+      "b": [
+        "97:92:84",
+        0
+      ]
+    },
+    "class_type": "ImpactMinMax",
+    "_meta": {
+      "title": "Max (segment)"
+    }
+  },
+  "97:79": {
+    "inputs": {
+      "base_resolution": [
+        "97:92:87",
+        0
+      ],
+      "padding": 0,
+      "min_crop_resolution": [
+        "97:92:88",
+        0
+      ],
+      "max_crop_resolution": [
+        "97:92:87",
+        0
+      ],
+      "image": [
+        "97:78",
+        0
+      ],
+      "mask": [
+        "97:82",
+        0
+      ]
+    },
+    "class_type": "ImageCropByMaskAndResize",
+    "_meta": {
+      "title": "Crop Segment"
+    }
+  },
+  "95": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "upscale_method": "lanczos",
+      "keep_proportion": "resize",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 8,
+      "device": "cpu",
+      "image": [
+        "97:79",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "Downsize for Florence"
+    }
+  },
+  "103:2": {
+    "inputs": {
+      "model": "microsoft/Florence-2-base-ft",
+      "precision": "fp16",
+      "convert_to_safetensors": "sdpa"
+    },
+    "class_type": "DownloadAndLoadFlorence2Model",
+    "_meta": {
+      "title": "DownloadAndLoadFlorence2Model"
+    }
+  },
+  "103:3": {
+    "inputs": {
+      "text_input": "upper garment",
+      "task": "caption_to_phrase_grounding",
+      "fill_mask": true,
+      "keep_model_loaded": false,
+      "max_new_tokens": 128,
+      "num_beams": 2,
+      "do_sample": false,
+      "output_mask_select": "",
+      "seed": 1,
+      "image": [
+        "95",
+        0
+      ],
+      "florence2_model": [
+        "103:2",
+        0
+      ]
+    },
+    "class_type": "Florence2Run",
+    "_meta": {
+      "title": "Florence2Run"
+    }
+  },
+  "103:6": {
+    "inputs": {
+      "index": "0",
+      "batch": false,
+      "data": [
+        "103:3",
+        3
+      ]
+    },
+    "class_type": "Florence2toCoordinates",
+    "_meta": {
+      "title": "Florence2 Coordinates"
+    }
+  },
+  "103:8": {
+    "inputs": {
+      "model": "sam2_hiera_base_plus.safetensors",
+      "segmentor": "single_image",
+      "device": "cuda",
+      "precision": "bf16"
+    },
+    "class_type": "DownloadAndLoadSAM2Model",
+    "_meta": {
+      "title": "(Down)Load SAM2Model"
+    }
+  },
+  "103:9": {
+    "inputs": {
+      "line_width": 4,
+      "bbox_format": "xyxy",
+      "images": [
+        "95",
+        0
+      ],
+      "bboxes": [
+        "103:6",
+        1
+      ]
+    },
+    "class_type": "BboxVisualize",
+    "_meta": {
+      "title": "Bbox Visualize"
+    }
+  },
+  "103:5": {
+    "inputs": {
+      "keep_model_loaded": false,
+      "individual_objects": true,
+      "sam2_model": [
+        "103:8",
+        0
+      ],
+      "image": [
+        "103:9",
+        0
+      ],
+      "bboxes": [
+        "103:6",
+        1
+      ]
+    },
+    "class_type": "Sam2Segmentation",
+    "_meta": {
+      "title": "Sam2Segmentation"
+    }
+  },
+  "97:98": {
+    "inputs": {
+      "mask_opacity": 0.5,
+      "mask_color": "255,0,0",
+      "pass_through": false,
+      "image": [
+        "97:79",
+        0
+      ],
+      "mask": [
+        "97:79",
+        1
+      ]
+    },
+    "class_type": "ImageAndMaskPreview",
+    "_meta": {
+      "title": "ImageAndMaskPreview (SAM2)"
+    }
+  },
+  "10": {
+    "inputs": {
+      "width": [
+        "96",
+        0
+      ],
+      "height": [
+        "96",
+        1
+      ],
+      "keep_proportions": false,
+      "upscale_method": "lanczos",
+      "crop": "center",
+      "mask": [
+        "103:5",
+        0
+      ]
+    },
+    "class_type": "ResizeMask",
+    "_meta": {
+      "title": "Resize Mask (Preview)"
+    }
+  },
+  "51": {
+    "inputs": {
+      "sensitivity": 0.5,
+      "mask_blur": 2,
+      "mask_offset": 0,
+      "smooth": 2,
+      "fill_holes": false,
+      "invert_output": false,
+      "mask": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "AILab_MaskEnhancer",
+    "_meta": {
+      "title": "Mask Enhancer (RMBG) 🖼️"
+    }
+  },
+  "11": {
+    "inputs": {
+      "mask_opacity": 0.5,
+      "mask_color": "255,0,0",
+      "pass_through": false,
+      "image": [
+        "103:9",
+        0
+      ],
+      "mask": [
+        "51",
+        0
+      ]
+    },
+    "class_type": "ImageAndMaskPreview",
+    "_meta": {
+      "title": "BBox and Mask Preview"
+    }
+  },
+  "37": {
+    "inputs": {
+      "images": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "RandomPreviewImage",
+    "_meta": {
+      "title": "Random Preview Image"
+    }
+  },
+  "96": {
+    "inputs": {
+      "image": [
+        "97:79",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Crop Size"
+    }
+  },
+  "74:59": {
+    "inputs": {
+      "int": [
+        "96",
+        0
+      ]
+    },
+    "class_type": "intToFloat _O",
+    "_meta": {
+      "title": "intToFloat (crop w)"
+    }
+  },
+  "74:62": {
+    "inputs": {
+      "int": [
+        "96",
+        1
+      ]
+    },
+    "class_type": "intToFloat _O",
+    "_meta": {
+      "title": "intToFloat (crop h)"
+    }
+  },
+  "74:57": {
+    "inputs": {
+      "a": [
+        "74:59",
+        0
+      ],
+      "b": [
+        "74:75",
+        0
+      ],
+      "operation": "multiply"
+    },
+    "class_type": "easy mathFloat",
+    "_meta": {
+      "title": "Math Float (crop w)"
+    }
+  },
+  "74:63": {
+    "inputs": {
+      "a": [
+        "74:62",
+        0
+      ],
+      "b": [
+        "74:75",
+        0
+      ],
+      "operation": "multiply"
+    },
+    "class_type": "easy mathFloat",
+    "_meta": {
+      "title": "Math Float (crop h)"
+    }
+  },
+  "74:60": {
+    "inputs": {
+      "float": [
+        "74:57",
+        0
+      ]
+    },
+    "class_type": "floatToInt _O",
+    "_meta": {
+      "title": "floatToInt (crop w)"
+    }
+  },
+  "74:64": {
+    "inputs": {
+      "float": [
+        "74:63",
+        0
+      ]
+    },
+    "class_type": "floatToInt _O",
+    "_meta": {
+      "title": "floatToInt (crop h)"
+    }
+  },
+  "74:75": {
+    "inputs": {
+      "value": 1.2
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "Scale Factor (result)"
+    }
+  },
+  "74:61": {
+    "inputs": {
+      "mode": true,
+      "a": [
+        "74:60",
+        0
+      ],
+      "b": [
+        "74:64",
+        0
+      ]
+    },
+    "class_type": "ImpactMinMax",
+    "_meta": {
+      "title": "Min (result)"
+    }
+  },
+  "74:65": {
+    "inputs": {
+      "mode": false,
+      "a": [
+        "74:60",
+        0
+      ],
+      "b": [
+        "74:64",
+        0
+      ]
+    },
+    "class_type": "ImpactMinMax",
+    "_meta": {
+      "title": "Max (result)"
+    }
+  },
+  "17": {
+    "inputs": {
+      "fill_background": true,
+      "background_color": "#ffffff",
+      "RGBA_image": [
+        "97:79",
+        0
+      ],
+      "mask": [
+        "51",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: ImageRemoveAlpha",
+    "_meta": {
+      "title": "Result Background Fill"
+    }
+  },
+  "39": {
+    "inputs": {
+      "base_resolution": [
+        "74:61",
+        0
+      ],
+      "padding": 0,
+      "min_crop_resolution": [
+        "74:61",
+        0
+      ],
+      "max_crop_resolution": [
+        "74:65",
+        0
+      ],
+      "image": [
+        "17",
+        0
+      ],
+      "mask": [
+        "51",
+        0
+      ]
+    },
+    "class_type": "ImageCropByMaskAndResize",
+    "_meta": {
+      "title": "Crop Result"
+    }
+  }
+}
