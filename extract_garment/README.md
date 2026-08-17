@@ -24,12 +24,12 @@ The user `background_color` valve defaults to **empty** on purpose: empty means 
 
 The LLM calls this tool when the user wants to isolate a garment from an image (e.g. to reuse it in a virtual try-on):
 
-- `image` — photo containing the garment (filename from a previous generation or a direct external image URL)
+- `image` — photo containing the garment (direct external image URL or filename from a previous generation)
 - `garment` — the garment to extract. One of: `upper garment`, `lower garment`, `shirt`, `t-shirt`, `jacket`, `sweater`, `pullover`, `pants`, `skirt`, `trousers`. Default: `upper garment`. Matching is case/separator-insensitive (`"T-Shirt"` → `t-shirt`); unsupported values return an error listing the supported types so the model can correct itself.
 
 ## Outputs
 
-The tool returns the extracted garment image, displayed as a **Rich UI embed**: the standard image viewer (70vh cap, click to open the lightbox with zoom, download, and gallery navigation). A small **source thumbnail** in the bottom-left corner of the frame shows the original image the garment was extracted from (~20% of the frame area, visual only — it never appears in the lightbox nor in the LLM context). The result carries the conversation-gallery markers, so it appears in the **conversation gallery** of the other image tools, with the garment name as caption (shown in the lightbox only).
+The tool returns the extracted garment image, displayed as a **Rich UI embed**: the standard image viewer (70vh cap, click to open the lightbox with zoom, download, and gallery navigation). A small **source thumbnail** in the bottom-left corner of the frame shows the original image the garment was extracted from (~5% of the frame area, visual only — it never appears in the lightbox nor in the LLM context). The result carries the conversation-gallery markers, so it appears in the **conversation gallery** of the other image tools, with the garment name as caption (shown in the lightbox only).
 
 In the tool result, the **LLM receives the context** `{ "image": <url> }` — the image URL, actionable for chained tool calls (e.g. `virtual_try_on` as `upper_image`/`lower_image`). The LLM never sees the HTML.
 

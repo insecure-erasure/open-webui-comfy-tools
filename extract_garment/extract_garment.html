@@ -24,7 +24,7 @@
         Source thumbnail: when `original` is provided, a small rounded box in
         the bottom-left corner of the frame shows the original image the
         garment was extracted from (context for where it came from). It is a
-        pure overlay (~20% of the frame area, sized in JS; pointer-events:none)
+        pure overlay (~5% of the frame area, sized in JS; pointer-events:none)
         and never appears in the lightbox.
 
         A failed image load is retried once (no watchdog): on `error` the img
@@ -44,7 +44,7 @@ body{display:flex;align-items:center;justify-content:center;background:transpare
 img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
 .viewer{position:relative;max-width:100%;overflow:hidden;cursor:zoom-in;border-radius:12px}
 .viewer img{display:block;width:100%;height:100%;object-fit:contain;border-radius:12px}
-.source{position:absolute;left:10px;bottom:10px;z-index:2;border-radius:8px;overflow:hidden;background:#000;box-shadow:0 2px 8px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.3);pointer-events:none}
+.source{position:absolute;left:10px;bottom:10px;z-index:2;border-radius:8px;overflow:hidden;background:#000;box-shadow:0 2px 8px rgba(0,0,0,.35);pointer-events:none}
 .source img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:999}
 .overlay.open{display:flex}
@@ -97,11 +97,11 @@ const viewer=document.getElementById('viewer'),thumb=document.getElementById('th
 const RESERVED_R={ratio_js};
 function reportHeight(){parent.postMessage({type:'iframe:height',height:viewer.offsetHeight||document.documentElement.scrollHeight},'*')}
 function sizeSource(w,h){
-  // Source thumbnail (~20% of the frame area, bottom-left): a square whose
-  // side is sqrt(0.2 * area), clamped so it stays visible on tiny frames and
+  // Source thumbnail (~5% of the frame area, bottom-left): a square whose
+  // side is sqrt(0.05 * area), clamped so it stays visible on tiny frames and
   // never exceeds 45% of the shorter side. Pure overlay, pointer-events none.
   if(!srcBox)return;
-  let L=Math.sqrt(0.2*w*h);
+  let L=Math.sqrt(0.05*w*h);
   L=Math.max(48,Math.min(L,Math.min(w,h)*0.45));
   srcBox.style.width=L+'px';
   srcBox.style.height=L+'px';
