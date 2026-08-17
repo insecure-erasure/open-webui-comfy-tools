@@ -352,7 +352,7 @@ class Tools:
         image accepts a filename from a previous generation or a direct external image URL. garment is optional and defaults to "upper garment". Returns the extracted image URL as context ({'image': <url>}) for chained tool calls (e.g. virtual_try_on).
 
         :param image: Filename or URL of the image containing the garment to extract. Required.
-        :param garment: Garment to extract. One of: upper garment, lower garment, shirt, t-shirt, jacket, sweater, pullover, pants, skirt, trousers. Default: upper garment.
+        :param garment: Garment to extract. Optional. One of: upper garment, lower garment, shirt, t-shirt, jacket, sweater, pullover, pants, skirt, trousers.
         """
         if __request__ is None:
             log.error("extract_garment called without request context")
