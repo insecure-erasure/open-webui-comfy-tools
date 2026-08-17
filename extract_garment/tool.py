@@ -349,7 +349,7 @@ class Tools:
         """
         Extract (isolate) a garment from a photo and return it as a standalone image.
 
-        Call when the user wants to isolate a garment from an image, e.g. to reuse it in a virtual try-on. The background is removed and the image is cropped to the garment. image accepts a filename from a previous generation or a direct external image URL. garment is optional and defaults to "upper garment". The result is displayed as a Rich UI embed (image viewer with zoom and download) and the tool returns the image URL as context ({'image': <url>}); use it for chained tool calls (virtual_try_on) or to refer to the extracted garment.
+        image accepts a filename from a previous generation or a direct external image URL. garment is optional and defaults to "upper garment". Returns the extracted image URL as context ({'image': <url>}) for chained tool calls (e.g. virtual_try_on).
 
         :param image: Filename or URL of the image containing the garment to extract. Required.
         :param garment: Garment to extract. One of: upper garment, lower garment, shirt, t-shirt, jacket, sweater, pullover, pants, skirt, trousers. Default: upper garment.
