@@ -271,7 +271,7 @@
     "inputs": {
       "source": "input",
       "url": "",
-      "image": "girl.jpg",
+      "image": "",
       "Choose file to upload": null
     },
     "class_type": "LoadImageByUrlOrPath",
@@ -283,7 +283,7 @@
     "inputs": {
       "source": "input",
       "url": "",
-      "image": "top.jpeg",
+      "image": "",
       "Choose file to upload": null
     },
     "class_type": "LoadImageByUrlOrPath",
@@ -294,8 +294,8 @@
   "425": {
     "inputs": {
       "source": "input",
-      "url": "https://cdn.grupoelcorteingles.es/statics-front/front-msh3-manager-cloud/contents/images/uploads/2026/03/rkxGegNNY-l.jpeg",
-      "image": "bottom.jpeg",
+      "url": "",
+      "image": "",
       "Choose file to upload": null
     },
     "class_type": "LoadImageByUrlOrPath",

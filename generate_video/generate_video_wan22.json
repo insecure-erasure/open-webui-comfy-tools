@@ -336,8 +336,8 @@
   "994": {
     "inputs": {
       "source": "temp",
-      "url": "https://huggingface.co/InsecureErasure/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v-NVFP4/resolve/main/assets/wan21_input_cat.png",
-      "image": "ComfyUI_temp_ekhjy_00004_.png",
+      "url": "",
+      "image": "",
       "Choose file to upload": null
     },
     "class_type": "LoadImageByUrlOrPath",
